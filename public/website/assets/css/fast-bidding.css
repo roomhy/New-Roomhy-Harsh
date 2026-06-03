@@ -1,0 +1,109 @@
+body {
+  font-family: "Inter", sans-serif;
+}
+
+.html-page {
+  color: #0f172a;
+  background:
+    radial-gradient(circle at top, rgba(15, 23, 42, 0.04), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+  min-height: 100vh;
+}
+
+.btn-primary {
+  background: #111827;
+  color: #ffffff;
+  font-weight: 600;
+  border: 1px solid #111827;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(17, 24, 39, 0.14);
+  background: #000000;
+}
+
+.form-input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 0.875rem;
+  padding: 0.875rem 1rem;
+  font-size: 0.95rem;
+  background: #ffffff;
+  color: #111827;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.form-input::placeholder {
+  color: #94a3b8;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #111827;
+  box-shadow: 0 0 0 4px rgba(17, 24, 39, 0.08);
+}
+
+.loading {
+  display: none;
+}
+
+.loading.show {
+  display: flex;
+}
+
+.property-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  padding: 1rem 1.1rem;
+  background: #ffffff;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.property-item:hover {
+  border-color: #111827;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  transform: translateY(-1px);
+}
+
+.property-item.selected {
+  border-color: #111827;
+  background: #f8fafc;
+  box-shadow: 0 0 0 1px rgba(17, 24, 39, 0.04);
+}
+
+.panel-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 1.5rem;
+  background: #ffffff;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.06);
+}
+
+.section-title {
+  color: #0f172a;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.section-subtitle {
+  color: #475569;
+}
+
+.helper-text {
+  color: #64748b;
+}
+
+.info-panel {
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 1.25rem;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.04);
+}
+
+.modal-card {
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.18);
+}

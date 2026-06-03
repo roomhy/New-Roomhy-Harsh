@@ -1,0 +1,203 @@
+import { 
+  LayoutDashboard, BedDouble, Users, CalendarCheck, MessageCircle, 
+  User, Settings, MapPin, FileText, Building2, PlusCircle, DoorOpen,
+  Image, Globe, QrCode, UserCheck, Bell, CalendarClock, HelpCircle,
+  Eye, Wallet, CheckCircle, BellRing, Receipt, Link, Repeat, Calculator,
+  FileBadge, TrendingUp, BarChart3, AlertTriangle, PieChart, CreditCard,
+  AlertCircle, Megaphone, MessageSquare, Star, FolderOpen,
+  Calendar, IndianRupee, Headset, Briefcase, ClipboardList, Target, ShieldCheck, Zap
+} from 'lucide-react';
+
+// ============================================
+// PROPERTY OWNER NAVIGATION - CLEAN VERSION
+// ============================================
+
+export const PROPERTY_OWNER_NAV = [
+  {
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    href: "/propertyowner/admin"
+  },
+  {
+    label: "Properties",
+    icon: Building2,
+    href: "/propertyowner/properties",
+    submenus: [
+      { label: "All Properties", href: "/propertyowner/properties", goldOnly: false },
+      { label: "Add Property", href: "/propertyowner/add-property", goldOnly: false },
+      { label: "Rooms", href: "/propertyowner/rooms", goldOnly: false },
+      { label: "Amenities", href: "/propertyowner/amenities", goldOnly: false },
+      { label: "Locations", href: "/propertyowner/location", goldOnly: false },
+    ]
+  },
+  {
+    label: "Tenants",
+    icon: Users,
+    href: "/propertyowner/tenants",
+    submenus: [
+      { label: "All Tenants", href: "/propertyowner/tenants", goldOnly: false },
+      { label: "Add Tenant", href: "/propertyowner/tenantrec", goldOnly: false },
+      { label: "Active Tenants", href: "/propertyowner/active-tenants", goldOnly: false },
+      { label: "Upcoming Move-ins", href: "/propertyowner/upcoming-moveins", goldOnly: false },
+      { label: "Move-out Requests", href: "/propertyowner/moveout-requests", goldOnly: false },
+      { label: "Ex-Tenants", href: "/propertyowner/ex-tenants", goldOnly: false },
+      { label: "Tenant Documents", href: "/propertyowner/tenant-docs", goldOnly: false },
+      { label: "Police Verification", href: "/propertyowner/police-verification", goldOnly: false },
+      { label: "Tenant Feedback", href: "/propertyowner/review", goldOnly: false },
+    ]
+  },
+  {
+    label: "Leads & Bookings",
+    icon: Calendar,
+    href: "/propertyowner/booking",
+    submenus: [
+      { label: "All Leads", href: "/propertyowner/enquiry", goldOnly: false },
+      { label: "New Enquiries", href: "/propertyowner/new-enquiries", goldOnly: false },
+      { label: "Follow Ups", href: "/propertyowner/follow-ups", goldOnly: false },
+      { label: "Site Visits", href: "/propertyowner/schedulevisit", goldOnly: false },
+      { label: "Booking Requests", href: "/propertyowner/booking_request", goldOnly: false },
+      { label: "Confirmed Bookings", href: "/propertyowner/booking", goldOnly: false },
+      { label: "Cancelled Bookings", href: "/propertyowner/cancelled-bookings", goldOnly: false },
+      { label: "Lead Sources", href: "/propertyowner/lead-sources", goldOnly: false },
+      { label: "WhatsApp Leads", href: "/propertyowner/whatsapp-leads", goldOnly: false },
+      { label: "New Booking Form", href: "/propertyowner/booking-form", goldOnly: false },
+    ]
+  },
+  {
+    label: "Rent & Payments",
+    icon: IndianRupee,
+    href: "/propertyowner/payment",
+    submenus: [
+      { label: "Rent Collection", href: "/propertyowner/payment", goldOnly: false },
+      { label: "Pending Dues", href: "/propertyowner/dues-report", goldOnly: false },
+      { label: "Late Payments", href: "/propertyowner/late-fine", goldOnly: false },
+      { label: "Payment History", href: "/propertyowner/payment-received", goldOnly: false },
+      { label: "Online Payments", href: "/propertyowner/payment-dashboard", goldOnly: false },
+      { label: "Receipts", href: "/propertyowner/receipts", goldOnly: false },
+      { label: "Electricity Readings", href: "/propertyowner/electricity-readings", goldOnly: false },
+      { label: "Security Deposits", href: "/propertyowner/security-deposits", goldOnly: false },
+      { label: "Refunds", href: "/propertyowner/refunds", goldOnly: false },
+      { label: "Discounts & Offers", href: "/propertyowner/discounts-offers", goldOnly: false },
+    ]
+  },
+  {
+    label: "Accounting",
+    icon: Wallet,
+    href: "/propertyowner/collection-report",
+    submenus: [
+      { label: "Income", href: "/propertyowner/income", goldOnly: false },
+      { label: "Expenses", href: "/propertyowner/expense-tracking", goldOnly: false },
+      { label: "Vendor Payments", href: "/propertyowner/vendor-payments", goldOnly: false },
+      { label: "Transactions", href: "/propertyowner/transactions", goldOnly: false },
+      { label: "Profit & Loss", href: "/propertyowner/profit-loss", goldOnly: false },
+      { label: "Cash Flow", href: "/propertyowner/cash-flow", goldOnly: false },
+      { label: "GST & Tax", href: "/propertyowner/hra-gst", goldOnly: false },
+      { label: "Download Statements", href: "/propertyowner/download-statements", goldOnly: false },
+    ]
+  },
+  {
+    label: "Complaints & Maintenance",
+    icon: Headset,
+    href: "/propertyowner/complaints",
+    submenus: [
+      { label: "All Complaints", href: "/propertyowner/complaints", goldOnly: false },
+      { label: "Open Tickets", href: "/propertyowner/open-tickets", goldOnly: false },
+      { label: "In Progress", href: "/propertyowner/in-progress-complaints", goldOnly: false },
+      { label: "Resolved Complaints", href: "/propertyowner/resolved-complaints", goldOnly: false },
+      { label: "Maintenance Requests", href: "/propertyowner/maintenance-requests", goldOnly: false },
+      { label: "Assigned Staff", href: "/propertyowner/assigned-staff", goldOnly: false },
+      { label: "Service History", href: "/propertyowner/service-history", goldOnly: false },
+      { label: "Maintenance Calendar", href: "/propertyowner/maintenance-calendar", goldOnly: false },
+    ]
+  },
+  {
+    label: "Staff Management",
+    icon: Briefcase,
+    href: "/propertyowner/all-staff",
+    submenus: [
+      { label: "Property Managers", href: "/propertyowner/property-managers", goldOnly: false },
+      { label: "All Staff", href: "/propertyowner/all-staff", goldOnly: false },
+      { label: "Add Staff", href: "/propertyowner/add-staff", goldOnly: false },
+      { label: "Roles & Permissions", href: "/propertyowner/roles-permissions", goldOnly: false },
+      { label: "Attendance", href: "/propertyowner/staff-attendance", goldOnly: false },
+      { label: "Salaries", href: "/propertyowner/staff-salaries", goldOnly: false },
+      { label: "Shift Management", href: "/propertyowner/shift-management", goldOnly: false },
+      { label: "Staff Performance", href: "/propertyowner/staff-performance", goldOnly: false },
+    ]
+  },
+  {
+    label: "Attendance & Entry",
+    icon: ClipboardList,
+    href: "/propertyowner/tenant-attendance",
+    submenus: [
+      { label: "Tenant Attendance", href: "/propertyowner/tenant-attendance", goldOnly: false },
+      { label: "Visitor Entry", href: "/propertyowner/visitor-entry", goldOnly: false },
+      { label: "Visitor Passes", href: "/propertyowner/visitor-passes", goldOnly: false },
+      { label: "Entry Logs", href: "/propertyowner/entry-logs", goldOnly: false },
+      { label: "Exit Logs", href: "/propertyowner/exit-logs", goldOnly: false },
+      { label: "Leave Requests", href: "/propertyowner/leave-requests", goldOnly: false },
+      { label: "Gate Management", href: "/propertyowner/gate-management", goldOnly: false },
+    ]
+  },
+
+  {
+    label: "Communication",
+    icon: MessageCircle,
+    href: "/propertyowner/ownerchat",
+    submenus: [
+      { label: "Chat", href: "/propertyowner/ownerchat", goldOnly: false },
+      { label: "Broadcast Message", href: "/propertyowner/announcements", goldOnly: false },
+      { label: "WhatsApp Broadcast", href: "/propertyowner/whatsapp", goldOnly: false },
+    ]
+  },
+  {
+    label: "Marketing",
+    icon: Globe,
+    href: "/propertyowner/vacancy-promotion",
+    submenus: [
+      { label: "Vacancy Promotion", href: "/propertyowner/vacancy-promotion", goldOnly: false },
+      { label: "Banners & Posters", href: "/propertyowner/banners-posters", goldOnly: false },
+      { label: "Coupons & Offers", href: "/propertyowner/coupons-offers", goldOnly: false },
+    ]
+  },
+  {
+    label: "Reports",
+    icon: BarChart3,
+    href: "/propertyowner/reports",
+  },
+  {
+    label: "Documents",
+    icon: FileText,
+    href: "/propertyowner/agreement",
+    submenus: [
+      { label: "Agreements", href: "/propertyowner/agreement", goldOnly: false },
+      { label: "Tenant Documents", href: "/propertyowner/tenant-docs", goldOnly: false },
+      { label: "Staff Documents", href: "/propertyowner/staff-documents", goldOnly: false },
+      { label: "Property Documents", href: "/propertyowner/property-documents", goldOnly: false },
+      { label: "Uploaded Files", href: "/propertyowner/uploaded-files", goldOnly: false },
+      { label: "Digital Signatures", href: "/propertyowner/digital-signatures", goldOnly: false },
+    ]
+  },
+  {
+    label: "Settings",
+    icon: Settings,
+    href: "/propertyowner/settings",
+    submenus: [
+      { label: "General Settings", href: "/propertyowner/settings", goldOnly: false },
+      { label: "Profile Settings", href: "/propertyowner/ownerprofile", goldOnly: false },
+      { label: "Company Settings", href: "/propertyowner/company-settings", goldOnly: false },
+      { label: "Property Settings", href: "/propertyowner/property-settings-global", goldOnly: false },
+      { label: "Notification Settings", href: "/propertyowner/notification-settings", goldOnly: false },
+      { label: "Payment Gateway", href: "/propertyowner/payment-gateway", goldOnly: false },
+      { label: "Bank Accounts", href: "/propertyowner/bank-accounts", goldOnly: false },
+      { label: "Integrations", href: "/propertyowner/integrations", goldOnly: false },
+      { label: "Role Permissions", href: "/propertyowner/role-permissions", goldOnly: false },
+      { label: "Language Settings", href: "/propertyowner/language-settings", goldOnly: false },
+      { label: "Theme Settings", href: "/propertyowner/theme-settings", goldOnly: false },
+    ]
+  }
+];
+
+export const GOLD_NAV = PROPERTY_OWNER_NAV;
+export const SILVER_NAV = PROPERTY_OWNER_NAV;
+export const BASE_NAV = PROPERTY_OWNER_NAV;

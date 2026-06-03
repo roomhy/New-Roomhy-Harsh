@@ -1,0 +1,67 @@
+import React from "react";
+import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
+import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
+import { 
+  FileText, Search, Download, CheckCircle2, 
+  Eye, ShieldCheck, IndianRupee
+} from "lucide-react";
+
+export default function InvoicesPage() {
+  const owner = getOwnerRuntimeSession();
+  if (!owner?.loginId && typeof window !== "undefined") { 
+    window.location.href = "/propertyowner/ownerlogin"; 
+    return null; 
+  }
+
+  const items = [
+    { name: "Roomhy Gold Software Subscription (May)", invoiceNo: "INV-2026-9081", date: "15 May 2026", amount: 4999 },
+    { name: "Roomhy Gold Software Subscription (April)", invoiceNo: "INV-2026-8022", date: "15 April 2026", amount: 4999 }
+  ];
+
+  return (
+    <PropertyOwnerLayout 
+      owner={owner} 
+      title="Software Tax Invoices" 
+      onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
+    >
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
+        <div>
+          <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Tax Invoices</h1>
+          <p className="mt-1.5 text-[13.5px] text-muted-foreground">Download business tax invoices with GSTIN compliance breakdown numbers.</p>
+        </div>
+      </div>
+
+      {/* Invoices Table */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-soft">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="text-left text-[11.5px] uppercase tracking-wider text-muted-foreground bg-muted/50">
+                <th className="px-6 py-3.5 font-semibold">Invoice No</th>
+                <th className="px-6 py-3.5 font-semibold">Description</th>
+                <th className="px-6 py-3.5 font-semibold">Billing Date</th>
+                <th className="px-6 py-3.5 font-semibold">Total Amount</th>
+                <th className="px-6 py-3.5 font-semibold text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {items.map((i, index) => (
+                <tr key={index} className="hover:bg-muted/40 transition-colors">
+                  <td className="px-6 py-4 font-mono font-bold text-foreground">{i.invoiceNo}</td>
+                  <td className="px-6 py-4 font-semibold text-foreground">{i.name}</td>
+                  <td className="px-6 py-4 text-muted-foreground">{i.date}</td>
+                  <td className="px-6 py-4 font-bold text-slate-850">₹{i.amount.toLocaleString("en-IN")}</td>
+                  <td className="px-6 py-4 text-right space-x-2">
+                    <button onClick={() => alert("Downloading invoice...")} className="size-8 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors">
+                      <Download size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </PropertyOwnerLayout>
+  );
+}

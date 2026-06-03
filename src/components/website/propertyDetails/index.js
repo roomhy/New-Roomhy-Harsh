@@ -1,0 +1,11 @@
+export { default as PropertyGallery } from "./PropertyGallery";
+export { default as PropertyHeader } from "./PropertyHeader";
+export { default as HighlightsSection } from "./HighlightsSection";
+export { default as DescriptionSection } from "./DescriptionSection";
+export { default as OffersSection } from "./OffersSection";
+export { default as ReviewsSection } from "./ReviewsSection";
+export { default as NearbySection } from "./NearbySection";
+export { default as CompareSection } from "./CompareSection";
+export { default as StickyCTA } from "./StickyCTA";
+export { default as PricingBreakdown } from "./PricingBreakdown";
+export { default as RoomTypesSection } from "./RoomTypesSection";

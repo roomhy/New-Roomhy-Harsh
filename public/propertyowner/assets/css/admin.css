@@ -1,0 +1,71 @@
+
+        .sidebar { background-color: #111827; color: #9ca3af; }
+        .sidebar-link { color: #9ca3af; font-weight: 500; transition: all 0.2s ease; display: flex; align-items: center; padding: 0.75rem 1.5rem; font-size: 0.9rem; border-left: 3px solid transparent; cursor: pointer; }
+        .sidebar-link:hover { color: #f3f4f6; background-color: #1f2937; }
+        .sidebar-link.active { background-color: #1f2937; color: #ffffff; border-left-color: #a855f7; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
+
+@media (max-width: 768px) {
+        .owner-occupancy-card {
+                padding: 1rem;
+        }
+
+        .owner-occupancy-header {
+                gap: 0.75rem;
+                align-items: flex-start;
+                margin-bottom: 1rem;
+        }
+
+        .owner-occupancy-header select {
+                width: 100%;
+                max-width: 9rem;
+        }
+
+        .owner-occupancy-grid {
+                grid-template-columns: minmax(0, 1fr) !important;
+                gap: 1.25rem;
+        }
+
+        .owner-occupancy-chart-wrap {
+                width: 100%;
+        }
+
+        .owner-occupancy-donut {
+                width: min(72vw, 17rem);
+                height: min(72vw, 17rem);
+        }
+
+        .owner-occupancy-donut-center {
+                inset: 24%;
+                padding: 0.5rem;
+        }
+
+        .owner-occupancy-stats {
+                grid-template-columns: 1fr;
+        }
+
+        .owner-occupancy-legend {
+                gap: 0.75rem 1rem;
+        }
+
+        .owner-occupancy-note {
+                font-size: 0.875rem;
+                line-height: 1.55;
+        }
+}
+
+@media (max-width: 480px) {
+        .owner-occupancy-card {
+                padding: 0.85rem;
+        }
+
+        .owner-occupancy-donut {
+                width: min(80vw, 15rem);
+                height: min(80vw, 15rem);
+        }
+
+        .owner-occupancy-donut-center p:nth-child(2) {
+                font-size: 1.35rem;
+        }
+}

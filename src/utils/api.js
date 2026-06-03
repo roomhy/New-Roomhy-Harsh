@@ -1,0 +1,1471 @@
+import { fetchPropertiesLocal } from './mockApi';
+
+export const getApiBase = () => {
+  // Use Vite env variable if available
+  if (import.meta.env?.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  if (typeof window === "undefined") return "";
+  const host = window.location.hostname;
+  
+  // Production Vercel deployment
+  if (host.includes('vercel.app') || host.includes('roomhy.com')) {
+    return "https://roohmy-backend-xwa9.vercel.app";
+  }
+  
+  // Local development (support localhost, 127.0.0.1, LAN IPs, and local domains)
+  const isLocal = host === "localhost" || 
+                  host === "127.0.0.1" || 
+                  host.startsWith("192.168.") || 
+                  host.startsWith("10.") || 
+                  host.startsWith("172.") || 
+                  host.endsWith(".local");
+  return isLocal
+    ? `http://${host}:5001`
+    : "https://roohmy-backend-xwa9.vercel.app";
+};
+
+export const getAuthHeader = () => {
+  if (typeof window === "undefined") return {};
+  let token = "";
+  try {
+    token = sessionStorage.getItem("token") || localStorage.getItem("token") || "";
+  } catch (_) {
+    token = "";
+  }
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+export const fetchJson = async (path, options = {}) => {
+  const base = getApiBase();
+  const url = path.startsWith("http") ? path : `${base}${path}`;
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+    ...getAuthHeader()
+  };
+  const res = await fetch(url, { 
+    credentials: "include", // Essential for CORS with credentials
+    ...options, 
+    headers 
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let errorMsg = `Request failed: ${res.status} ${res.statusText}`;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed.error) errorMsg = parsed.error + (parsed.details ? `: ${parsed.details}` : '');
+    } catch (e) {
+      // Not JSON
+    }
+    const err = new Error(errorMsg);
+    err.status = res.status;
+    err.body = text;
+    throw err;
+  }
+  return res.json();
+};
+
+// Fetch cities from backend
+export const fetchCities = async () => {
+  try {
+    const data = await fetchJson('/api/locations/cities');
+    return data.data || data || [];
+  } catch (error) {
+    console.error('Error fetching cities:', error);
+    return [];
+  }
+};
+
+// Fetch areas from backend
+export const fetchAreas = async () => {
+  try {
+    const data = await fetchJson('/api/locations/areas');
+    return data.data || data || [];
+  } catch (error) {
+    console.error('Error fetching areas:', error);
+    return [];
+  }
+};
+
+// Static properties for Vercel deployment
+const staticPropertiesList = [
+  {
+    _id: "static1",
+    property_name: "Roomhy Boys PG - Kota",
+    propertyName: "Roomhy Boys PG - Kota",
+    city: "Kota",
+    address: "Talwandi, Kota, Rajasthan 324005",
+    propertyType: "pg",
+    monthlyRent: 8000,
+    rent: 8000,
+    owner_name: "Verified Owner",
+    owner_phone: "9000000001",
+    owner_id: "ROOMHY9999",
+    gender: "male",
+    status: "active",
+    isPublished: true,
+    images: [
+      "https://images.pexels.com/photos/1571468/pexels-photo-1571468.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/271618/pexels-photo-271618.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1743229/pexels-photo-1743229.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600"
+    ],
+    propertyViews: [
+      { 
+        label: "Facade", 
+        images: [
+          "https://picsum.photos/800/600?random=1001",
+          "https://picsum.photos/800/600?random=1002",
+          "https://picsum.photos/800/600?random=1003",
+          "https://picsum.photos/800/600?random=1004"
+        ] 
+      },
+      { 
+        label: "Reception", 
+        images: [
+          "https://picsum.photos/800/600?random=2001",
+          "https://picsum.photos/800/600?random=2002"
+        ] 
+      },
+      { 
+        label: "Room", 
+        images: [
+          "https://picsum.photos/800/600?random=3001",
+          "https://picsum.photos/800/600?random=3002",
+          "https://picsum.photos/800/600?random=3003"
+        ] 
+      },
+      { 
+        label: "Common Area", 
+        images: [
+          "https://picsum.photos/800/600?random=4001",
+          "https://picsum.photos/800/600?random=4002"
+        ] 
+      },
+      { 
+        label: "Mess/Food", 
+        images: [
+          "https://picsum.photos/800/600?random=5001",
+          "https://picsum.photos/800/600?random=5002"
+        ] 
+      }
+    ],
+    amenities: [
+      { title: "High-Speed WiFi", description: "24/7 unlimited internet access", icon: "wifi" },
+      { title: "Air Conditioning", description: "Centralized AC in all rooms", icon: "ac" },
+      { title: "Food Included", description: "3 meals + tea/coffee", icon: "food" },
+      { title: "Laundry Service", description: "Weekly pickup and delivery", icon: "laundry" },
+      { title: "Parking", description: "Secure bike and car parking", icon: "parking" },
+      { title: "Gym", description: "Fully equipped fitness center", icon: "gym" },
+      { title: "TV Room", description: "LCD TV with cable connection", icon: "tv" },
+      { title: "Power Backup", description: "24/7 generator backup", icon: "power" }
+    ],
+    featuredImage: "https://images.pexels.com/photos/1571468/pexels-photo-1571468.jpeg?auto=compress&cs=tinysrgb&w=600"
+  },
+  {
+    _id: "static2",
+    property_name: "Roomhy Girls Hostel - Indore",
+    propertyName: "Roomhy Girls Hostel - Indore",
+    city: "Indore",
+    address: "Vijay Nagar, Indore, Madhya Pradesh 452010",
+    propertyType: "hostel",
+    monthlyRent: 10000,
+    rent: 10000,
+    owner_name: "Verified Owner",
+    owner_phone: "9000000002",
+    owner_id: "ROOMHY9999",
+    gender: "female",
+    status: "active",
+    isPublished: true,
+    images: [
+      "https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/279719/pexels-photo-279719.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/164595/pexels-photo-164595.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/271624/pexels-photo-271624.jpeg?auto=compress&cs=tinysrgb&w=600"
+    ],
+    propertyViews: [
+      { 
+        label: "Facade", 
+        images: [
+          "https://picsum.photos/800/600?random=1101",
+          "https://picsum.photos/800/600?random=1102",
+          "https://picsum.photos/800/600?random=1103"
+        ] 
+      },
+      { 
+        label: "Reception", 
+        images: [
+          "https://picsum.photos/800/600?random=2101",
+          "https://picsum.photos/800/600?random=2102"
+        ] 
+      },
+      { 
+        label: "Room", 
+        images: [
+          "https://picsum.photos/800/600?random=3101",
+          "https://picsum.photos/800/600?random=3102",
+          "https://picsum.photos/800/600?random=3103",
+          "https://picsum.photos/800/600?random=3104"
+        ] 
+      },
+      { 
+        label: "Common Area", 
+        images: [
+          "https://picsum.photos/800/600?random=4101",
+          "https://picsum.photos/800/600?random=4102"
+        ] 
+      },
+      { 
+        label: "Mess/Food", 
+        images: [
+          "https://picsum.photos/800/600?random=5101",
+          "https://picsum.photos/800/600?random=5102",
+          "https://picsum.photos/800/600?random=5103"
+        ] 
+      }
+    ],
+    amenities: [
+      { title: "High-Speed WiFi", description: "24/7 unlimited internet access", icon: "wifi" },
+      { title: "Air Conditioning", description: "Centralized AC in all rooms", icon: "ac" },
+      { title: "Food Included", description: "3 meals + evening snacks", icon: "food" },
+      { title: "Laundry Service", description: "Daily pickup and delivery", icon: "laundry" },
+      { title: "Parking", description: "Secure two-wheeler parking", icon: "parking" },
+      { title: "Gym", description: "Basic fitness equipment", icon: "gym" },
+      { title: "TV Room", description: "Common area with entertainment", icon: "tv" },
+      { title: "Power Backup", description: "Inverter backup for all rooms", icon: "power" }
+    ],
+    featuredImage: "https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=600"
+  },
+  {
+    _id: "static3",
+    property_name: "Roomhy Co-living - Jaipur",
+    propertyName: "Roomhy Co-living - Jaipur",
+    city: "Jaipur",
+    address: "Malviya Nagar, Jaipur, Rajasthan 302017",
+    propertyType: "co-living",
+    monthlyRent: 12000,
+    rent: 12000,
+    owner_name: "Verified Owner",
+    owner_phone: "9000000003",
+    owner_id: "ROOMHY9999",
+    gender: "any",
+    status: "active",
+    isPublished: true,
+    images: [
+      "https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/276724/pexels-photo-276724.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/2062426/pexels-photo-2062426.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/271618/pexels-photo-271618.jpeg?auto=compress&cs=tinysrgb&w=600"
+    ],
+    propertyViews: [
+      { label: "Facade", images: ["https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600"] },
+      { label: "Lobby", images: ["https://images.pexels.com/photos/276724/pexels-photo-276724.jpeg?auto=compress&cs=tinysrgb&w=600"] },
+      { label: "Kitchen", images: ["https://images.pexels.com/photos/2062426/pexels-photo-2062426.jpeg?auto=compress&cs=tinysrgb&w=600"] }
+    ],
+    featuredImage: "https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600"
+  },
+  {
+    _id: "static4",
+    property_name: "Roomhy Apartments - Delhi",
+    propertyName: "Roomhy Apartments - Delhi",
+    city: "Delhi",
+    address: "Dwarka, New Delhi, Delhi 110075",
+    propertyType: "apartment",
+    monthlyRent: 25000,
+    rent: 25000,
+    owner_name: "Verified Owner",
+    owner_phone: "9000000004",
+    owner_id: "ROOMHY9999",
+    gender: "any",
+    status: "active",
+    isPublished: true,
+    images: [
+      "https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1571463/pexels-photo-1571463.jpeg?auto=compress&cs=tinysrgb&w=600"
+    ],
+    featuredImage: "https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg?auto=compress&cs=tinysrgb&w=600"
+  },
+  {
+    _id: "static5",
+    property_name: "Roomhy Student PG - Bhopal",
+    propertyName: "Roomhy Student PG - Bhopal",
+    city: "Bhopal",
+    address: "MP Nagar, Bhopal, Madhya Pradesh 462016",
+    propertyType: "pg",
+    monthlyRent: 6000,
+    rent: 6000,
+    owner_name: "Verified Owner",
+    owner_phone: "9000000005",
+    owner_id: "ROOMHY9999",
+    gender: "male",
+    status: "active",
+    isPublished: true,
+    images: [
+      "https://images.pexels.com/photos/1571468/pexels-photo-1571468.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1743229/pexels-photo-1743229.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/271618/pexels-photo-271618.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600"
+    ],
+    featuredImage: "https://images.pexels.com/photos/1571468/pexels-photo-1571468.jpeg?auto=compress&cs=tinysrgb&w=600"
+  },
+  {
+    _id: "static6",
+    property_name: "Roomhy Luxury PG - Nagpur",
+    propertyName: "Roomhy Luxury PG - Nagpur",
+    city: "Nagpur",
+    address: "Civil Lines, Nagpur, Maharashtra 440001",
+    propertyType: "pg",
+    monthlyRent: 15000,
+    rent: 15000,
+    owner_name: "Verified Owner",
+    owner_phone: "9000000006",
+    owner_id: "ROOMHY9999",
+    gender: "male",
+    status: "active",
+    isPublished: true,
+    images: [
+      "https://images.pexels.com/photos/271624/pexels-photo-271624.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1743229/pexels-photo-1743229.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600"
+    ],
+    featuredImage: "https://images.pexels.com/photos/271624/pexels-photo-271624.jpeg?auto=compress&cs=tinysrgb&w=600"
+  },
+  {
+    _id: "static7",
+    property_name: "Roomhy Working Women PG - Jodhpur",
+    propertyName: "Roomhy Working Women PG - Jodhpur",
+    city: "Jodhpur",
+    address: "Paota, Jodhpur, Rajasthan 342001",
+    propertyType: "pg",
+    monthlyRent: 9000,
+    rent: 9000,
+    owner_name: "Verified Owner",
+    owner_phone: "9000000007",
+    owner_id: "ROOMHY9999",
+    gender: "female",
+    status: "active",
+    isPublished: true,
+    images: [
+      "https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/2360673/pexels-photo-2360673.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/271618/pexels-photo-271618.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1743229/pexels-photo-1743229.jpeg?auto=compress&cs=tinysrgb&w=600"
+    ],
+    featuredImage: "https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600"
+  },
+  {
+    _id: "static8",
+    property_name: "Roomhy Budget PG - Mumbai",
+    propertyName: "Roomhy Budget PG - Mumbai",
+    city: "Mumbai",
+    address: "Andheri, Mumbai, Maharashtra 400053",
+    propertyType: "pg",
+    monthlyRent: 7000,
+    rent: 7000,
+    owner_name: "Verified Owner",
+    owner_phone: "9000000008",
+    owner_id: "ROOMHY9999",
+    gender: "male",
+    status: "active",
+    isPublished: true,
+    images: [
+      "https://images.pexels.com/photos/1571463/pexels-photo-1571463.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1743229/pexels-photo-1743229.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/271618/pexels-photo-271618.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=600"
+    ],
+    featuredImage: "https://images.pexels.com/photos/1571463/pexels-photo-1571463.jpeg?auto=compress&cs=tinysrgb&w=600"
+  },
+  {
+    _id: "static9",
+    property_name: "Roomhy Executive Hostel - Bangalore",
+    propertyName: "Roomhy Executive Hostel - Bangalore",
+    city: "Bangalore",
+    address: "Electronic City, Bangalore, Karnataka 560100",
+    propertyType: "hostel",
+    monthlyRent: 18000,
+    rent: 18000,
+    owner_name: "Verified Owner",
+    owner_phone: "9000000009",
+    owner_id: "ROOMHY9999",
+    gender: "male",
+    status: "active",
+    isPublished: true,
+    images: [
+      "https://images.pexels.com/photos/1457847/pexels-photo-1457847.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1743229/pexels-photo-1743229.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/271624/pexels-photo-271624.jpeg?auto=compress&cs=tinysrgb&w=600"
+    ],
+    featuredImage: "https://images.pexels.com/photos/1457847/pexels-photo-1457847.jpeg?auto=compress&cs=tinysrgb&w=600"
+  },
+  {
+    _id: "static10",
+    property_name: "Roomhy Family PG - Chennai",
+    propertyName: "Roomhy Family PG - Chennai",
+    city: "Chennai",
+    address: "T Nagar, Chennai, Tamil Nadu 600017",
+    propertyType: "pg",
+    monthlyRent: 13000,
+    rent: 13000,
+    owner_name: "Verified Owner",
+    owner_phone: "9000000010",
+    owner_id: "ROOMHY9999",
+    gender: "any",
+    status: "active",
+    isPublished: true,
+    images: [
+      "https://images.pexels.com/photos/1743229/pexels-photo-1743229.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1571468/pexels-photo-1571468.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600",
+      "https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=600"
+    ],
+    featuredImage: "https://images.pexels.com/photos/1743229/pexels-photo-1743229.jpeg?auto=compress&cs=tinysrgb&w=600"
+  }
+];
+
+// Fetch properties from backend
+export const fetchProperties = async () => {
+  try {
+    // Add cache-busting timestamp to ensure fresh data
+    const timestamp = Date.now();
+    const data = await fetchJson(`/api/approved-properties/public/approved?t=${timestamp}`);
+    const properties = Array.isArray(data) ? data : data?.properties || data?.data || [];
+    
+    // Get total count from API (new field) or fallback to properties length
+    const totalCount = data?.total || properties.length;
+    
+    console.log('📊 API returned', properties.length, 'properties (Total:', totalCount + ')');
+    
+    // Debug: Check first property to see what images data we have
+    if (properties.length > 0) {
+      console.log('🔍 API Debug - First Property:');
+      console.log('  p.images:', properties[0].images);
+      console.log('  p.photos:', properties[0].photos);
+      console.log('  p.propertyInfo?.photos:', properties[0].propertyInfo?.photos);
+      console.log('  p.property_name:', properties[0].property_name);
+      console.log('  p.propertyName:', properties[0].propertyName);
+    }
+    
+    // Ensure all required fields are present with fallback values
+    const formattedProperties = properties
+      .map(p => {
+        // Debug each property
+        console.log(`🔍 Processing Property: ${p.property_name || p.propertyName || 'Unknown'}`);
+        console.log(`  Images: ${p.images?.length || 0}, Photos: ${p.photos?.length || 0}, PropertyInfo Photos: ${p.propertyInfo?.photos?.length || 0}`);
+        
+        const imagesArray = p.images || p.photos || p.propertyInfo?.photos || [];
+        const firstImage = imagesArray[0] || `https://picsum.photos/800/600?random=${Math.floor(Math.random() * 100)}`;
+        
+        console.log(`  Final images array length: ${imagesArray.length}`);
+        console.log(`  First image: ${firstImage}`);
+        
+        return {
+          ...p,
+          _id: String(p._id || p.visitId || ''),
+          visitId: p.visitId || p._id,
+          property_name: p.property_name || p.propertyName || p.propertyInfo?.name || 'Property',
+          name: p.property_name || p.propertyName || p.propertyInfo?.name || 'Property',
+          city: p.city || p.propertyInfo?.city || 'Unknown',
+          location: p.propertyInfo?.area ? `${p.propertyInfo.area}, ${p.city || p.propertyInfo?.city}` : (p.city || p.propertyInfo?.city || 'Unknown'),
+          owner_name: p.owner_name || p.ownerName || p.generatedCredentials?.ownerName || p.approvedBy || 'Verified Owner',
+          owner_phone: p.owner_phone || p.contactPhone || p.ownerPhone || p.propertyInfo?.phone || '9000000000',
+          propertyName: p.propertyName || p.property_name || p.propertyInfo?.name || 'Property',
+          propertyType: p.propertyType || p.property_type || p.propertyInfo?.propertyType || 'PG',
+          monthlyRent: p.monthlyRent || p.rent || p.propertyInfo?.rent || 5000,
+          
+          // Add image field with first image from images array
+          image: firstImage,
+          
+          // Ensure images array exists for PropertyCard
+          images: imagesArray,
+
+          // Location coordinates
+          latitude: p.latitude || p.propertyInfo?.latitude || p.propertyInfo?.location?.coordinates?.[1] || null,
+          longitude: p.longitude || p.propertyInfo?.longitude || p.propertyInfo?.location?.coordinates?.[0] || null,
+          
+          // Beds/Rooms calculation
+          beds: (() => {
+            const fromRoomTypes = (p.roomTypes || p.propertyInfo?.roomTypes || [])
+              .reduce((acc, rt) => acc + parseInt(rt.totalRooms || rt.total_rooms || 0), 0);
+            return fromRoomTypes || p.propertyInfo?.totalSeats || p.totalRooms || p.beds || 1;
+          })(),
+
+          // Owner info
+          owner_id: p.owner_id || p.ownerLoginId || p.generatedCredentials?.loginId || p.ownerLoginId,
+          isPremium: p.isPremium || p.is_premium || p.propertyInfo?.isPremium || false,
+          gender: p.gender || p.genderSuitability || p.propertyInfo?.genderSuitability || 'Co-ed'
+        };
+      });
+    
+    // Attach total count to the array for access by components
+    formattedProperties.total = totalCount;
+    
+    console.log('✅ API SUCCESS - Returning formatted properties:');
+    console.log('  Total properties:', formattedProperties.length);
+    console.log('  First property images:', formattedProperties[0]?.images);
+    console.log('  First property image:', formattedProperties[0]?.image);
+    
+    return formattedProperties;
+  } catch (error) {
+    console.error('❌ API ERROR - Falling back to static data:', error);
+    console.log('🔄 Using static data fallback - this explains why PropertyCard gets wrong data!');
+    // Return static properties as fallback with correct structure
+    const staticFormatted = staticPropertiesList.map(p => ({
+      ...p,
+      property_name: p.property_name,
+      city: p.city,
+      location: p.city || 'Unknown',
+      owner_name: p.owner_name,
+      owner_phone: p.owner_phone,
+      propertyName: p.propertyName,
+      propertyType: p.propertyType,
+      monthlyRent: p.monthlyRent,
+      
+      // Add image field with first image from images array
+      image: p.images?.[0] || p.featuredImage || `https://picsum.photos/800/600?random=${Math.floor(Math.random() * 100)}`,
+      
+      // Ensure images array exists for PropertyCard
+      images: p.images || [],
+      
+      // Owner link for bidding
+      owner_id: p.owner_id
+    }));
+    staticFormatted.total = staticPropertiesList.length;
+    return staticFormatted;
+  }
+};
+
+// Fetch stats for homepage
+export const fetchStats = async () => {
+  try {
+    const [properties, cities] = await Promise.all([fetchProperties(), fetchCities()]);
+    const liveProperties = properties.filter(p => p.isLiveOnWebsite === true || p.status === 'live' || p.status === 'approved');
+    const uniqueCities = new Set(liveProperties.map(p => p.city || p.propertyInfo?.city)).size;
+    const totalBeds = liveProperties.reduce((acc, p) => acc + (parseInt(p.totalSeats || p.beds || p.propertyInfo?.totalSeats || 1) || 1), 0);
+    return {
+      cities: uniqueCities || cities.length || 15,
+      residences: liveProperties.length || 450,
+      beds: totalBeds || 70000
+    };
+  } catch (error) {
+    return { cities: 15, residences: 450, beds: 70000 };
+  }
+};
+
+// Fetch reviews from backend
+export const fetchReviews = async (limit = 10) => {
+  try {
+    const data = await fetchJson(`/api/reviews?limit=${limit}`);
+    return data.data || data || [];
+  } catch (error) {
+    return [];
+  }
+};
+
+// Fetch featured reviews for homepage
+export const fetchFeaturedReviews = async (limit = 6) => {
+  try {
+    const data = await fetchJson(`/api/reviews/featured?limit=${limit}`);
+    return data.data || data || [];
+  } catch (error) {
+    return [];
+  }
+};
+
+// Fetch top rated reviews
+export const fetchTopRatedReviews = async (limit = 6) => {
+  try {
+    const data = await fetchJson(`/api/reviews/top-rated?limit=${limit}`);
+    return data.data || data || [];
+  } catch (error) {
+    return [];
+  }
+};
+
+// Track view on featured listing
+export const trackFeaturedView = async (id) => {
+  try {
+    await fetchJson(`/api/featured/${id}/view`, { method: 'POST' });
+  } catch (error) {
+    console.error('Error tracking view:', error);
+  }
+};
+
+// Track click on featured listing
+export const trackFeaturedClick = async (id) => {
+  try {
+    await fetchJson(`/api/featured/${id}/click`, { method: 'POST' });
+  } catch (error) {
+    console.error('Error tracking click:', error);
+  }
+};
+
+// Track view on property
+export const trackPropertyView = async (id) => {
+  try {
+    console.log(`🌐 API: Tracking View for ID: ${id}`);
+    const res = await fetchJson(`/api/properties/${id}/view`, { method: 'POST' });
+    console.log(`✅ API: View tracked successfully for ${id}`, res);
+  } catch (error) {
+    console.error('❌ API: Error tracking property view:', error);
+  }
+};
+
+// Track click on property
+export const trackPropertyClick = async (id) => {
+  try {
+    console.log(`🌐 API: Tracking Click for ID: ${id}`);
+    const res = await fetchJson(`/api/properties/${id}/click`, { method: 'POST' });
+    console.log(`✅ API: Click tracked successfully for ${id}`, res);
+  } catch (error) {
+    console.error('❌ API: Error tracking property click:', error);
+  }
+};
+
+// Submit website enquiry
+export const submitEnquiry = async (formData) => {
+  return fetchJson('/api/website-enquiry/submit', {
+    method: 'POST',
+    body: JSON.stringify(formData)
+  });
+};
+
+// Submit bid
+export const submitBid = async (bidData) => {
+  return fetchJson('/api/booking/create', {
+    method: 'POST',
+    body: JSON.stringify(bidData)
+  });
+};
+
+// Reviews API
+export const getPropertyReviews = async (propertyId) => {
+  try {
+    const data = await fetchJson(`/api/reviews/property/${propertyId}`);
+    return data.data || [];
+  } catch (error) {
+    console.error('Error fetching property reviews:', error);
+    return [];
+  }
+};
+
+export const getPropertyReviewStats = async (propertyId) => {
+  try {
+    const data = await fetchJson(`/api/reviews/property/${propertyId}/stats`);
+    return data.data || { avgRating: 0, totalReviews: 0, ratingBreakdown: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
+  } catch (error) {
+    console.error('Error fetching property review stats:', error);
+    return { avgRating: 0, totalReviews: 0, ratingBreakdown: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
+  }
+};
+
+export const checkUserReview = async (propertyId) => {
+  try {
+    const data = await fetchJson(`/api/reviews/property/${propertyId}/user-review`);
+    return data;
+  } catch (error) {
+    console.error('Error checking user review:', error);
+    return { hasReviewed: false, review: null };
+  }
+};
+
+export const submitReview = async (reviewData) => {
+  return fetchJson('/api/reviews', {
+    method: 'POST',
+    body: JSON.stringify(reviewData)
+  });
+};
+
+// Fetch property types/categories for offerings
+export const fetchPropertyTypes = async () => {
+  // ============================================
+  // REAL API - Uncomment when ready to use database
+  // ============================================
+  try {
+    const response = await fetchJson('/api/property-types');
+    if (response && response.success && response.data && response.data.length > 0) {
+      console.log('✅ Fetched property types from API:', response.data.length);
+      return response.data;
+    }
+    console.log('⚠️ Property types API returned empty or failed, using fallback');
+  } catch (error) {
+    console.log('❌ Property types endpoint not available, using fallback');
+  }
+  // ============================================
+
+  // Fallback: use static data for now
+  console.log('Using static fallback data for property types');
+  
+  // Fallback: get unique property types from approved properties
+  try {
+    const properties = await fetchProperties();
+    const types = new Set();
+    properties.forEach(p => {
+      const type = p.propertyType || p.propertyInfo?.propertyType || p.type;
+      if (type) types.add(type);
+    });
+    
+    // Map to standard format with images array
+    const typeMap = {
+      'pg': { 
+        title: 'PG', 
+        category: 'PG', 
+        description: 'Comfortable paying guest accommodations with all amenities', 
+        images: [
+          'https://images.pexels.com/photos/1743229/pexels-photo-1743229.jpeg?auto=compress&cs=tinysrgb&w=600',
+          'https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=600',
+          'https://images.pexels.com/photos/1571468/pexels-photo-1571468.jpeg?auto=compress&cs=tinysrgb&w=600',
+          'https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg?auto=compress&cs=tinysrgb&w=600',
+          'https://images.pexels.com/photos/271624/pexels-photo-271624.jpeg?auto=compress&cs=tinysrgb&w=600'
+        ]
+      },
+      'hostel': { 
+        title: 'Hostel', 
+        category: 'Hostel', 
+        description: 'Affordable hostel living for students and working professionals', 
+        images: [
+          'https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=600',
+          'https://images.pexels.com/photos/271624/pexels-photo-271624.jpeg?auto=compress&cs=tinysrgb&w=600',
+          'https://images.pexels.com/photos/1571463/pexels-photo-1571463.jpeg?auto=compress&cs=tinysrgb&w=600',
+          'https://images.pexels.com/photos/1457847/pexels-photo-1457847.jpeg?auto=compress&cs=tinysrgb&w=600',
+          'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600'
+        ]
+      },
+      'coliving': { 
+        title: 'Co-living', 
+        category: 'Co-living', 
+        description: 'Modern co-living spaces with community and facilities', 
+        images: [
+          'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600',
+          'https://images.pexels.com/photos/1571463/pexels-photo-1571463.jpeg?auto=compress&cs=tinysrgb&w=600',
+          'https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=600',
+          'https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg?auto=compress&cs=tinysrgb&w=600',
+          'https://images.pexels.com/photos/1743229/pexels-photo-1743229.jpeg?auto=compress&cs=tinysrgb&w=600'
+        ]
+      },
+      'apartment': { 
+        title: 'Apartment/Flats', 
+        category: 'Apartment', 
+        description: 'Private apartments for individuals and small groups', 
+        images: [
+          'https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg?auto=compress&cs=tinysrgb&w=600',
+          'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600',
+          'https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=600',
+          'https://images.pexels.com/photos/1571463/pexels-photo-1571463.jpeg?auto=compress&cs=tinysrgb&w=600',
+          'https://images.pexels.com/photos/1743229/pexels-photo-1743229.jpeg?auto=compress&cs=tinysrgb&w=600'
+        ]
+      },
+      'list': {
+        title: 'List Your Property',
+        category: 'list',
+        description: 'Are you a property owner? List your property with Roomhy and reach thousands of students.',
+        images: [
+          'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=1000&auto=format&fit=crop',
+          'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1000&auto=format&fit=crop',
+          'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=1000&auto=format&fit=crop'
+        ],
+        link: '/website/list'
+      }
+    };
+    
+    const result = [];
+    types.forEach(type => {
+      const key = type.toLowerCase();
+      if (typeMap[key]) {
+        result.push(typeMap[key]);
+      }
+    });
+    
+    // Always return all default types, merging with any found types
+    const defaultTypes = Object.values(typeMap);
+    if (result.length === 0) {
+      return defaultTypes;
+    }
+    
+    // Ensure all default types are present (merge found with defaults)
+    const foundCategories = new Set(result.map(r => r.category.toLowerCase()));
+    defaultTypes.forEach(defaultType => {
+      if (!foundCategories.has(defaultType.category.toLowerCase())) {
+        result.push(defaultType);
+      }
+    });
+    
+    return result;
+  } catch (error) {
+    console.error('Error fetching property types:', error);
+    return [];
+  }
+};
+
+// Search properties by location and property type
+export const searchPropertiesByLocation = async (latitude, longitude, propertyType = null, radiusKm = 10) => {
+  try {
+    const properties = await fetchProperties();
+    
+    // Store total count from API before filtering
+    const totalCount = properties.total || properties.length;
+    
+    // Calculate distance between two coordinates (Haversine formula)
+    const calculateDistance = (lat1, lon1, lat2, lon2) => {
+      const R = 6371; // Earth radius in km
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    };
+
+    // Get nearby coordinates (mock data - in real app, fetch from db)
+    const coordinatesByCity = {
+      'Kota': { lat: 25.2048, lon: 75.8615 },
+      'Indore': { lat: 22.7196, lon: 75.8577 },
+      'Jaipur': { lat: 26.9124, lon: 75.7873 },
+      'Delhi': { lat: 28.6139, lon: 77.2090 },
+      'Bhopal': { lat: 23.1815, lon: 79.9864 },
+      'Nagpur': { lat: 21.1458, lon: 79.0882 },
+      'Mumbai': { lat: 19.0760, lon: 72.8777 },
+      'Bangalore': { lat: 12.9716, lon: 77.5946 }
+    };
+
+    let filtered = [...properties];
+
+    // Filter by distance if coordinates provided
+    if (latitude && longitude) {
+      filtered = properties.filter(p => {
+        const coords = coordinatesByCity[p.city || p.propertyInfo?.city];
+        if (!coords) return false;
+        const distance = calculateDistance(latitude, longitude, coords.lat, coords.lon);
+        return distance <= radiusKm;
+      });
+    }
+
+    // Filter by property type
+    if (propertyType) {
+      filtered = filtered.filter(p => {
+        const type = p.propertyType || p.propertyInfo?.propertyType || p.type;
+        return type && type.toLowerCase().includes(propertyType.toLowerCase());
+      });
+    }
+
+    // Sort by distance (nearest first)
+    filtered.sort((a, b) => {
+      const coordsA = coordinatesByCity[a.city || a.propertyInfo?.city];
+      const coordsB = coordinatesByCity[b.city || b.propertyInfo?.city];
+      if (!coordsA || !coordsB) return 0;
+      const distA = calculateDistance(latitude, longitude, coordsA.lat, coordsA.lon);
+      const distB = calculateDistance(latitude, longitude, coordsB.lat, coordsB.lon);
+      return distA - distB;
+    });
+
+    // Preserve total count on the filtered array
+    filtered.total = totalCount;
+    
+    console.log('📍 Location search:', filtered.length, 'nearby of', totalCount, 'total');
+    
+    return filtered;
+  } catch (error) {
+    console.error('Error searching properties by location:', error);
+    return [];
+  }
+};
+
+// Get nearby areas for a location
+export const getNearbyAreas = async (latitude, longitude, city) => {
+  try {
+    const areas = await fetchAreas();
+    
+    // Filter areas by city
+    const cityAreas = areas.filter(a => 
+      (typeof a === 'object' ? a.city : a.split('-')[0]) === city
+    );
+
+    return cityAreas.map(a => typeof a === 'string' ? a : a.name);
+  } catch (error) {
+    console.error('Error fetching nearby areas:', error);
+    return [];
+  }
+};
+
+// Get institutions/colleges for a city
+export const getInstitutions = async (city) => {
+  try {
+    const cities = await fetchCities();
+    const cityData = cities.find(c => (typeof c === 'object' ? c.name : c) === city);
+    
+    if (typeof cityData === 'object' && cityData.colleges) {
+      return cityData.colleges;
+    }
+
+    // Fallback: fetch from properties with institution data
+    const properties = await fetchProperties();
+    const institutions = new Set();
+    
+    properties
+      .filter(p => (p.city || p.propertyInfo?.city) === city)
+      .forEach(p => {
+        if (p.propertyInfo?.landmarks) {
+          p.propertyInfo.landmarks.forEach(l => institutions.add(l));
+        }
+      });
+
+    return Array.from(institutions);
+  } catch (error) {
+    console.error('Error fetching institutions:', error);
+    return [];
+  }
+};
+
+// Get price range for property type
+export const getPriceRangeByType = async (propertyType) => {
+  try {
+    const properties = await fetchProperties();
+    
+    const filtered = properties.filter(p => {
+      const type = p.propertyType || p.propertyInfo?.propertyType || p.type;
+      return type && type.toLowerCase().includes(propertyType.toLowerCase());
+    });
+
+    if (filtered.length === 0) {
+      return { min: 0, max: 0, average: 0 };
+    }
+
+    const rents = filtered.map(p => p.monthlyRent || p.rent || p.propertyInfo?.rent || 0).filter(r => r > 0);
+    const min = Math.min(...rents);
+    const max = Math.max(...rents);
+    const average = Math.round(rents.reduce((a, b) => a + b, 0) / rents.length);
+
+    return { min, max, average, count: filtered.length };
+  } catch (error) {
+    console.error('Error fetching price range:', error);
+    return { min: 0, max: 0, average: 0, count: 0 };
+  }
+};
+
+// Fetch all colleges for properties from backend
+export const fetchAllCollegesForProperties = async () => {
+  try {
+    const data = await fetchJson('/api/approved-properties/colleges/all');
+    return {
+      colleges: data.colleges || [],
+      allColleges: data.allColleges || [],
+      success: data.success || false
+    };
+  } catch (error) {
+    console.error('Error fetching colleges:', error);
+    return { colleges: [], allColleges: [], success: false };
+  }
+};
+
+// Fetch nearby colleges/institutes from OpenStreetMap API
+export const fetchNearbyColleges = async (latitude, longitude, city = '', radiusKm = 2) => {
+  try {
+    // Simple place search for colleges/universities in the city
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?` +
+      `format=json&` +
+      `q=college university school institute ${city}&` +
+      `lat=${latitude}&` +
+      `lon=${longitude}&` +
+      `limit=10`,
+      { 
+        headers: { 'Accept-Language': 'en' },
+        timeout: 5000
+      }
+    );
+    
+    if (!response.ok) throw new Error('OSM API failed');
+    const results = await response.json();
+    
+    const colleges = new Set();
+    results.slice(0, 8).forEach(result => {
+      const name = result.name || result.display_name?.split(',')[0];
+      if (name && name.length > 3 && !name.toLowerCase().includes('unknown')) {
+        colleges.add(name.trim());
+      }
+    });
+    
+    return Array.from(colleges);
+  } catch (error) {
+    console.warn('Error fetching nearby colleges from OSM:', error);
+    return [];
+  }
+};
+
+// Enrich properties with nearby colleges from map API
+export const enrichPropertiesWithColleges = async (properties) => {
+  try {
+    // Default colleges for each city - instant display (no waiting)
+    const defaultCollegesByCity = {
+      'Kota': ['Allen', 'FIITJEE', 'Bansal Classes', 'Resonance'],
+      'Indore': ['IIT Indore', 'MITS', 'Devi Ahilya University', 'MAWL Institute'],
+      'Jaipur': ['MNIT Jaipur', 'RTU Jaipur', 'Manipal University', 'BITS Pilani'],
+      'Delhi': ['Delhi University', 'IIT Delhi', 'NSIT Delhi', 'DTU Delhi'],
+      'Bhopal': ['IISER Bhopal', 'Barkatullah University', 'MATS University', 'ITM Universe'],
+      'Nagpur': ['VNIT Nagpur', 'RCOEM', 'Rashtrasant Tukdoji Maharaj', 'Nagpur University'],
+      'Mumbai': ['IIT Bombay', 'NMIMS', 'AISSMS', 'Mumbai University'],
+      'Bangalore': ['IIT Bangalore', 'VTU', 'RV University', 'Christ University'],
+      'Chandigarh': ['Punjab University', 'PEC University', 'Chitkara University', 'DAV College'],
+      'Pune': ['Pune University', 'COEP', 'Symbiosis', 'MIT Pune']
+    };
+
+    // Map properties with fallback colleges immediately
+    const enrichedProperties = properties.map((property) => {
+      try {
+        const city = property.city || property.propertyInfo?.city || 'Kota';
+        
+        // If already has nearby colleges from mock data, keep them
+        if (property.nearbyColleges && property.nearbyColleges.length > 0) {
+          return property;
+        }
+        
+        // Use default colleges for the city
+        const colleges = defaultCollegesByCity[city] || defaultCollegesByCity['Kota'];
+        
+        return {
+          ...property,
+          nearbyColleges: colleges
+        };
+      } catch (err) {
+        console.warn('Error processing property:', err);
+        return property;
+      }
+    });
+
+    // Try to fetch real data from OSM in background (don't block UI)
+    setTimeout(async () => {
+      const cityCoordinates = {
+        'Kota': { lat: 25.2048, lon: 75.8615 },
+        'Indore': { lat: 22.7196, lon: 75.8577 },
+        'Jaipur': { lat: 26.9124, lon: 75.7873 },
+        'Delhi': { lat: 28.6139, lon: 77.2090 },
+        'Bhopal': { lat: 23.1815, lon: 79.9864 },
+        'Nagpur': { lat: 21.1458, lon: 79.0882 },
+        'Mumbai': { lat: 19.0760, lon: 72.8777 },
+        'Bangalore': { lat: 12.9716, lon: 77.5946 },
+        'Chandigarh': { lat: 30.7595, lon: 76.7620 },
+        'Pune': { lat: 18.5204, lon: 73.8567 }
+      };
+
+      for (const property of enrichedProperties) {
+        try {
+          const city = property.city || property.propertyInfo?.city || 'Kota';
+          const coords = cityCoordinates[city];
+          if (coords) {
+            const colleges = await fetchNearbyColleges(coords.lat, coords.lon, city);
+            if (colleges && colleges.length > 0) {
+              property.nearbyColleges = colleges;
+            }
+          }
+        } catch (err) {
+          console.warn('Background OSM enrichment failed:', err);
+        }
+      }
+    }, 500);
+
+    return enrichedProperties;
+  } catch (error) {
+    console.error('Error enriching properties:', error);
+    return properties;
+  }
+};
+
+// ============================================================
+// SEPARATE COLLEGES API - Completely independent from properties
+// ============================================================
+
+// Fetch colleges for a single city from backend (calls Overpass API)
+export const fetchCollegesForCity = async (city) => {
+  try {
+    console.log(`🎓 Fetching colleges for city: ${city}`);
+    const data = await fetchJson(`/api/colleges/fetch-nearby?city=${encodeURIComponent(city)}`);
+    
+    if (data.success) {
+      console.log(`✅ Found ${data.count} colleges for ${city}`);
+      return data.colleges || [];
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching colleges for city:', error);
+    return [];
+  }
+};
+
+// Fetch colleges for ALL cities from backend (with delays, takes 20-30 seconds)
+export const fetchAllCollegesFromBackend = async () => {
+  try {
+    console.log('🎓 Fetching all colleges from backend (this may take 20-30 seconds)...');
+    const data = await fetchJson('/api/colleges/fetch-all-cities');
+    
+    if (data.success) {
+      console.log(`✅ Found ${data.totalColleges} colleges across ${data.cityCount} cities`);
+      return {
+        allColleges: data.allColleges || [],
+        cities: data.cities || {},
+        totalColleges: data.totalColleges || 0
+      };
+    }
+    return { allColleges: [], cities: {}, totalColleges: 0 };
+  } catch (error) {
+    console.error('Error fetching all colleges:', error);
+    return { allColleges: [], cities: {}, totalColleges: 0 };
+  }
+};
+
+// ==================== USER API FUNCTIONS ====================
+
+// Get user profile
+export const getUserProfile = async () => {
+  try {
+    const data = await fetchJson('/api/user/profile');
+    return data;
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    throw error;
+  }
+};
+
+// Update user profile
+export const updateUserProfile = async (profileData) => {
+  try {
+    const data = await fetchJson('/api/user/profile', {
+      method: 'PUT',
+      body: JSON.stringify(profileData)
+    });
+    return data;
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    throw error;
+  }
+};
+
+// Get user settings
+export const getUserSettings = async () => {
+  try {
+    const data = await fetchJson('/api/user/settings');
+    return data;
+  } catch (error) {
+    console.error('Error fetching settings:', error);
+    throw error;
+  }
+};
+
+// Update user settings
+export const updateUserSettings = async (settings) => {
+  try {
+    const data = await fetchJson('/api/user/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings)
+    });
+    return data;
+  } catch (error) {
+    console.error('Error updating settings:', error);
+    throw error;
+  }
+};
+
+// Change password
+export const changePassword = async (currentPassword, newPassword) => {
+  try {
+    const data = await fetchJson('/api/user/change-password', {
+      method: 'PUT',
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+    return data;
+  } catch (error) {
+    console.error('Error changing password:', error);
+    throw error;
+  }
+};
+
+// Get user favourites
+export const getUserFavourites = async () => {
+  try {
+    const data = await fetchJson('/api/user/favourites');
+    return data;
+  } catch (error) {
+    console.error('Error fetching favourites:', error);
+    throw error;
+  }
+};
+
+// Add to favourites
+export const addToFavourites = async (propertyId) => {
+  try {
+    const data = await fetchJson(`/api/user/favourites/${propertyId}`, {
+      method: 'POST'
+    });
+    return data;
+  } catch (error) {
+    console.error('Error adding to favourites:', error);
+    throw error;
+  }
+};
+
+// Remove from favourites
+export const removeFromFavourites = async (propertyId) => {
+  try {
+    const data = await fetchJson(`/api/user/favourites/${propertyId}`, {
+      method: 'DELETE'
+    });
+    return data;
+  } catch (error) {
+    console.error('Error removing from favourites:', error);
+    throw error;
+  }
+};
+
+// Delete account
+export const deleteAccount = async (password) => {
+  try {
+    const data = await fetchJson('/api/user/account', {
+      method: 'DELETE',
+      body: JSON.stringify({ password })
+    });
+    return data;
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    throw error;
+  }
+};
+
+// ==================== REVIEW API FUNCTIONS ====================
+
+// Get user reviews
+export const getUserReviews = async () => {
+  try {
+    const data = await fetchJson('/api/reviews/user/my-reviews');
+    return data;
+  } catch (error) {
+    console.error('Error fetching user reviews:', error);
+    throw error;
+  }
+};
+
+// Update review
+export const updateReview = async (reviewId, reviewData) => {
+  try {
+    const data = await fetchJson(`/api/reviews/${reviewId}`, {
+      method: 'PUT',
+      body: JSON.stringify(reviewData)
+    });
+    return data;
+  } catch (error) {
+    console.error('Error updating review:', error);
+    throw error;
+  }
+};
+
+// Delete review
+export const deleteReview = async (reviewId) => {
+  try {
+    const data = await fetchJson(`/api/reviews/${reviewId}`, {
+      method: 'DELETE'
+    });
+    return data;
+  } catch (error) {
+    console.error('Error deleting review:', error);
+    throw error;
+  }
+};
+// ==================== SUPERADMIN API FUNCTIONS ====================
+
+// Fetch overall platform stats
+export const fetchSuperadminStats = async () => {
+  try {
+    const data = await fetchJson('/api/superadmin/stats');
+    return data;
+  } catch (error) {
+    console.error('Error fetching superadmin stats:', error);
+    // Return mock fallback to prevent UI crash
+    return {
+      success: false,
+      stats: { tenants: 0, properties: 0, owners: 0, netRevenue: 0 },
+      recentSignups: []
+    };
+  }
+};
+
+// Fetch user distribution for charts
+export const fetchUserDistribution = async () => {
+  try {
+    const data = await fetchJson('/api/superadmin/user-distribution');
+    return data;
+  } catch (error) {
+    console.error('Error fetching user distribution:', error);
+    return { success: false, distribution: { labels: [], data: [] } };
+  }
+};
+
+// Fetch revenue trends for charts
+export const fetchRevenueTrends = async () => {
+  try {
+    const data = await fetchJson('/api/superadmin/revenue-trends');
+    return data;
+  } catch (error) {
+    console.error('Error fetching revenue trends:', error);
+    return { success: false, labels: [], data: [] };
+  }
+};
+
+// Fetch audit logs
+export const fetchAuditLogs = async (limit = 200) => {
+  try {
+    const data = await fetchJson(`/api/admin/audit-logs?limit=${limit}`);
+    return data;
+  } catch (error) {
+    console.error('Error fetching audit logs:', error);
+    return { success: false, logs: [] };
+  }
+};
+
+// Fetch accounting overview stats
+export const fetchAccountingOverviewStats = async () => {
+  try {
+    const data = await fetchJson('/api/superadmin/accounting/overview');
+    return data;
+  } catch (error) {
+    console.error('Error fetching accounting stats:', error);
+    return {
+      success: false,
+      summary: { totalCollection: 0, totalPayout: 0, revenue: 0, dueRent: 0, pendingPayout: 0 },
+      trends: [],
+      transactions: [],
+      dueAging: []
+    };
+  }
+};
+
+// Fetch booking and leads overview stats
+export const fetchBookingOverviewStats = async () => {
+  try {
+    const data = await fetchJson('/api/superadmin/bookings/overview');
+    return data;
+  } catch (error) {
+    console.error('Error fetching booking stats:', error);
+    return {
+      success: false,
+      summary: { todayLeads: 0, weekLeads: 0, monthLeads: 0, todayBookings: 0, weekBookings: 0, monthBookings: 0 },
+      funnel: [],
+      recentLeads: [],
+      trends: [],
+      distributions: { sources: [], status: [] }
+    };
+  }
+};
+// Fetch property overview stats
+export const fetchPropertyOverviewStats = async () => {
+  try {
+    const data = await fetchJson('/api/superadmin/properties/overview');
+    return data;
+  } catch (error) {
+    console.error('Error fetching property stats:', error);
+    return {
+      success: false,
+      summary: { total: 0, approved: 0, pending: 0, rejected: 0, newThisMonth: 0 },
+      statusData: [],
+      recentProperties: []
+    };
+  }
+};
+// Fetch user management overview stats
+export const fetchUserOverviewStats = async () => {
+  try {
+    const data = await fetchJson('/api/superadmin/users/overview');
+    return data;
+  } catch (error) {
+    console.error('Error fetching user stats:', error);
+    return {
+      success: false,
+      summary: { total: 0, team: 0, owners: 0, tenants: 0, activeToday: 0 },
+      distribution: [],
+      recentUsers: [],
+      kyc: []
+    };
+  }
+};
+
+// Fetch report and analytics overview stats
+export const fetchReportOverviewStats = async () => {
+  try {
+    const data = await fetchJson('/api/superadmin/reports/overview');
+    return data;
+  } catch (error) {
+    console.error('Error fetching report stats:', error);
+    return {
+      success: false,
+      summary: { totalProperties: 0, totalTenants: 0, occupancyRate: 0, monthlyRevenue: 0, netProfit: 0, growthRate: 0 },
+      revenueTrends: [],
+      occupancy: { occupied: 0, vacant: 0, maintenance: 0 },
+      topProperties: [],
+      locationData: []
+    };
+  }
+};
+
+// Fetch review and ratings overview stats
+export const fetchReviewOverviewStats = async () => {
+  try {
+    const data = await fetchJson('/api/superadmin/reviews/overview');
+    return data;
+  } catch (error) {
+    console.error('Error fetching review stats:', error);
+    return {
+      success: false,
+      summary: { today: 0, week: 0, month: 0, avgRating: 0, total: 0, pending: 0 },
+      trends: [],
+      distribution: [],
+      recentReviews: [],
+      topProperties: []
+    };
+  }
+};
+
+// Fetch support and complaint overview stats
+export const fetchSupportOverviewStats = async () => {
+  try {
+    const data = await fetchJson('/api/superadmin/support/overview');
+    return data;
+  } catch (error) {
+    console.error('Error fetching support stats:', error);
+    return {
+      success: false,
+      summary: { total: 0, open: 0, inProgress: 0, resolved: 0, overdue: 0, avgTime: '0 Days' },
+      trends: [],
+      categories: [],
+      sources: [],
+      recentTickets: [],
+      resolutionRate: 0
+    };
+  }
+};
+
+// Fetch home overview stats
+export const fetchHomeOverviewStats = async () => {
+  try {
+    const data = await fetchJson('/api/superadmin/home/overview');
+    return data;
+  } catch (error) {
+    console.error('Error fetching home overview stats:', error);
+    return {
+      success: false,
+      metrics: { properties: 0, tenants: 0, revenue: 0, alerts: 0 },
+      revenueTrend: [],
+      propertyStatus: [],
+      tenantTypes: [],
+      pendingAlerts: [],
+      activities: []
+    };
+  }
+};
+
+
+
+

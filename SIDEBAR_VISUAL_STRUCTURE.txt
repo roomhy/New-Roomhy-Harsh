@@ -1,0 +1,260 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    PROPERTY OWNER SIDEBAR - VISUAL STRUCTURE                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Legend:
+  ✅ = Silver Tier (Free)
+  🔒 = Gold Tier (Premium)
+  🤖 = AI Feature
+  ⚡ = Automation
+  🆕 = New Feature
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  SIDEBAR NAVIGATION                                                          ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  📊 Dashboard                                                          ✅    ║
+║     └─ Overview, Stats, Recent Activities                                   ║
+║                                                                              ║
+║  👥 Tenant Management                                                  ▼     ║
+║     ├─ All Tenants                                                     ✅    ║
+║     ├─ Tenant Records                                                  ✅    ║
+║     ├─ Tenant Joining Form                                        ✅ 🆕    ║
+║     ├─ Rent Agreement                                                  🔒    ║
+║     ├─ Tenant Documentation                                            🔒    ║
+║     ├─ Tenant Passbook                                                 🔒    ║
+║     ├─ Tenant Vault                                                    🔒    ║
+║     ├─ Tenant Ledger                                                   🔒    ║
+║     ├─ Old Tenants                                                     ✅    ║
+║     └─ Smart Filter & Search                                      🔒 🤖    ║
+║                                                                              ║
+║  🏢 Property & Rooms                                                   ▼     ║
+║     ├─ My Properties                                                   ✅    ║
+║     ├─ Add New Property                                           ✅ 🆕    ║
+║     ├─ Room Management                                                 ✅    ║
+║     ├─ Room Facilities                                                 🔒    ║
+║     ├─ Room Photos & Videos                                            🔒    ║
+║     ├─ Room Lists                                                      ✅    ║
+║     ├─ Room Reviews                                                    🔒    ║
+║     ├─ Floor Map                                                       🔒    ║
+║     ├─ Room & Property Assets                                          🔒    ║
+║     ├─ AI Room Recommendor                                        🔒 🤖    ║
+║     ├─ Share Booking Link                                              🔒    ║
+║     └─ Room History                                                    🔒    ║
+║                                                                              ║
+║  💰 Rent Collection                                                    ▼     ║
+║     ├─ Record Payment                                                  ✅    ║
+║     ├─ Payment Received                                                ✅    ║
+║     ├─ Auto Reminders                                             🔒 ⚡    ║
+║     ├─ Instant Receipts                                           🔒 ⚡    ║
+║     ├─ Recurring Dues                                             🔒 ⚡    ║
+║     ├─ HRA & GST Receipts                                              🔒    ║
+║     ├─ Automatic Rent Addition                                    🔒 ⚡    ║
+║     ├─ GST & TDS Management                                            🔒    ║
+║     ├─ Multiple Dues Types                                             🔒    ║
+║     ├─ Late Fine Management                                       🔒 ⚡    ║
+║     ├─ Cash Collect by OTP                                             🔒    ║
+║     ├─ Settlement Modes                                                🔒    ║
+║     ├─ E-NACH Setup                                               🔒 ⚡    ║
+║     └─ Split Settlement                                                🔒    ║
+║                                                                              ║
+║  📈 Reports & Accounting                                               ▼     ║
+║     ├─ Settlement Report                                               ✅    ║
+║     ├─ Profit & Loss Report                                            🔒    ║
+║     ├─ Collection Report                                               ✅    ║
+║     ├─ Expense Report                                                  🔒    ║
+║     ├─ All Dues Report                                                 ✅    ║
+║     ├─ AI Report Assistant                                        🔒 🤖    ║
+║     ├─ Tenant Profile Report                                           🔒    ║
+║     ├─ Tenant Ledger Report                                            🔒    ║
+║     ├─ Vacancy Report                                                  🔒    ║
+║     ├─ Complaint Report                                                🔒    ║
+║     └─ Bookings & Joining Report                                       🔒    ║
+║                                                                              ║
+║  👔 Team Management                                            🔒 GOLD ▼     ║
+║     ├─ Staff Management                                                🔒    ║
+║     ├─ Cash Handover                                                   🔒    ║
+║     ├─ Staff Passbook                                                  🔒    ║
+║     ├─ Role Based Access                                               🔒    ║
+║     ├─ Staff Documentation                                             🔒    ║
+║     ├─ Employee KYC                                                    🔒    ║
+║     ├─ Staff Salary Payment                                            🔒    ║
+║     ├─ Employment Agreement                                            🔒    ║
+║     ├─ Staff Attendance                                                🔒    ║
+║     └─ Employee Verification                                           🔒    ║
+║                                                                              ║
+║  🎯 Leads & Booking                                                    ▼     ║
+║     ├─ Booking Requests                                                ✅    ║
+║     ├─ All Bookings                                                    ✅    ║
+║     ├─ Schedule Visits                                                 ✅    ║
+║     ├─ Enquiries                                                       ✅    ║
+║     ├─ Import FB/Insta Leads                                           🔒    ║
+║     ├─ Lead Funnels & Filters                                          🔒    ║
+║     ├─ Import Call Logs                                                🔒    ║
+║     ├─ AI Lead Qualification                                      🔒 🤖    ║
+║     ├─ All Leads                                                       🔒    ║
+║     ├─ Lead TO DOs                                                     🔒    ║
+║     ├─ AI Booking Bot                                             🔒 🤖    ║
+║     ├─ Lead Scoring Rules                                              🔒    ║
+║     ├─ Tenant Refer & Earn                                             🔒    ║
+║     ├─ RentOk Leads                                                    🔒    ║
+║     └─ Tenancy Score                                                   🔒    ║
+║                                                                              ║
+║  📢 Marketing                                                  🔒 GOLD ▼     ║
+║     ├─ Brand Website                                                   🔒    ║
+║     ├─ Basic SEO                                                       🔒    ║
+║     ├─ Booking Website & QR                                            🔒    ║
+║     ├─ GMB Profile                                                     🔒    ║
+║     ├─ Room & Unit Website                                             🔒    ║
+║     ├─ Digital Food Menu                                               🔒    ║
+║     ├─ Share Location & Discount                                       🔒    ║
+║     ├─ Publish Reviews                                                 🔒    ║
+║     ├─ Multi Platform Listing                                          🔒    ║
+║     ├─ Auto Collect Reviews                                       🔒 ⚡    ║
+║     ├─ Property Location                                               ✅    ║
+║     └─ Manage Reviews                                                  ✅    ║
+║                                                                              ║
+║  ☕ Operations                                                         ▼     ║
+║     ├─ Complaints                                                      ✅    ║
+║     ├─ Chat & Announcements                                            ✅    ║
+║     ├─ Plate (Meals) Tracking                                          🔒    ║
+║     ├─ Send Announcement                                               🔒    ║
+║     ├─ Entry Exit Management                                           🔒    ║
+║     ├─ Vendor & Staff Passbook                                         🔒    ║
+║     ├─ Parcel Management                                               🔒    ║
+║     ├─ Electricity Management                                          🔒    ║
+║     ├─ Visitor/Guest Management                                        🔒    ║
+║     ├─ WiFi Management                                                 🔒    ║
+║     ├─ 24/7 AI Helpline                                           🔒 🤖    ║
+║     ├─ Smart Parent App                                                🔒    ║
+║     ├─ Feedback Management                                             🔒    ║
+║     ├─ Subscription Management                                         🔒    ║
+║     ├─ Auto Deposit Refund                                        🔒 ⚡    ║
+║     ├─ Room Tasks                                                      🔒    ║
+║     ├─ Smart AI Attendance                                        🔒 🤖    ║
+║     ├─ Move in/out Checklist                                           🔒    ║
+║     ├─ Manual Attendance                                               🔒    ║
+║     ├─ Activity Log                                                    🔒    ║
+║     └─ Eviction Management                                             🔒    ║
+║                                                                              ║
+║  🧾 Expense Management                                        🔒 GOLD ▼     ║
+║     ├─ Petty Cash Management                                           🔒    ║
+║     ├─ Recurring Expenses                                              🔒    ║
+║     ├─ Approve Expense by OTP                                          🔒    ║
+║     ├─ Track & Record Expenses                                         🔒    ║
+║     ├─ Vendor List & Bank A/C                                          🔒    ║
+║     ├─ Pay via RentOk                                                  🔒    ║
+║     ├─ AI Expense Insights                                        🔒 🤖    ║
+║     ├─ Google/FB/Insta Ads                                             🔒    ║
+║     ├─ Blogs for Website                                               🔒    ║
+║     ├─ Social Media Posts                                              🔒    ║
+║     ├─ Settlement Bank A/C                                             🔒    ║
+║     ├─ Discount Management                                             🔒    ║
+║     ├─ Accept Payment Link                                             🔒    ║
+║     ├─ Payment Gateway Fees                                            🔒    ║
+║     └─ Technology Fees                                                 🔒    ║
+║                                                                              ║
+║  📄 Documents                                                          ▼     ║
+║     ├─ All Documents                                                   ✅    ║
+║     ├─ Tenant Documents                                                🔒    ║
+║     ├─ Property Documents                                              🔒    ║
+║     └─ Agreement Templates                                             🔒    ║
+║                                                                              ║
+║  ⚙️  Settings                                                          ✅    ║
+║     └─ Account Settings, Preferences                                        ║
+║                                                                              ║
+║  👤 My Profile                                                         ✅    ║
+║     └─ Profile Details, Account Info                                        ║
+║                                                                              ║
+║  ─────────────────────────────────────────────────────────────────────      ║
+║                                                                              ║
+║  🚪 Logout                                                             ✅    ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                              FEATURE SUMMARY                                 ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  Total Categories:        11 main categories                                ║
+║  Total Features:          128 features                                      ║
+║                                                                              ║
+║  Silver Tier (Free):      25 features (20%)                                 ║
+║  Gold Tier (Premium):     103 features (80%)                                ║
+║                                                                              ║
+║  AI Features:             8 features                                        ║
+║  Automation Features:     12 features                                       ║
+║  New Features:            2 features                                        ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         TIER COMPARISON                                      ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  SILVER TIER (FREE)                    GOLD TIER (PREMIUM)                  ║
+║  ═══════════════════                   ══════════════════                   ║
+║                                                                              ║
+║  ✅ Basic Dashboard                    🔒 Everything in Silver +            ║
+║  ✅ Tenant Records                     🔒 Automation Features               ║
+║  ✅ Room Management                    🔒 AI-Powered Tools                  ║
+║  ✅ Manual Payments                    🔒 Team Management                   ║
+║  ✅ Basic Reports                      🔒 Advanced CRM                      ║
+║  ✅ Complaint Handling                 🔒 Marketing Suite                   ║
+║  ✅ Basic Bookings                     🔒 Expense Management                ║
+║  ✅ Settings & Profile                 🔒 Advanced Operations               ║
+║                                        🔒 Premium Support                    ║
+║                                                                              ║
+║  Perfect for:                          Perfect for:                         ║
+║  • Small properties (1-5 rooms)        • Medium to large properties         ║
+║  • Individual owners                   • Professional managers              ║
+║  • Getting started                     • Multiple properties                ║
+║  • Basic management                    • Team collaboration                 ║
+║                                        • Scaling operations                  ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                      IMPLEMENTATION PRIORITY                                 ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  🔴 HIGH PRIORITY (Must Have - Phase 1)                                     ║
+║     • Dashboard                                                             ║
+║     • Tenant Management (Silver features)                                   ║
+║     • Property & Rooms (Silver features)                                    ║
+║     • Basic Payments                                                        ║
+║     • Settings & Profile                                                    ║
+║                                                                              ║
+║  🟡 MEDIUM PRIORITY (Should Have - Phase 2)                                 ║
+║     • Rent Collection (Gold features)                                       ║
+║     • Reports & Accounting                                                  ║
+║     • Leads & Booking                                                       ║
+║     • Documents                                                             ║
+║     • Operations (Basic)                                                    ║
+║                                                                              ║
+║  🟢 LOW PRIORITY (Nice to Have - Phase 3)                                   ║
+║     • Team Management                                                       ║
+║     • Marketing                                                             ║
+║     • Expense Management                                                    ║
+║     • Operations (Advanced)                                                 ║
+║     • AI Features                                                           ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         UPGRADE TRIGGERS                                     ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  When Silver users click on Gold features, show upgrade modal with:         ║
+║                                                                              ║
+║  1. Feature benefit explanation                                             ║
+║  2. Time/money savings calculation                                          ║
+║  3. Success stories from Gold users                                         ║
+║  4. Limited time offer (if applicable)                                      ║
+║  5. Easy upgrade button                                                     ║
+║                                                                              ║
+║  Track which Gold features get most clicks → Optimize marketing             ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+End of Visual Structure

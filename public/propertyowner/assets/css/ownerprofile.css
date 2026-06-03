@@ -1,0 +1,87 @@
+
+
+.sidebar {
+  background-color: #111827;
+  color: #9ca3af;
+}
+
+.sidebar-link {
+  color: #9ca3af;
+  font-weight: 500;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.9rem;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+
+.sidebar-link:hover {
+  color: #f3f4f6;
+  background-color: #1f2937;
+}
+
+.sidebar-link.active {
+  background-color: #1f2937;
+  color: #ffffff;
+  border-left-color: #a855f7;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 4px;
+}
+
+.html-page main {
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.7), transparent 28%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+}
+
+.html-page form > div.bg-white,
+.html-page form .bg-white.rounded-xl {
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.05);
+}
+
+.html-page form input,
+.html-page form select,
+.html-page form textarea {
+  border-color: #cbd5e1;
+  color: #111827;
+  background: #ffffff;
+}
+
+.html-page form input:focus,
+.html-page form select:focus,
+.html-page form textarea:focus {
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.08);
+  outline: none;
+}
+
+.html-page form .text-xs.text-slate-500,
+.html-page form .text-sm.text-slate-600 {
+  color: #64748b;
+}
+
+.html-page form button[type="submit"] {
+  background: #111827 !important;
+  color: #ffffff !important;
+}
+
+.html-page form button[type="submit"]:hover {
+  background: #000000 !important;
+}
+
+@media (max-width: 768px) {
+  .html-page .sidebar {
+    width: 18rem;
+    max-width: calc(100vw - 1rem);
+  }
+}
