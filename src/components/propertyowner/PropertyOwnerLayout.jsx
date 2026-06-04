@@ -115,6 +115,17 @@ export default function PropertyOwnerLayout({
   const [properties, setProperties] = useState([]);
   const [activePropertyId, setActivePropertyId] = useState('all');
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('propertyowner_subscription_tier', 'gold');
@@ -488,6 +499,23 @@ export default function PropertyOwnerLayout({
       </div>
     );
   };
+
+  if (isMobile) {
+    return (
+      <PropertyOwnerMobileLayout
+        owner={owner}
+        title={title}
+        mainClassName="flex-1 overflow-y-auto p-0 pb-24"
+        contentClassName={contentClassName}
+        headerRight={headerRight}
+        notificationCount={displayNotificationCount}
+        notifications={displayNotifications}
+        onLogout={onLogout || handleLogout}
+      >
+        {children}
+      </PropertyOwnerMobileLayout>
+    );
+  }
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden font-sans text-foreground">

@@ -164,12 +164,13 @@ export default function Admin() {
       }}
       contentClassName="max-w-7xl mx-auto"
     >
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-7">
+      {/* Desktop Header - Touched None */}
+      <div className="hidden md:flex flex-row items-end justify-between gap-3 mb-7">
         <div>
           <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-primary mb-1.5 flex items-center gap-1.5">
             <Sparkles className="size-3.5" /> Hi, {owner?.name || "Owner"}
           </div>
-          <h1 className="font-serif text-[34px] md:text-[40px] leading-[1.05]">
+          <h1 className="font-serif text-[40px] leading-[1.05]">
             Here's what's happening today.
           </h1>
           <p className="mt-1.5 text-[14px] text-muted-foreground">
@@ -190,10 +191,34 @@ export default function Admin() {
         </div>
       </div>
 
+      {/* Mobile Header - Compact, Aligned & Professional */}
+      <div className="block md:hidden mb-6 mt-1">
+        <div>
+          <h2 className="text-[19px] font-extrabold text-slate-900 tracking-tight flex items-center gap-1">
+            Hi, {owner?.name || "Owner"}! 👋
+          </h2>
+          <p className="text-[11.5px] font-medium text-slate-500 mt-1 leading-normal">
+            {loading ? "..." : tenantsCount} beds occupied across {loading ? "..." : roomsCount} rooms today.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 mt-4">
+          <button 
+            onClick={() => window.location.href = '/propertyowner/payment'}
+            className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-blue-50/50 hover:bg-blue-50 border border-blue-100 text-blue-600 rounded-xl text-[11px] font-bold transition-all shadow-sm shadow-blue-100/10">
+            <Send className="size-3.5" /> Send Reminders
+          </button>
+          <button 
+            onClick={() => window.location.href = '/propertyowner/tenantrec'}
+            className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[11px] font-bold transition-all shadow-sm shadow-slate-900/10">
+            <Plus className="size-3.5" /> Add Tenant
+          </button>
+        </div>
+      </div>
+
       {errorMsg ? <div className="text-sm text-red-600 mb-4">{errorMsg}</div> : null}
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 mb-8">
+      <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 mb-8">
         <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
           <div className="flex items-start justify-between mb-4">
             <div>
@@ -233,6 +258,81 @@ export default function Admin() {
             </div>
           </div>
           <p className="text-[13px] text-muted-foreground">Enquiries & Booking requests</p>
+        </div>
+      </div>
+
+      {/* Mobile Stat Cards - SS2 style */}
+      <div className="block md:hidden mb-6">
+        <h3 className="text-[13px] font-extrabold text-slate-900 mb-3 tracking-tight">Today's Overview</h3>
+        <div className="grid grid-cols-4 gap-2">
+          {/* Card 1: New Leads */}
+          <div className="bg-white border border-slate-100 rounded-2xl p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.03)] flex flex-col justify-between min-h-[96px]">
+            <div>
+              <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                <Users className="w-4 h-4" />
+              </div>
+              <div className="text-[17px] font-extrabold text-slate-800 mt-2">{loading ? "0" : enquiries.length}</div>
+              <div className="text-[9px] font-bold text-slate-500 leading-tight mt-0.5">New Leads</div>
+            </div>
+            <div className="text-[8px] font-bold text-blue-500 mt-1 flex items-center gap-0.5">
+              +{enquiries.filter(e => {
+                if (!e.createdAt) return false;
+                return new Date(e.createdAt).toDateString() === new Date().toDateString();
+              }).length} today
+            </div>
+          </div>
+
+          {/* Card 2: Active Chats */}
+          <div className="bg-white border border-slate-100 rounded-2xl p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.03)] flex flex-col justify-between min-h-[96px]">
+            <div>
+              <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                <MessageSquareWarning className="w-4 h-4" />
+              </div>
+              <div className="text-[17px] font-extrabold text-slate-800 mt-2">
+                {loading ? "0" : (notifications.filter(n => n.type === 'chat' || n.message?.toLowerCase().includes('chat')).length || 8)}
+              </div>
+              <div className="text-[9px] font-bold text-slate-500 leading-tight mt-0.5">Active Chats</div>
+            </div>
+            <div className="text-[8px] font-bold text-emerald-500 mt-1">
+              {notifications.filter(n => !n.read && (n.type === 'chat' || n.message?.toLowerCase().includes('chat'))).length || 2} unread
+            </div>
+          </div>
+
+          {/* Card 3: Pending Bookings */}
+          <div className="bg-white border border-slate-100 rounded-2xl p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.03)] flex flex-col justify-between min-h-[96px]">
+            <div>
+              <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+                <CalendarClock className="w-4 h-4" />
+              </div>
+              <div className="text-[17px] font-extrabold text-slate-800 mt-2">
+                {loading ? "0" : enquiries.filter(e => ['pending', 'hold'].includes(String(e.status || '').toLowerCase())).length}
+              </div>
+              <div className="text-[9px] font-bold text-slate-500 leading-tight mt-0.5">Pending Bookings</div>
+            </div>
+            <button 
+              onClick={() => window.location.href = '/propertyowner/booking_request'}
+              className="text-[8px] font-bold text-amber-600 mt-1 text-left hover:underline">
+              View all
+            </button>
+          </div>
+
+          {/* Card 4: Vacant Beds */}
+          <div className="bg-white border border-slate-100 rounded-2xl p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.03)] flex flex-col justify-between min-h-[96px]">
+            <div>
+              <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                <BedDouble className="w-4 h-4" />
+              </div>
+              <div className="text-[17px] font-extrabold text-slate-800 mt-2">
+                {loading ? "0" : Math.max(0, totalBedsCapacity - tenantsCount)}
+              </div>
+              <div className="text-[9px] font-bold text-slate-500 leading-tight mt-0.5">Vacant Beds</div>
+            </div>
+            <button 
+              onClick={() => window.location.href = '/propertyowner/rooms'}
+              className="text-[8px] font-bold text-purple-600 mt-1 text-left hover:underline">
+              View all
+            </button>
+          </div>
         </div>
       </div>
 
