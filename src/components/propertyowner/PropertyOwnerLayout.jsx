@@ -504,7 +504,7 @@ export default function PropertyOwnerLayout({
     return (
       <PropertyOwnerMobileLayout
         owner={owner}
-        title={title}
+        title={title === "Dashboard" ? "" : title}
         mainClassName="flex-1 overflow-y-auto p-0 pb-24"
         contentClassName={contentClassName}
         headerRight={headerRight}

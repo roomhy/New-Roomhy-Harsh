@@ -145,43 +145,46 @@ export default function PropertyOwnerMobileLayout({
   }, [pathname]);
 
   return (
-    <div className="flex flex-col h-screen w-full bg-[#FAFAFC] font-['Plus_Jakarta_Sans'] overflow-hidden text-slate-800">
+    <div className="flex flex-col h-screen w-full bg-white font-['Plus_Jakarta_Sans'] overflow-hidden text-slate-800">
       
       {/* 1. PREMIUM HEADER */}
       <header className="sticky top-0 z-40 bg-white text-slate-800 px-4 py-3 flex flex-col justify-between shadow-sm shrink-0 border-b border-slate-100">
         <div className="flex items-center justify-between w-full">
-          {/* Brand Logo & Name */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-lg font-black tracking-tight text-slate-900 font-sans">
+          {/* Menu & Brand Logo & Name */}
+          <div className="flex items-center gap-3">
+            {/* Hamburger Menu trigger */}
+            <button 
+              onClick={() => setMoreDrawerOpen(true)}
+              className="p-1 text-slate-700 hover:text-slate-900 transition-colors"
+              aria-label="Open menu"
+            >
+              <Menu size={22} className="stroke-[2.5]" />
+            </button>
+            <span className="text-xl font-black tracking-tight text-slate-900 font-sans flex items-center">
               Roomhy<span className="text-blue-600">.com</span>
             </span>
           </div>
 
           {/* Right Header Controls */}
-          <div className="flex items-center gap-2.5">
-            {/* Quick Actions Trigger */}
-            <button 
-              onClick={() => setQuickActionsOpen(!quickActionsOpen)}
-              className="p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200/60 text-slate-700 rounded-lg transition-all"
-            >
-              <Plus size={16} className={cn("transition-transform duration-300", quickActionsOpen && "rotate-45")} />
-            </button>
-
+          <div className="flex items-center gap-3">
             {/* Notification Bell */}
             <button 
               onClick={() => setNotifDrawerOpen(true)}
-              className="relative p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200/60 text-slate-700 rounded-lg transition-all"
+              className="relative p-1.5 text-slate-700 transition-all"
+              aria-label="Notifications"
             >
-              <Bell size={16} />
+              <Bell size={22} className="stroke-[2]" />
               {displayNotificationCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white shadow-sm animate-pulse" />
+                <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 bg-[#E11D48] text-white text-[8px] font-black rounded-full flex items-center justify-center border border-white shadow-sm">
+                  {displayNotificationCount}
+                </span>
               )}
             </button>
 
             {/* Profile Avatar */}
             <button 
               onClick={() => setProfileDrawerOpen(true)}
-              className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center border border-white/20 shadow-sm"
+              className="w-8 h-8 rounded-full bg-blue-600 text-white font-black text-sm flex items-center justify-center border border-white/20 shadow-sm"
             >
               {ownerInitial}
             </button>
@@ -244,7 +247,7 @@ export default function PropertyOwnerMobileLayout({
       </header>
 
       {/* 2. BODY CONTENT */}
-      <main className={cn("flex-1 overflow-y-auto bg-[#FAFAFC] custom-scrollbar", mainClassName)}>
+      <main className={cn("flex-1 overflow-y-auto bg-white custom-scrollbar", mainClassName)}>
         {title && (
           <div className="px-2.5 pt-4 pb-2">
             <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">{title}</h2>

@@ -7,6 +7,7 @@ import {
   BedDouble,
   IndianRupee,
   ArrowUpRight,
+  ArrowDownRight,
   BarChart2,
   Wallet,
   AlertTriangle,
@@ -15,7 +16,13 @@ import {
   Sparkles,
   TrendingUp,
   MessageSquareWarning,
-  CalendarClock
+  CalendarClock,
+  Calendar,
+  Building2,
+  MessageCircle,
+  ChevronRight,
+  Clock,
+  AlertCircle
 } from "lucide-react";
 import { StatCard } from "../../components/propertyowner/StatCard";
 import { Pill } from "../../components/propertyowner/Pill";
@@ -55,8 +62,18 @@ export default function Admin() {
   const [rentTotal, setRentTotal] = useState(0);
   const [enquiries, setEnquiries] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [propertiesCount, setPropertiesCount] = useState(0);
+  const [recentChats, setRecentChats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
+  const [mobileChartTab, setMobileChartTab] = useState("revenue");
+
+  const getGreeting = () => {
+    const hrs = new Date().getHours();
+    if (hrs < 12) return "Good Morning";
+    if (hrs < 17) return "Good Afternoon";
+    return "Good Evening";
+  };
 
   const notificationCount = useMemo(
     () => {
@@ -75,13 +92,14 @@ export default function Admin() {
     setLoading(true);
     setErrorMsg("");
     try {
-      const [ownerRes, roomsRes, tenantsRes, rentRes, enquiryRes, notificationRes] = await Promise.all([
+      const [ownerRes, roomsRes, tenantsRes, rentRes, enquiryRes, notificationRes, chatRes] = await Promise.all([
         fetchJson(`/api/owners/${encodeURIComponent(loginId)}`).catch(() => null),
         fetchJson(`/api/owners/${encodeURIComponent(loginId)}/rooms`),
         fetchOwnerTenants(loginId),
         fetchJson(`/api/owners/${encodeURIComponent(loginId)}/rent`),
         fetchJson(`/api/owners/${encodeURIComponent(loginId)}/enquiries`),
-        fetchJson(`/api/notifications?toLoginId=${encodeURIComponent(loginId)}`)
+        fetchJson(`/api/notifications?toLoginId=${encodeURIComponent(loginId)}`),
+        fetchJson(`/api/chat/inbox/${encodeURIComponent(loginId)}?search=`).catch(() => null)
       ]);
       setOwner((prev) => ({ ...prev, ...(ownerRes || {}) }));
       
@@ -92,6 +110,8 @@ export default function Admin() {
       setRoomsCount(filteredRooms.length);
       setTotalBedsCapacity(filteredRooms.reduce((s, r) => s + (r.beds || 1), 0));
       setTenantsCount(filteredTenants.length);
+      setPropertiesCount(roomsRes?.properties?.length || 0);
+      setRecentChats(chatRes?.conversations || []);
       
       const computedRent = allEnquiries
           .filter(e => String(e.status).toLowerCase() === 'accepted' || String(e.status).toLowerCase() === 'approved' || String(e.status).toLowerCase() === 'active')
@@ -191,27 +211,15 @@ export default function Admin() {
         </div>
       </div>
 
-      {/* Mobile Header - Compact, Aligned & Professional */}
-      <div className="block md:hidden mb-6 mt-1">
+      {/* Mobile Header - Mockup Match */}
+      <div className="block md:hidden mb-4 mt-0.5 px-1">
         <div>
-          <h2 className="text-[19px] font-extrabold text-slate-900 tracking-tight flex items-center gap-1">
-            Hi, {owner?.name || "Owner"}! 👋
+          <h2 className="text-[22px] font-black text-slate-900 tracking-tight flex items-center gap-1.5 font-sans">
+            {getGreeting()}, {owner?.name || "Owner"}! 👋
           </h2>
-          <p className="text-[11.5px] font-medium text-slate-500 mt-1 leading-normal">
-            {loading ? "..." : tenantsCount} beds occupied across {loading ? "..." : roomsCount} rooms today.
+          <p className="text-[12.5px] font-semibold text-slate-500 mt-0.5 leading-normal">
+            Here's what's happening with your properties today.
           </p>
-        </div>
-        <div className="grid grid-cols-2 gap-2 mt-4">
-          <button 
-            onClick={() => window.location.href = '/propertyowner/payment'}
-            className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-blue-50/50 hover:bg-blue-50 border border-blue-100 text-blue-600 rounded-xl text-[11px] font-bold transition-all shadow-sm shadow-blue-100/10">
-            <Send className="size-3.5" /> Send Reminders
-          </button>
-          <button 
-            onClick={() => window.location.href = '/propertyowner/tenantrec'}
-            className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[11px] font-bold transition-all shadow-sm shadow-slate-900/10">
-            <Plus className="size-3.5" /> Add Tenant
-          </button>
         </div>
       </div>
 
@@ -261,82 +269,220 @@ export default function Admin() {
         </div>
       </div>
 
-      {/* Mobile Stat Cards - SS2 style */}
-      <div className="block md:hidden mb-6">
-        <h3 className="text-[13px] font-extrabold text-slate-900 mb-3 tracking-tight">Today's Overview</h3>
-        <div className="grid grid-cols-4 gap-2">
-          {/* Card 1: New Leads */}
-          <div className="bg-white border border-slate-100 rounded-2xl p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.03)] flex flex-col justify-between min-h-[96px]">
-            <div>
-              <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
-                <Users className="w-4 h-4" />
+      {/* MOBILE VIEW - RESTORED ORIGINAL CONTENT WITH PREMIUM UI STYLING */}
+      <div className="block md:hidden space-y-5 pb-24 px-1">
+        
+        {/* 1. Today's Overview (The 3 Stats Cards in 1 Row) */}
+        <div>
+          <h3 className="text-[13px] font-extrabold uppercase tracking-wider text-slate-400 mb-2.5 font-sans flex items-center gap-1.5">
+            <span className="w-1 h-3 rounded-full bg-blue-650 shrink-0" /> Today's Overview
+          </h3>
+          <div className="grid grid-cols-3 gap-2">
+            {/* Card 1: Expected Rent */}
+            <div className="bg-white border border-slate-100 rounded-[20px] p-3 shadow-[0_4px_16px_rgba(0,0,0,0.015)] flex flex-col justify-between min-h-[96px] active:scale-[0.98] transition-transform duration-200">
+              <div>
+                <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mb-2">
+                  <IndianRupee className="w-3.5 h-3.5" />
+                </div>
+                <div className="text-[14.5px] font-black text-slate-900 leading-tight">₹{loading ? "0" : (rentTotal * 30).toLocaleString('en-IN')}</div>
+                <div className="text-[9px] font-bold text-slate-500 mt-1 leading-none">Expected Rent</div>
               </div>
-              <div className="text-[17px] font-extrabold text-slate-800 mt-2">{loading ? "0" : enquiries.length}</div>
-              <div className="text-[9px] font-bold text-slate-500 leading-tight mt-0.5">New Leads</div>
+              <span className="text-[8px] text-slate-400 font-semibold truncate mt-1.5 block">From {tenantsCount} tenants</span>
             </div>
-            <div className="text-[8px] font-bold text-blue-500 mt-1 flex items-center gap-0.5">
-              +{enquiries.filter(e => {
-                if (!e.createdAt) return false;
-                return new Date(e.createdAt).toDateString() === new Date().toDateString();
-              }).length} today
+
+            {/* Card 2: Total Tenants */}
+            <div className="bg-white border border-slate-100 rounded-[20px] p-3 shadow-[0_4px_16px_rgba(0,0,0,0.015)] flex flex-col justify-between min-h-[96px] active:scale-[0.98] transition-transform duration-200">
+              <div>
+                <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mb-2">
+                  <Users className="w-3.5 h-3.5" />
+                </div>
+                <div className="text-[14.5px] font-black text-slate-900 leading-tight">{loading ? "0" : tenantsCount}</div>
+                <div className="text-[9px] font-bold text-slate-500 mt-1 leading-none">Residing Tenants</div>
+              </div>
+              <span className="text-[8px] text-slate-400 font-semibold truncate mt-1.5 block">Active residents</span>
+            </div>
+
+            {/* Card 3: Total Leads */}
+            <div className="bg-white border border-slate-100 rounded-[20px] p-3 shadow-[0_4px_16px_rgba(0,0,0,0.015)] flex flex-col justify-between min-h-[96px] active:scale-[0.98] transition-transform duration-200">
+              <div>
+                <div className="w-7 h-7 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 mb-2">
+                  <TrendingUp className="w-3.5 h-3.5" />
+                </div>
+                <div className="text-[14.5px] font-black text-slate-900 leading-tight">{loading ? "0" : enquiries.length}</div>
+                <div className="text-[9px] font-bold text-slate-500 mt-1 leading-none">Total Leads</div>
+              </div>
+              <span className="text-[8px] text-slate-400 font-semibold truncate mt-1.5 block">Booking requests</span>
             </div>
           </div>
+        </div>
 
-          {/* Card 2: Active Chats */}
-          <div className="bg-white border border-slate-100 rounded-2xl p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.03)] flex flex-col justify-between min-h-[96px]">
-            <div>
-              <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                <MessageSquareWarning className="w-4 h-4" />
-              </div>
-              <div className="text-[17px] font-extrabold text-slate-800 mt-2">
-                {loading ? "0" : (notifications.filter(n => n.type === 'chat' || n.message?.toLowerCase().includes('chat')).length || 8)}
-              </div>
-              <div className="text-[9px] font-bold text-slate-500 leading-tight mt-0.5">Active Chats</div>
-            </div>
-            <div className="text-[8px] font-bold text-emerald-500 mt-1">
-              {notifications.filter(n => !n.read && (n.type === 'chat' || n.message?.toLowerCase().includes('chat'))).length || 2} unread
-            </div>
-          </div>
-
-          {/* Card 3: Pending Bookings */}
-          <div className="bg-white border border-slate-100 rounded-2xl p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.03)] flex flex-col justify-between min-h-[96px]">
-            <div>
-              <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
-                <CalendarClock className="w-4 h-4" />
-              </div>
-              <div className="text-[17px] font-extrabold text-slate-800 mt-2">
-                {loading ? "0" : enquiries.filter(e => ['pending', 'hold'].includes(String(e.status || '').toLowerCase())).length}
-              </div>
-              <div className="text-[9px] font-bold text-slate-500 leading-tight mt-0.5">Pending Bookings</div>
-            </div>
+        {/* 2. QUICK ACTION TILES GRID - 1 Row (4 Columns) */}
+        <div>
+          <h3 className="text-[13px] font-extrabold uppercase tracking-wider text-slate-400 mb-2.5 font-sans flex items-center gap-1.5">
+            <span className="w-1 h-3 rounded-full bg-blue-650 shrink-0" /> Quick Actions
+          </h3>
+          <div className="grid grid-cols-4 gap-2">
             <button 
-              onClick={() => window.location.href = '/propertyowner/booking_request'}
-              className="text-[8px] font-bold text-amber-600 mt-1 text-left hover:underline">
-              View all
+              onClick={() => window.location.href = '/propertyowner/tenantrec'}
+              className="flex flex-col items-center justify-center p-3 bg-white border border-slate-100 rounded-[20px] transition-all shadow-[0_4px_16px_rgba(0,0,0,0.01)] active:scale-95 duration-200"
+            >
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mb-2 shadow-sm">
+                <Plus className="w-4 h-4" />
+              </div>
+              <span className="text-[9px] font-extrabold text-slate-700 mt-1 text-center leading-tight">Add Tenant</span>
             </button>
-          </div>
 
-          {/* Card 4: Vacant Beds */}
-          <div className="bg-white border border-slate-100 rounded-2xl p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.03)] flex flex-col justify-between min-h-[96px]">
-            <div>
-              <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
-                <BedDouble className="w-4 h-4" />
+            <button 
+              onClick={() => window.location.href = '/propertyowner/payment'}
+              className="flex flex-col items-center justify-center p-3 bg-white border border-slate-100 rounded-[20px] transition-all shadow-[0_4px_16px_rgba(0,0,0,0.01)] active:scale-95 duration-200"
+            >
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mb-2 shadow-sm">
+                <Send className="w-4 h-4" />
               </div>
-              <div className="text-[17px] font-extrabold text-slate-800 mt-2">
-                {loading ? "0" : Math.max(0, totalBedsCapacity - tenantsCount)}
+              <span className="text-[9px] font-extrabold text-slate-700 mt-1 text-center leading-tight">Reminders</span>
+            </button>
+
+            <button 
+              onClick={() => window.location.href = '/propertyowner/booking'}
+              className="flex flex-col items-center justify-center p-3 bg-white border border-slate-100 rounded-[20px] transition-all shadow-[0_4px_16px_rgba(0,0,0,0.01)] active:scale-95 duration-200"
+            >
+              <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 mb-2 shadow-sm">
+                <Calendar className="w-4 h-4" />
               </div>
-              <div className="text-[9px] font-bold text-slate-500 leading-tight mt-0.5">Vacant Beds</div>
-            </div>
+              <span className="text-[9px] font-extrabold text-slate-700 mt-1 text-center leading-tight">Book Bed</span>
+            </button>
+
             <button 
               onClick={() => window.location.href = '/propertyowner/rooms'}
-              className="text-[8px] font-bold text-purple-600 mt-1 text-left hover:underline">
-              View all
+              className="flex flex-col items-center justify-center p-3 bg-white border border-slate-100 rounded-[20px] transition-all shadow-[0_4px_16px_rgba(0,0,0,0.01)] active:scale-95 duration-200"
+            >
+              <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 mb-2 shadow-sm">
+                <BedDouble className="w-4 h-4" />
+              </div>
+              <span className="text-[9px] font-extrabold text-slate-700 mt-1 text-center leading-tight">Rooms</span>
             </button>
+          </div>
+        </div>
+
+        {/* 3. Portfolio Analytics */}
+        <div>
+          <h3 className="text-[13px] font-extrabold uppercase tracking-wider text-slate-400 mb-2.5 font-sans flex items-center gap-1.5">
+            <span className="w-1 h-3 rounded-full bg-blue-650 shrink-0" /> Portfolio Analytics
+          </h3>
+          <div className="bg-white border border-slate-100 rounded-[24px] p-4 shadow-[0_6px_24px_rgba(0,0,0,0.015)] space-y-5">
+            {/* Chart 1: Revenue (Collection Flow) */}
+            <div>
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <h4 className="text-[12px] font-extrabold text-slate-800 font-sans">Weekly Collection</h4>
+                  <p className="text-[9.5px] text-slate-400 font-bold font-sans">Last 7 days revenue flow</p>
+                </div>
+                <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">
+                  <TrendingUp size={11} className="stroke-[2.5]" /> +12.4%
+                </span>
+              </div>
+              
+              <div className="h-[130px] mt-2 -ml-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={[{day: "Mon", amount: 15000}, {day: "Tue", amount: 25000}, {day: "Wed", amount: 10000}, {day: "Thu", amount: 45000}, {day: "Fri", amount: 30000}, {day: "Sat", amount: 50000}, {day: "Sun", amount: 15000}]} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                    <defs>
+                      <linearGradient id="g1-mobile" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.25} />
+                        <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#94a3b8", fontWeight: "bold" }} />
+                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#94a3b8", fontWeight: "bold" }} tickFormatter={(v) => `₹${v / 1000}k`} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", background: "#ffffff", fontSize: 9, fontWeight: "bold" }}
+                      formatter={(v) => [`Rs ${v}`, "Collected"]}
+                    />
+                    <Area type="monotone" dataKey="amount" stroke="#3b82f6" strokeWidth={2} fill="url(#g1-mobile)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-slate-100" />
+
+            {/* Chart 2: Occupancy */}
+            <div>
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <h4 className="text-[12px] font-extrabold text-slate-800 font-sans">Property Occupancy</h4>
+                  <p className="text-[9.5px] text-slate-400 font-bold font-sans">Active vs Vacant capacity</p>
+                </div>
+                <div className="text-[9.5px] font-bold text-blue-650 bg-blue-50 px-2 py-0.5 rounded-full shrink-0">
+                  {totalBedsCapacity ? Math.min(100, Math.round(((tenantsCount||0) / totalBedsCapacity) * 100)) : 0}% Occupied
+                </div>
+              </div>
+
+              <div className="grid grid-cols-12 gap-3 items-center mt-3">
+                {/* Circular Chart (Left) */}
+                <div className="col-span-5 relative h-[90px] flex items-center justify-center">
+                  <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      className="text-slate-100"
+                      strokeWidth="3.5"
+                      stroke="currentColor"
+                      fill="none"
+                      d="M18 2.0845
+                        a 15.9155 15.9155 0 0 1 0 31.831
+                        a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    <path
+                      className="text-blue-600"
+                      strokeDasharray={`${totalBedsCapacity ? Math.min(100, Math.round((tenantsCount / totalBedsCapacity) * 100)) : 87}, 100`}
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      stroke="currentColor"
+                      fill="none"
+                      d="M18 2.0845
+                        a 15.9155 15.9155 0 0 1 0 31.831
+                        a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                    <span className="text-[12.5px] font-black text-slate-800 leading-none">{tenantsCount}</span>
+                    <span className="text-[7.5px] text-slate-400 font-extrabold mt-0.5">residing</span>
+                  </div>
+                </div>
+
+                {/* Table details (Right) */}
+                <div className="col-span-7 space-y-1.5 pl-2">
+                  <div className="flex items-center justify-between border-b border-slate-50 pb-1">
+                    <div className="flex items-center gap-1.5 text-[9.5px] text-slate-500 font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                      <span>Occupied Beds</span>
+                    </div>
+                    <span className="text-[11px] font-black text-slate-800">{tenantsCount || 0}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between border-b border-slate-50 pb-1">
+                    <div className="flex items-center gap-1.5 text-[9.5px] text-slate-500 font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-200 shrink-0" />
+                      <span>Vacant Beds</span>
+                    </div>
+                    <span className="text-[11px] font-black text-slate-800">{Math.max((totalBedsCapacity || 0) - (tenantsCount || 0), 0)}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-[9.5px] text-slate-500 font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-900 shrink-0" />
+                      <span>Total Capacity</span>
+                    </div>
+                    <span className="text-[11px] font-black text-slate-800">{totalBedsCapacity || 0}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5 mt-5">
+      <div className="hidden md:grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5 mt-5">
         {/* Collection chart */}
         <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-5 shadow-soft">
           <div className="flex items-start justify-between mb-1">
