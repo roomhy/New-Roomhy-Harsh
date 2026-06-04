@@ -194,6 +194,7 @@ export const PROPERTY_OWNER_NAV = [
       { label: "Role Permissions", href: "/propertyowner/role-permissions", goldOnly: false },
       { label: "Language Settings", href: "/propertyowner/language-settings", goldOnly: false },
       { label: "Theme Settings", href: "/propertyowner/theme-settings", goldOnly: false },
+      { label: "Data Backup", href: "/propertyowner/settings#backup", goldOnly: false },
     ]
   }
 ];

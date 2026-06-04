@@ -428,6 +428,11 @@ export const deleteTenantRecord = async (id) => fetchJson(`/api/tenants/${encode
   method: "DELETE"
 });
 
+export const updateTenant = async (id, payload) => fetchJson(`/api/tenants/${encodeURIComponent(id)}`, {
+  method: "PATCH",
+  body: JSON.stringify(payload)
+});
+
 export const updateBookingDecision = async (bookingId, action) => {
   const endpoint = action === "approve" ? "approve" : "reject";
   return fetchJson(`/api/booking/requests/${encodeURIComponent(bookingId)}/${endpoint}`, { method: "PUT" });

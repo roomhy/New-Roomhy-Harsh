@@ -103,7 +103,8 @@ export default function PropertyOwnerLayout({
   notifications = [],
   showNotificationSettings = false,
   onNotificationSettingsClick,
-  onLogout
+  onLogout,
+  disableSubmenuStrip = false
 }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -511,6 +512,7 @@ export default function PropertyOwnerLayout({
         notificationCount={displayNotificationCount}
         notifications={displayNotifications}
         onLogout={onLogout || handleLogout}
+        disableSubmenuStrip={disableSubmenuStrip}
       >
         {children}
       </PropertyOwnerMobileLayout>
@@ -618,7 +620,7 @@ export default function PropertyOwnerLayout({
         )}
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-4 space-y-0.5 custom-scrollbar pb-6">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-4 space-y-0.5 custom-scrollbar pb-6">
           {CURRENT_NAV.map(renderDynamicNavItem)}
 
           <div className="pt-4 mt-4 border-t border-slate-800/50">

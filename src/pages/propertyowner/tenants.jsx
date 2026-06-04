@@ -5,12 +5,15 @@ import {
   Plus, Search, ArrowUpDown, Download, Users, ExternalLink,
   User, CalendarClock, CheckCircle, AlertTriangle, Phone,
   Shield, Building2, FileText, BadgeCheck, X, MapPin, Mail,
-  CreditCard, Home
+  CreditCard, Home, Edit
 } from "lucide-react";
 import {
   clearOwnerRuntimeSession,
   fetchOwnerTenants,
-  getOwnerRuntimeSession
+  getOwnerRuntimeSession,
+  updateTenant,
+  clearOwnerFetchCache,
+  fetchOwnerRooms
 } from "../../utils/propertyowner";
 import { API_URL } from "../../services/api";
 
@@ -50,6 +53,122 @@ export default function Tenants() {
   const [sortOrder, setSortOrder] = useState("asc");
   const [selectedTenant, setSelectedTenant] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingTenant, setEditingTenant] = useState(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    roomNo: "",
+    bedNo: "",
+    agreedRent: 0
+  });
+  const [saving, setSaving] = useState(false);
+
+  // Transfer room states
+  const [rooms, setRooms] = useState([]);
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [transferringTenant, setTransferringTenant] = useState(null);
+  const [transferForm, setTransferForm] = useState({
+    roomId: "",
+    roomNo: "",
+    bedNo: "",
+    agreedRent: 0,
+    transferDate: new Date().toISOString().split("T")[0]
+  });
+
+  const handleEditClick = (t) => {
+    setEditingTenant(t);
+    setEditForm({
+      name: t.name || "",
+      phone: t.phone || "",
+      email: t.email || "",
+      roomNo: t.roomNo || "",
+      bedNo: t.bedNo || "",
+      agreedRent: t.agreedRent || t.rent || 0
+    });
+    setEditModalOpen(true);
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editingTenant?._id && !editingTenant?.id) return;
+    setSaving(true);
+    setErrorMsg("");
+    try {
+      const updated = await updateTenant(editingTenant._id || editingTenant.id, {
+        name: editForm.name,
+        phone: editForm.phone,
+        email: editForm.email,
+        roomNo: editForm.roomNo,
+        bedNo: editForm.bedNo,
+        agreedRent: Number(editForm.agreedRent)
+      });
+      
+      // Update tenant in local state
+      setTenants(prev => prev.map(t => (t._id === editingTenant._id || t.id === editingTenant.id || t._id === updated._id || t.id === updated.id) ? { ...t, ...updated } : t));
+      setEditModalOpen(false);
+      setEditingTenant(null);
+      
+      // Clear owner fetch cache so that re-fetch gives fresh data
+      if (owner?.loginId) {
+        clearOwnerFetchCache(owner.loginId);
+      }
+    } catch (err) {
+      setErrorMsg(err?.body || err?.message || "Failed to update tenant details.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTransferClick = (t) => {
+    setTransferringTenant(t);
+    setTransferForm({
+      roomId: t.room || "",
+      roomNo: t.roomNo || "",
+      bedNo: t.bedNo || "",
+      agreedRent: t.agreedRent || t.rent || 0,
+      transferDate: new Date().toISOString().split("T")[0]
+    });
+    setTransferModalOpen(true);
+  };
+
+  const handleSaveTransfer = async (e) => {
+    e.preventDefault();
+    if (!transferringTenant?._id && !transferringTenant?.id) return;
+    if (!transferForm.roomNo) {
+      setErrorMsg("Please select a target room.");
+      return;
+    }
+    if (!transferForm.bedNo) {
+      setErrorMsg("Please select a target bed.");
+      return;
+    }
+    setSaving(true);
+    setErrorMsg("");
+    try {
+      const updated = await updateTenant(transferringTenant._id || transferringTenant.id, {
+        roomNo: transferForm.roomNo,
+        bedNo: transferForm.bedNo,
+        agreedRent: Number(transferForm.agreedRent),
+        moveInDate: transferForm.transferDate ? new Date(transferForm.transferDate) : undefined
+      });
+      
+      // Update tenant in local state
+      setTenants(prev => prev.map(t => (t._id === transferringTenant._id || t.id === transferringTenant.id || t._id === updated._id || t.id === updated.id) ? { ...t, ...updated } : t));
+      setTransferModalOpen(false);
+      setTransferringTenant(null);
+      
+      // Clear owner fetch cache so that re-fetch gives fresh data
+      if (owner?.loginId) {
+        clearOwnerFetchCache(owner.loginId);
+      }
+    } catch (err) {
+      setErrorMsg(err?.body || err?.message || "Failed to transfer room.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   useEffect(() => {
     const session = getOwnerRuntimeSession();
@@ -57,8 +176,14 @@ export default function Tenants() {
     setOwner(session);
     const load = async () => {
       try {
-        const data = await fetchOwnerTenants(session.loginId);
-        setTenants(data || []);
+        const [tenantsData, roomsData] = await Promise.all([
+          fetchOwnerTenants(session.loginId),
+          fetchOwnerRooms(session.loginId).catch(() => ({ rooms: [] }))
+        ]);
+        // Filter out inactive soft-deleted tenants from main view
+        const activeTenantsOnly = (tenantsData || []).filter(t => t.status !== "inactive");
+        setTenants(activeTenantsOnly);
+        setRooms(roomsData?.rooms || []);
       } catch (err) {
         setErrorMsg(err?.body || err?.message || "Failed to load tenants.");
       } finally {
@@ -249,7 +374,7 @@ export default function Tenants() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-[13px] text-foreground">
-                        {t.propertyName || (t.property && typeof t.property === "object" ? t.property.title || t.property.name : t.property) || "—"}
+                        {t.propertyTitle || t.propertyName || (t.property && typeof t.property === "object" ? t.property.title || t.property.name : t.property) || "—"}
                       </div>
                       <div className="text-[11.5px] text-muted-foreground">Room {t.roomNo || "—"} / Bed {t.bedNo || "—"}</div>
                     </td>
@@ -266,12 +391,26 @@ export default function Tenants() {
                       <Pill tone={getStatusTone(t.status)}>{t.status || "active"}</Pill>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button 
-                        onClick={() => { setSelectedTenant(t); setModalOpen(true); }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors"
-                      >
-                        <ExternalLink size={14} /> View
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button 
+                          onClick={() => { setSelectedTenant(t); setModalOpen(true); }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-semibold text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors"
+                        >
+                          <ExternalLink size={14} /> View
+                        </button>
+                        <button 
+                          onClick={() => handleEditClick(t)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-semibold text-amber-600 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
+                        >
+                          <Edit size={14} /> Edit
+                        </button>
+                        <button 
+                          onClick={() => handleTransferClick(t)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-semibold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                        >
+                          <ArrowUpDown size={14} /> Transfer
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -357,7 +496,7 @@ export default function Tenants() {
                   <div className="p-4 rounded-xl border border-border bg-muted/10">
                     <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Room Details</span>
                     <div className="font-medium text-foreground text-[14px]">
-                      {val(t.propertyName, typeof t.property === "object" ? t.property?.title : null, "—")}
+                      {val(t.propertyTitle, t.propertyName, typeof t.property === "object" ? t.property?.title : null, "—")}
                     </div>
                     <div className="text-[12.5px] text-muted-foreground mt-0.5">
                       Room {t.roomNo || "—"}{t.bedNo ? ` / Bed ${t.bedNo}` : ""}
@@ -541,6 +680,330 @@ export default function Tenants() {
                   Close
                 </button>
               </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Edit Tenant Modal */}
+      {editModalOpen && editingTenant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/60 backdrop-blur-sm">
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh] border border-border">
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-border flex items-center justify-between bg-muted/30">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                  <Edit size={20} />
+                </div>
+                <div>
+                  <h2 className="text-[18px] font-semibold text-foreground">Edit Tenant Details</h2>
+                  <p className="text-[11.5px] text-muted-foreground mt-0.5">{editingTenant.loginId || "—"}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setEditModalOpen(false); setEditingTenant(null); }}
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Form Body */}
+            <form onSubmit={handleSaveEdit} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 overflow-y-auto space-y-4 flex-1 text-left">
+                <div>
+                  <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Tenant Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.name}
+                    onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Phone Number</label>
+                    <input
+                      type="tel"
+                      required
+                      value={editForm.phone}
+                      onChange={e => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Email Address</label>
+                    <input
+                      type="email"
+                      value={editForm.email}
+                      onChange={e => setEditForm(prev => ({ ...prev, email: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Room Number</label>
+                    <input
+                      type="text"
+                      required
+                      value={editForm.roomNo}
+                      onChange={e => setEditForm(prev => ({ ...prev, roomNo: e.target.value }))}
+                      placeholder="e.g. 101"
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Bed Number</label>
+                    <input
+                      type="text"
+                      value={editForm.bedNo}
+                      onChange={e => setEditForm(prev => ({ ...prev, bedNo: e.target.value }))}
+                      placeholder="e.g. 1, A, or B"
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Monthly Rent (₹)</label>
+                  <input
+                    type="number"
+                    required
+                    value={editForm.agreedRent}
+                    onChange={e => setEditForm(prev => ({ ...prev, agreedRent: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-border bg-muted/30 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => { setEditModalOpen(false); setEditingTenant(null); }}
+                  className="px-4 py-2 rounded-lg border border-border text-[13px] font-medium hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-5 py-2 rounded-lg bg-foreground text-background text-[13px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {saving ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Tenant Room Modal */}
+      {transferModalOpen && transferringTenant && (() => {
+        // Filter owner's rooms by the tenant's current property
+        const tenantPropertyId = transferringTenant.property?._id || transferringTenant.property || transferringTenant.propertyId;
+        const propertyRooms = rooms.filter(r => {
+          const rPropId = r.property?._id || r.property || r.propertyId;
+          return String(rPropId) === String(tenantPropertyId);
+        });
+
+        // Find currently selected target room object to show available beds
+        const selectedRoomObj = propertyRooms.find(r => r.roomNo === transferForm.roomNo || r.number === transferForm.roomNo);
+        const bedAssignments = selectedRoomObj?.bedAssignments || [];
+        const capacity = selectedRoomObj?.capacity || selectedRoomObj?.totalBeds || 1;
+
+        // Generate list of bed slots (1-indexed)
+        const bedSlots = Array.from({ length: capacity }, (_, idx) => {
+          const bedNum = String(idx + 1);
+          const assignment = bedAssignments[idx];
+          const isOccupied = assignment && assignment.tenantId && String(assignment.tenantId) !== String(transferringTenant._id);
+          return {
+            bedNo: bedNum,
+            isOccupied,
+            occupiedBy: assignment?.tenantName || "Another tenant"
+          };
+        });
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/60 backdrop-blur-sm">
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh] border border-border animate-in fade-in zoom-in duration-200">
+              
+              {/* Header */}
+              <div className="px-6 py-5 border-b border-border flex items-center justify-between bg-muted/30">
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                    <ArrowUpDown size={20} />
+                  </div>
+                  <div>
+                    <h2 className="text-[18px] font-semibold text-foreground">Transfer Room</h2>
+                    <p className="text-[11.5px] text-muted-foreground mt-0.5">Move {transferringTenant.name} to another room</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setTransferModalOpen(false); setTransferringTenant(null); }}
+                  className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Form Body */}
+              <form onSubmit={handleSaveTransfer} className="flex flex-col flex-1 overflow-hidden">
+                <div className="p-6 overflow-y-auto space-y-5 flex-1 text-left">
+                  
+                  {/* Current Room Info Summary */}
+                  <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/30 space-y-1">
+                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest block">Current Placement</span>
+                    <div className="text-[13px] font-semibold text-foreground">
+                      Room {transferringTenant.roomNo || "—"} / Bed {transferringTenant.bedNo || "—"}
+                    </div>
+                    <div className="text-[11.5px] text-muted-foreground">
+                      Current Rent: ₹{(transferringTenant.agreedRent || transferringTenant.rent || 0).toLocaleString("en-IN")} · Property: {transferringTenant.propertyTitle || "—"}
+                    </div>
+                  </div>
+
+                  {/* Date Input */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Transfer Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={transferForm.transferDate}
+                      onChange={e => setTransferForm(prev => ({ ...prev, transferDate: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+
+                  {/* Room Selector */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">New Room</label>
+                    <select
+                      value={transferForm.roomNo}
+                      onChange={e => {
+                        const targetRoomNo = e.target.value;
+                        const targetRoomObj = propertyRooms.find(r => r.roomNo === targetRoomNo || r.number === targetRoomNo);
+                        const targetRoomRent = targetRoomObj?.roomRent || targetRoomObj?.rent || 0;
+                        setTransferForm(prev => ({
+                          ...prev,
+                          roomNo: targetRoomNo,
+                          roomId: targetRoomObj?._id || "",
+                          bedNo: "", // Reset bed number on room change
+                          agreedRent: targetRoomRent || prev.agreedRent // Default to room's rent if available
+                        }));
+                      }}
+                      required
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
+                    >
+                      <option value="">Select target room...</option>
+                      {propertyRooms.map(room => {
+                        // Calculate vacant beds count
+                        const currentRoomCapacity = room.capacity || room.totalBeds || 1;
+                        const currentAssignments = room.bedAssignments || [];
+                        let occupiedCount = 0;
+                        for (let i = 0; i < currentRoomCapacity; i++) {
+                          const assignment = currentAssignments[i];
+                          // Do not count the transferring tenant as occupied in their own room
+                          if (assignment && assignment.tenantId && String(assignment.tenantId) !== String(transferringTenant._id)) {
+                            occupiedCount++;
+                          }
+                        }
+                        const vacantCount = Math.max(0, currentRoomCapacity - occupiedCount);
+                        const isCurrent = String(room.roomNo) === String(transferringTenant.roomNo);
+
+                        return (
+                          <option key={room._id || room.id} value={room.roomNo}>
+                            Room {room.roomNo} ({vacantCount} / {currentRoomCapacity} beds vacant) {isCurrent ? " - Current" : ""}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  {/* Bed Selector (Visual grid) */}
+                  {transferForm.roomNo && (
+                    <div>
+                      <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Select Bed</label>
+                      {bedSlots.length === 0 ? (
+                        <p className="text-[12px] text-muted-foreground italic">No beds defined for this room.</p>
+                      ) : (
+                        <div className="grid grid-cols-3 gap-2.5">
+                          {bedSlots.map(slot => {
+                            const isSelected = transferForm.bedNo === slot.bedNo;
+                            const isCurrentBed = String(slot.bedNo) === String(transferringTenant.bedNo) && String(transferForm.roomNo) === String(transferringTenant.roomNo);
+                            
+                            return (
+                              <button
+                                key={slot.bedNo}
+                                type="button"
+                                disabled={slot.isOccupied}
+                                onClick={() => setTransferForm(prev => ({ ...prev, bedNo: slot.bedNo }))}
+                                className={[
+                                  "p-3 rounded-xl border flex flex-col items-center justify-center transition-all text-center gap-1 min-h-[70px]",
+                                  slot.isOccupied 
+                                    ? "bg-muted/40 border-border text-muted-foreground/50 cursor-not-allowed"
+                                    : isCurrentBed
+                                    ? "bg-amber-50 border-amber-300 text-amber-800 ring-2 ring-amber-300/30"
+                                    : isSelected
+                                    ? "bg-blue-50 border-blue-500 text-blue-700 font-semibold ring-2 ring-blue-500/20"
+                                    : "bg-background border-border text-foreground hover:border-blue-300 hover:bg-blue-50/10"
+                                ].join(" ")}
+                              >
+                                <span className="text-[13px] font-medium">Bed {slot.bedNo}</span>
+                                <span className="text-[9.5px] uppercase tracking-wide">
+                                  {isCurrentBed ? "Current" : slot.isOccupied ? "Occupied" : "Vacant"}
+                                </span>
+                                {slot.isOccupied && (
+                                  <span className="text-[8px] text-muted-foreground truncate w-full max-w-[80px]" title={slot.occupiedBy}>
+                                    ({slot.occupiedBy})
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Rent Override */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">New Monthly Rent (₹)</label>
+                    <input
+                      type="number"
+                      required
+                      value={transferForm.agreedRent}
+                      onChange={e => setTransferForm(prev => ({ ...prev, agreedRent: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                    <span className="text-[10px] text-muted-foreground mt-1 block">
+                      Current rent: ₹{(transferringTenant.agreedRent || transferringTenant.rent || 0).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-border bg-muted/30 flex justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => { setTransferModalOpen(false); setTransferringTenant(null); }}
+                    className="px-4 py-2 rounded-lg border border-border text-[13px] font-medium hover:bg-muted transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving || !transferForm.roomNo || !transferForm.bedNo}
+                    className="px-5 py-2 rounded-lg bg-foreground text-background text-[13px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {saving ? "Transferring..." : "Confirm Transfer"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         );

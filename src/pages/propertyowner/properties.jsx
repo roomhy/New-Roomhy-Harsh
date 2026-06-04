@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { fetchJson, getApiBase, getAuthHeader } from "../../utils/api";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
+import PropertiesMobile from "./mobile/PropertiesMobile";
 import { requireOwnerSession } from "../../utils/ownerSession";
 import { fetchOwnerProperties } from "../../utils/propertyowner";
 import {

@@ -23,7 +23,8 @@ export default function PropertyOwnerMobileLayout({
   headerRight = null,
   notificationCount = 0,
   notifications = [],
-  onLogout
+  onLogout,
+  disableSubmenuStrip = false
 }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -151,7 +152,7 @@ export default function PropertyOwnerMobileLayout({
       <header className="sticky top-0 z-40 bg-white text-slate-800 px-4 py-3 flex flex-col justify-between shadow-sm shrink-0 border-b border-slate-100">
         <div className="flex items-center justify-between w-full">
           {/* Menu & Brand Logo & Name */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {/* Hamburger Menu trigger */}
             <button 
               onClick={() => setMoreDrawerOpen(true)}
@@ -160,20 +161,45 @@ export default function PropertyOwnerMobileLayout({
             >
               <Menu size={22} className="stroke-[2.5]" />
             </button>
-            <span className="text-xl font-black tracking-tight text-slate-900 font-sans flex items-center">
+            <span className="text-lg font-black tracking-tight text-slate-900 font-sans flex items-center shrink-0">
               Roomhy<span className="text-blue-600">.com</span>
             </span>
           </div>
 
+          {/* Quick Header Icon Shortcuts for Mobile (Middle Space) */}
+          <div className="flex items-center gap-1.5 mx-2 bg-slate-50 p-1 rounded-xl border border-slate-200/50">
+            <Link 
+              to="/propertyowner/ownerchat" 
+              title="Chat" 
+              className={cn("p-1.5 rounded-lg text-slate-500 hover:text-blue-600 transition-colors", pathname.startsWith("/propertyowner/ownerchat") && "text-blue-600 bg-white shadow-sm")}
+            >
+              <MessageSquare size={15} className="stroke-[2.5]" />
+            </Link>
+            <Link 
+              to="/propertyowner/payment" 
+              title="Payments" 
+              className={cn("p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 transition-colors", pathname.startsWith("/propertyowner/payment") && "text-emerald-600 bg-white shadow-sm")}
+            >
+              <IndianRupee size={15} className="stroke-[2.5]" />
+            </Link>
+            <Link 
+              to="/propertyowner/complaints" 
+              title="Complaints" 
+              className={cn("p-1.5 rounded-lg text-slate-500 hover:text-rose-600 transition-colors", pathname.startsWith("/propertyowner/complaints") && "text-rose-600 bg-white shadow-sm")}
+            >
+              <Headset size={15} className="stroke-[2.5]" />
+            </Link>
+          </div>
+
           {/* Right Header Controls */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {/* Notification Bell */}
             <button 
               onClick={() => setNotifDrawerOpen(true)}
               className="relative p-1.5 text-slate-700 transition-all"
               aria-label="Notifications"
             >
-              <Bell size={22} className="stroke-[2]" />
+              <Bell size={21} className="stroke-[2]" />
               {displayNotificationCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 bg-[#E11D48] text-white text-[8px] font-black rounded-full flex items-center justify-center border border-white shadow-sm">
                   {displayNotificationCount}
@@ -184,7 +210,7 @@ export default function PropertyOwnerMobileLayout({
             {/* Profile Avatar */}
             <button 
               onClick={() => setProfileDrawerOpen(true)}
-              className="w-8 h-8 rounded-full bg-blue-600 text-white font-black text-sm flex items-center justify-center border border-white/20 shadow-sm"
+              className="w-7.5 h-7.5 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center border border-white/20 shadow-sm shrink-0"
             >
               {ownerInitial}
             </button>
@@ -192,25 +218,25 @@ export default function PropertyOwnerMobileLayout({
         </div>
 
         {/* Context Switcher / Active Property Bar */}
-        <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+        <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
           <button 
             onClick={() => setSwitcherOpen(!switcherOpen)}
-            className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200/60 px-2.5 py-1 rounded-lg text-slate-700 transition-all text-xs font-semibold max-w-[200px]"
+            className="flex items-center gap-1 bg-slate-50 hover:bg-slate-100 border border-slate-200/60 px-2 py-0.5 rounded-lg text-slate-700 transition-all text-[11px] font-semibold max-w-[170px]"
           >
-            <Building2 size={13} className="text-blue-600 shrink-0" />
+            <Building2 size={12} className="text-blue-600 shrink-0" />
             <span className="truncate">{activePropertyName}</span>
-            <ChevronDown size={12} className={cn("text-slate-500 transition-transform shrink-0", switcherOpen && "rotate-180")} />
+            <ChevronDown size={11} className={cn("text-slate-500 transition-transform shrink-0", switcherOpen && "rotate-180")} />
           </button>
 
           {/* Mini Stats Indicator */}
-          <div className="text-[10px] font-black text-emerald-600 uppercase tracking-wider flex items-center gap-1">
+          <div className="text-[9px] font-black text-emerald-600 uppercase tracking-wider flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
             <span>Active</span>
           </div>
         </div>
 
         {/* Horizontal Submenus Strip */}
-        {activeParent && activeParent.submenus && activeParent.submenus.length > 0 && (
+        {!disableSubmenuStrip && activeParent && activeParent.submenus && activeParent.submenus.length > 0 && (
           <>
             <style dangerouslySetInnerHTML={{__html: `
               .no-scrollbar::-webkit-scrollbar {
@@ -221,8 +247,8 @@ export default function PropertyOwnerMobileLayout({
                 scrollbar-width: none;
               }
             `}} />
-            <div className="mt-2.5 pt-2.5 border-t border-slate-100 overflow-x-auto no-scrollbar">
-              <div className="flex items-center gap-2 pb-1.5 whitespace-nowrap">
+            <div className="mt-2 pt-2 border-t border-slate-100 overflow-x-auto no-scrollbar">
+              <div className="flex items-center gap-1.5 pb-1 whitespace-nowrap">
                 {activeParent.submenus.map((sub, index) => {
                   const isActive = pathname === sub.href || pathname.startsWith(sub.href + '/');
                   return (
@@ -230,10 +256,10 @@ export default function PropertyOwnerMobileLayout({
                       key={index}
                       to={sub.href}
                       className={cn(
-                        "text-[11px] px-3 py-1.5 rounded-full font-bold transition-all inline-block",
+                        "text-[10px] px-2.5 py-1 rounded-full font-bold transition-all inline-block",
                         isActive 
                           ? "bg-blue-600 text-white shadow-sm shadow-blue-600/20" 
-                          : "bg-slate-100/80 text-slate-600 hover:text-slate-800 hover:bg-slate-200/80"
+                          : "bg-slate-100 text-slate-650 hover:text-slate-800 hover:bg-slate-200"
                       )}
                     >
                       {sub.label}
@@ -564,14 +590,15 @@ export default function PropertyOwnerMobileLayout({
           <GridItem to="/propertyowner/vacancy-promotion" icon={Globe} label="Marketing" active={pathname.startsWith("/propertyowner/vacancy-promotion")} />
           <GridItem to="/propertyowner/reports" icon={BarChart3} label="Reports" active={pathname.startsWith("/propertyowner/reports")} />
           <GridItem to="/propertyowner/agreement" icon={FileText} label="Documents" active={pathname.startsWith("/propertyowner/agreement")} />
-          <GridItem to="/propertyowner/settings" icon={Settings} label="Settings" active={pathname.startsWith("/propertyowner/settings")} />
+          <GridItem to="/propertyowner/settings" icon={Settings} label="Settings" active={pathname.startsWith("/propertyowner/settings") && window.location.hash !== "#backup"} />
+          <GridItem to="/propertyowner/settings#backup" icon={Database} label="Data Backup" active={pathname.startsWith("/propertyowner/settings") && window.location.hash === "#backup"} />
           
           <button 
             onClick={() => {
               setMoreDrawerOpen(false);
               setSwitcherOpen(true);
             }}
-            className="flex flex-col items-center justify-center p-3 rounded-2xl border border-white/5 hover:border-white/10 bg-white/5 hover:bg-white/10 transition-all text-slate-350"
+            className="flex flex-col items-center justify-center p-3 rounded-2xl border border-white/5 hover:border-white/10 bg-white/5 hover:bg-white/10 transition-all text-slate-350 col-span-3 sm:col-span-1"
           >
             <Building2 size={20} className="text-blue-400 mb-1.5" />
             <span className="text-[10px] font-bold tracking-tight text-center leading-tight">Switch Property</span>
