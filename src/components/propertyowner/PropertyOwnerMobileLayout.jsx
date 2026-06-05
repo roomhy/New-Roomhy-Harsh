@@ -7,7 +7,7 @@ import {
   Lock, ChevronRight, Crown, Zap, Users, BookOpen, FileText, Smartphone, 
   Wallet, PieChart, Shield, Target, Navigation, Megaphone, Coffee, 
   Receipt, Sparkles, LinkIcon, UserPlus, AlertCircle, Calendar, HelpCircle, Building2,
-  IndianRupee, Headset, Briefcase, Globe, BarChart3
+  IndianRupee, Headset, Briefcase, Globe, BarChart3, Database
 } from "lucide-react";
 import { SILVER_NAV, GOLD_NAV } from './navConfig';
 import { fetchOwnerProperties } from "../../utils/propertyowner";

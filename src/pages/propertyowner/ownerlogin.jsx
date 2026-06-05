@@ -78,9 +78,26 @@ export default function Ownerlogin() {
         method: "POST",
         body: JSON.stringify({ identifier: loginId, password })
       });
+      if (data.requireReset) {
+        setStep("setPassword");
+        return;
+      }
       storeAuth(data);
       window.location.href = resolvePanelPath("propertyowner", "admin");
     } catch (err) {
+      let loginMsg = "Login failed.";
+      try {
+        const parsed = JSON.parse(err?.body || "{}");
+        loginMsg = parsed?.message || parsed?.error || err?.message || loginMsg;
+      } catch (_) {
+        loginMsg = err?.message || loginMsg;
+      }
+
+      if (err.status !== 401 && err.status !== 404) {
+        setErrorMsg(loginMsg);
+        return;
+      }
+
       try {
         await fetchJson("/api/auth/owner/verify-temp", {
           method: "POST",
@@ -88,7 +105,14 @@ export default function Ownerlogin() {
         });
         setStep("setPassword");
       } catch (verifyErr) {
-        setErrorMsg(verifyErr?.body || verifyErr?.message || err?.body || err?.message || "Invalid credentials.");
+        let verifyMsg = "Invalid credentials.";
+        try {
+          const parsed = JSON.parse(verifyErr?.body || "{}");
+          verifyMsg = parsed?.message || parsed?.error || verifyErr?.message || verifyMsg;
+        } catch (_) {
+          verifyMsg = verifyErr?.message || verifyMsg;
+        }
+        setErrorMsg(verifyMsg);
       }
     } finally {
       setLoading(false);
