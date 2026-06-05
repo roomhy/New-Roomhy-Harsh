@@ -157,7 +157,7 @@ export default function PropertiesMobile({ owner, defaultTab = "all" }) {
               <div className="space-y-3">
                 {filteredProperties.map(p => {
                   const occupied = p.occupiedBeds ?? p.tenantCount ?? 0;
-                  const total = p.totalBeds ?? p.roomCount ?? 1;
+                  const total = p.bedCount ?? p.totalBeds ?? p.roomCount ?? 1;
                   const occ = Math.round((occupied / Math.max(total, 1)) * 100);
                   const displayImage = p.image || (p.images && p.images.length > 0 ? p.images[0] : null);
 

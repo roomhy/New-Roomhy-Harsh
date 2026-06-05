@@ -129,6 +129,7 @@ export default function AddPropertyWizard() {
   const [contactName, setContactName] = useState("");
   const [contactNumber, setContactNumber] = useState("");
   const [email, setEmail] = useState("");
+  const [ownerLoginId, setOwnerLoginId] = useState("");
 
   // Owner dropdown for Contact Person autofill
   const [ownersList, setOwnersList] = useState([]);
@@ -210,6 +211,7 @@ export default function AddPropertyWizard() {
     setOwnerSearch(name);
     setContactNumber(phone);
     setEmail(ownerEmail);
+    setOwnerLoginId(owner.loginId || "");
     setShowOwnerDropdown(false);
   };
 
@@ -260,6 +262,7 @@ export default function AddPropertyWizard() {
             setOwnerSearch(prefilledName);
             setContactNumber(p.contact?.number || p.ownerPhone || "");
             setEmail(p.contact?.email || "");
+            setOwnerLoginId(p.ownerLoginId || "");
             
             if (p.roomTypes && p.roomTypes.length > 0) {
               setRoomTypes(p.roomTypes);
@@ -489,6 +492,7 @@ export default function AddPropertyWizard() {
         longitude: longitude ? Number(longitude) : null,
         ownerName: contactName,
         ownerPhone: contactNumber,
+        ownerLoginId,
         monthlyRent: minRent === 999999 ? 0 : minRent,
         contact: { name: contactName, number: contactNumber, email },
         propertyDetails: { totalArea, yearBuilt, propertyAge, floors, liftAvailable, parkingAvailable, noticePeriod, genderPref, preferredFor },
@@ -790,7 +794,7 @@ export default function AddPropertyWizard() {
                         {contactName && (
                           <button
                             type="button"
-                            onClick={() => { setContactName(""); setOwnerSearch(""); setContactNumber(""); setEmail(""); }}
+                            onClick={() => { setContactName(""); setOwnerSearch(""); setContactNumber(""); setEmail(""); setOwnerLoginId(""); }}
                             className="ml-2 text-slate-300 hover:text-red-400 transition-colors flex-shrink-0"
                           >
                             <X className="w-3 h-3" />

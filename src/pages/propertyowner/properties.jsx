@@ -302,7 +302,7 @@ export default function Properties() {
         <div className="flex flex-col gap-4">
           {filtered.map((p) => {
             const occupied = p.occupiedBeds ?? p.tenantCount ?? 0;
-            const total = p.totalBeds ?? p.roomCount ?? 1;
+            const total = p.bedCount ?? p.totalBeds ?? p.roomCount ?? 1;
             const occ = Math.round((occupied / Math.max(total, 1)) * 100);
             const actualRent = p.monthlyRent || p.rent || 0;
             const discountAmount = p.discount || 0;
