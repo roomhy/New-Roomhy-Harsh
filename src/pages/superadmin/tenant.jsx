@@ -143,6 +143,32 @@ export default function Tenant() {
     finally { setIsUpdatingKyc(false); }
   };
 
+  const handleToggleDeactivate = async (tenant) => {
+    const id = tenant._id || tenant.id;
+    if (!id) {
+      alert("Tenant ID not found");
+      return;
+    }
+    const isCurrentlyActive = tenant.status !== "suspended";
+    const action = isCurrentlyActive ? "deactivate" : "reactivate";
+    if (!window.confirm(`Are you sure you want to ${action} resident ${tenant.profile?.name || "this resident"}?`)) {
+      return;
+    }
+    try {
+      setLoading(true);
+      const res = await fetchJson(`/api/tenants/${id}/${action}`, {
+        method: "POST",
+        headers: getAuthHeader()
+      });
+      alert(res.message || `Resident ${action}d successfully`);
+      loadTenants();
+    } catch (err) {
+      alert(`Failed to ${action} resident: ` + (err.body || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteTenant = async (tenant) => {
     const id = tenant._id || tenant.id;
     if (!id) {
@@ -262,6 +288,14 @@ export default function Tenant() {
                                 <p className="text-base font-bold text-slate-800 tracking-tight">{t.profile.name}</p>
                                 <div className="flex items-center gap-2 mt-2">
                                    <span className="text-[9px] font-black bg-blue-600 text-white px-2 py-0.5 rounded-lg uppercase tracking-widest">{t.loginId || "ID-GEN"}</span>
+                                   <span className={cn(
+                                       "text-[8px] font-black px-2 py-0.5 rounded-lg uppercase tracking-widest ml-2",
+                                       t.status === "suspended" ? "bg-rose-100 text-rose-700" :
+                                       t.status === "active" ? "bg-emerald-100 text-emerald-700" :
+                                       "bg-slate-100 text-slate-600"
+                                    )}>
+                                       {t.status || "pending"}
+                                    </span>
                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-2">Moved in: {formatDate(t.profile.moveInDate)}</span>
                                 </div>
                              </div>
@@ -294,6 +328,18 @@ export default function Tenant() {
                        </td>
                         <td className="px-10 py-8 text-right" onClick={(e) => e.stopPropagation()}>
                            <div className="flex items-center justify-end gap-3">
+                              <button 
+                                 onClick={() => handleToggleDeactivate(t)} 
+                                 title={t.status === "suspended" ? "Reactivate Account" : "Deactivate Account"} 
+                                 className={cn(
+                                    "p-3.5 rounded-2xl border transition-all shadow-md active:scale-95",
+                                    t.status === "suspended" 
+                                       ? "bg-rose-50 text-rose-600 border-rose-100 hover:bg-rose-100" 
+                                       : "bg-white text-slate-400 border-slate-100 hover:text-slate-600 hover:border-slate-300"
+                                 )}
+                               >
+                                 <Shield size={20} className={t.status === "suspended" ? "animate-pulse" : ""} />
+                               </button>
                               <button onClick={() => setSelectedTenant(t)} className="p-3.5 rounded-2xl bg-white text-slate-400 hover:text-blue-600 hover:border-blue-100 transition-all border border-slate-100 shadow-md active:scale-95"><Eye className="w-5 h-5" /></button>
                               <button onClick={() => handleDeleteTenant(t)} className="p-3.5 rounded-2xl bg-white text-slate-400 hover:text-rose-600 hover:border-rose-100 transition-all border border-slate-100 shadow-md active:scale-95"><Trash2 className="w-5 h-5" /></button>
                            </div>
@@ -390,16 +436,31 @@ export default function Tenant() {
                  </section>
               </div>
 
-              <div className="px-10 py-10 border-t border-slate-50 bg-slate-50/50 flex justify-between items-center">
-                  <button 
-                     onClick={() => {
-                        handleDeleteTenant(selectedTenant);
-                        setSelectedTenant(null);
-                     }}
-                     className="text-[10px] font-bold text-rose-500 uppercase tracking-widest hover:underline"
-                  >
-                     Delete Resident
-                  </button>
+               <div className="px-10 py-10 border-t border-slate-50 bg-slate-50/50 flex justify-between items-center">
+                  <div className="flex items-center gap-4">
+                     <button 
+                        onClick={() => {
+                           handleDeleteTenant(selectedTenant);
+                           setSelectedTenant(null);
+                        }}
+                        className="text-[10px] font-bold text-rose-500 uppercase tracking-widest hover:underline"
+                     >
+                        Delete Resident
+                     </button>
+                     <span className="text-slate-300">|</span>
+                     <button 
+                        onClick={() => {
+                           handleToggleDeactivate(selectedTenant);
+                           setSelectedTenant(null);
+                        }}
+                        className={cn(
+                           "text-[10px] font-bold uppercase tracking-widest hover:underline",
+                           selectedTenant.status === "suspended" ? "text-emerald-600" : "text-amber-600"
+                        )}
+                     >
+                        {selectedTenant.status === "suspended" ? "Reactivate Account" : "Deactivate Account"}
+                     </button>
+                  </div>
                  <div className="flex gap-4">
                     <button 
                        onClick={() => handleKycUpdate(selectedTenant.loginId, "rejected")}

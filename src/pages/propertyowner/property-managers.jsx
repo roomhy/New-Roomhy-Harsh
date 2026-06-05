@@ -106,6 +106,24 @@ export default function PropertyManagers() {
     }
   };
 
+  const handleToggleDeactivate = async (manager) => {
+    const isCurrentlyActive = manager.status === "active";
+    const action = isCurrentlyActive ? "deactivate" : "reactivate";
+    if (!confirm(`Are you sure you want to ${action} manager ${manager.name}?`)) return;
+    
+    try {
+      const response = await fetch(`${getApiBase()}/api/property-managers/${manager._id}/${action}`, {
+        method: "POST"
+      });
+      const data = await response.json();
+      if (!data.success) throw new Error(data.message);
+      
+      await loadData(owner.loginId);
+    } catch (e) {
+      setErrorMsg(e?.message || `Failed to ${action} manager`);
+    }
+  };
+
   const handleDeleteManager = async (managerId) => {
     if (!confirm("Are you sure you want to delete this manager?")) return;
     
@@ -221,6 +239,17 @@ export default function PropertyManagers() {
               </div>
 
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleToggleDeactivate(mgr)}
+                  className={cn(
+                    "inline-flex items-center justify-center h-9 px-3 rounded-lg border text-[12px] font-medium transition-colors",
+                    mgr.status === "active"
+                      ? "border-amber-200 bg-amber-50/50 text-amber-700 hover:bg-amber-100/50"
+                      : "border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:bg-emerald-100/50"
+                  )}
+                >
+                  {mgr.status === "active" ? "Deactivate" : "Reactivate"}
+                </button>
                 <button
                   onClick={() => handleResetPassword(mgr._id)}
                   className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg border border-border bg-card text-[12px] font-medium hover:border-primary/40"

@@ -59,13 +59,14 @@ export default function AllStaffPage() {
     }
   };
 
-  const handleTerminate = async (loginId) => {
-    if (!window.confirm("Are you sure you want to terminate this staff member?")) return;
+  const handleToggleActive = async (loginId, isCurrentlyActive) => {
+    const action = isCurrentlyActive ? "deactivate" : "reactivate";
+    if (!window.confirm(`Are you sure you want to ${action} this staff member?`)) return;
     try {
-      await apiFetch(`/api/employees/${loginId}/deactivate`, { method: 'POST' });
-      setStaff(prev => prev.map(s => s.loginId === loginId ? { ...s, status: "Terminated" } : s));
+      await apiFetch(`/api/employees/${loginId}/${action}`, { method: 'POST' });
+      setStaff(prev => prev.map(s => s.loginId === loginId ? { ...s, status: isCurrentlyActive ? "Terminated" : "Active" } : s));
     } catch (err) {
-      console.error("Failed to terminate", err);
+      console.error(`Failed to ${action}`, err);
     }
   };
 
@@ -137,16 +138,23 @@ export default function AllStaffPage() {
                 </div>
               </div>
 
-              {s.status === "Active" && (
-                <div className="border-t border-border/60 mt-6 pt-4 flex gap-2">
+              <div className="border-t border-border/60 mt-6 pt-4 flex gap-2">
+                {s.status === "Active" ? (
                   <button 
-                    onClick={() => handleTerminate(s.loginId)}
+                    onClick={() => handleToggleActive(s.loginId, true)}
                     className="flex-1 h-10 border border-rose-200 hover:bg-rose-50 text-rose-600 rounded-xl text-xs font-bold transition-all"
                   >
-                    Terminate Staff
+                    Deactivate Staff
                   </button>
-                </div>
-              )}
+                ) : (
+                  <button 
+                    onClick={() => handleToggleActive(s.loginId, false)}
+                    className="flex-1 h-10 border border-emerald-200 hover:bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold transition-all"
+                  >
+                    Reactivate Staff
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

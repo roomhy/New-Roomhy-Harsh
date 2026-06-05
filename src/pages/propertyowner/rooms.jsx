@@ -378,10 +378,29 @@ export default function Rooms() {
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-3 mb-5 text-[11.5px] text-muted-foreground">
-        <span className="flex items-center gap-1.5"><span className="size-3 rounded bg-primary/80" /> Occupied</span>
-        <span className="flex items-center gap-1.5"><span className="size-3 rounded bg-warning/40" /> Reserved</span>
-        <span className="flex items-center gap-1.5"><span className="size-3 rounded border border-dashed border-border bg-card" /> Vacant</span>
+      <div className="bg-card p-4 rounded-xl border border-border mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          {/* Room status colors */}
+          <div className="flex flex-wrap items-center gap-2 text-[12px]">
+            <span className="text-muted-foreground font-medium mr-1">Room Occupancy:</span>
+            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded border border-emerald-250 bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300 text-[11px] font-semibold">
+              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" /> Fully Vacant (0% Filled)
+            </span>
+            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded border border-amber-250 bg-amber-50/40 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 text-[11px] font-semibold">
+              <span className="size-1.5 rounded-full bg-amber-500" /> Partially Occupied
+            </span>
+            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded border border-teal-250 bg-teal-50/40 dark:bg-teal-950/20 text-teal-800 dark:text-teal-300 text-[11px] font-semibold">
+              <span className="size-1.5 rounded-full bg-teal-500" /> Fully Occupied (100% Filled)
+            </span>
+          </div>
+          {/* Bed status colors */}
+          <div className="flex flex-wrap items-center gap-4 text-[12px]">
+            <span className="text-muted-foreground font-medium">Bed Status:</span>
+            <span className="flex items-center gap-1.5"><span className="size-3 rounded bg-primary/80" /> Occupied</span>
+            <span className="flex items-center gap-1.5"><span className="size-3 rounded bg-warning/40" /> Reserved</span>
+            <span className="flex items-center gap-1.5"><span className="size-3 rounded border border-dashed border-border bg-card" /> Vacant</span>
+          </div>
+        </div>
       </div>
 
       {errorMsg && <div className="text-sm text-destructive mb-6 bg-destructive/10 p-4 rounded-xl">{errorMsg}</div>}
@@ -416,44 +435,97 @@ export default function Rooms() {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                 {propRooms.slice(0,10).map(room => {
                   const beds = toLegacyBeds(room);
+                  const occupiedCount = beds.filter(b => b.status === "occupied" || b.tenantId).length;
+                  const totalBeds = beds.length;
+
+                  let headerClass = "";
+                  let bodyClass = "";
+                  let cardBorderClass = "";
+                  let badgeClass = "";
+                  let statusLabel = "";
+                  let dotColor = "";
+
+                  if (occupiedCount === 0) {
+                    // Fully Vacant
+                    headerClass = "bg-emerald-600 dark:bg-emerald-700 text-white";
+                    bodyClass = "bg-emerald-50/20 dark:bg-emerald-950/10";
+                    cardBorderClass = "border-emerald-500 dark:border-emerald-800/80";
+                    badgeClass = "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300";
+                    statusLabel = "Vacant";
+                    dotColor = "bg-emerald-400";
+                  } else if (occupiedCount === totalBeds) {
+                    // Fully Occupied
+                    headerClass = "bg-teal-600 dark:bg-teal-700 text-white";
+                    bodyClass = "bg-teal-50/20 dark:bg-teal-950/10";
+                    cardBorderClass = "border-teal-500 dark:border-teal-800/80";
+                    badgeClass = "bg-teal-100 dark:bg-teal-900/40 text-teal-800 dark:text-teal-300";
+                    statusLabel = "Full";
+                    dotColor = "bg-teal-400";
+                  } else {
+                    // Partially Occupied
+                    headerClass = "bg-amber-500 dark:bg-amber-600 text-white";
+                    bodyClass = "bg-amber-50/20 dark:bg-amber-950/10";
+                    cardBorderClass = "border-amber-500 dark:border-amber-800/80";
+                    badgeClass = "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300";
+                    statusLabel = `${occupiedCount}/${totalBeds} Beds`;
+                    dotColor = "bg-amber-400";
+                  }
+
                   return (
-                    <div key={room._id||room.id} className="group rounded-xl border border-border p-3 hover:border-primary/30 hover:shadow-soft transition-all">
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium text-[13.5px] text-foreground flex items-center gap-2">
+                    <div key={room._id||room.id} className={cn("group rounded-xl border overflow-hidden hover:shadow-md transition-all", cardBorderClass)}>
+                      {/* Colored Header Bar */}
+                      <div className={cn("px-3 py-1.5 flex items-center justify-between font-medium text-[13px]", headerClass)}>
+                        <div className="flex items-center gap-2">
                           Room {room.number||room.roomNo||room.title}
                           <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
-                            <button onClick={() => handleEditRoom(room)} className="p-1 text-muted-foreground hover:text-primary"><Edit2 size={12}/></button>
-                            <button onClick={() => handleDeleteRoom(room)} className="p-1 text-muted-foreground hover:text-destructive"><Trash2 size={12}/></button>
+                            <button onClick={(e) => { e.stopPropagation(); handleEditRoom(room); }} className="p-0.5 text-white/80 hover:text-white"><Edit2 size={11}/></button>
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteRoom(room); }} className="p-0.5 text-white/80 hover:text-white"><Trash2 size={11}/></button>
                           </div>
                         </div>
-                        <span className="bg-muted text-muted-foreground inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium">{room.type||"AC"}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-bold shadow-sm", badgeClass)}>
+                            <span className={cn("size-1 rounded-full", dotColor)} />
+                            {statusLabel}
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5">{room.gender||"Mixed"}</div>
-                      <div className="mt-2.5 flex gap-1.5">
-                        {beds.map((bed,i) => {
-                          const isOcc = bed.status==="occupied"||!!bed.tenantId;
-                          return (
-                            <div key={i}
-                              onClick={() => openAssignModal(room, i)}
-                              title={isOcc ? `Occupied${bed.tenantName ? ` — ${bed.tenantName}` : ""}` : "Vacant — Click to assign"}
-                              className={cn("flex-1 h-10 rounded-md grid place-items-center text-[10.5px] font-semibold transition-colors",
-                                isOcc
-                                  ? "bg-primary/80 text-primary-foreground cursor-pointer hover:bg-primary/70"
-                                  : i===0&&beds.length>2
-                                    ? "bg-warning/30 text-foreground cursor-pointer hover:bg-warning/50"
-                                    : "border border-dashed border-border text-muted-foreground cursor-pointer hover:bg-muted")}
-                            >
-                              {String.fromCharCode(65+i)}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div className="mt-2.5 flex items-center justify-between">
-                        <span className="text-[11px] text-muted-foreground">₹{(room.rent||0).toLocaleString("en-IN")}/bed</span>
-                        <button type="button" onClick={() => {
-                          const firstVacant = beds.findIndex(b=>!(b.status==="occupied"||b.tenantId));
-                          openAssignModal(room, firstVacant !== -1 ? firstVacant : 0);
-                        }} className="text-[11px] font-medium text-primary hover:underline">Manage</button>
+
+                      {/* Card Body */}
+                      <div className={cn("p-3 space-y-2.5", bodyClass)}>
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span>{room.gender||"Mixed"}</span>
+                          <span className="bg-card text-foreground px-1.5 py-0.5 rounded border border-border text-[10.5px] font-medium">{room.type||"AC"}</span>
+                        </div>
+
+                        {/* Beds display */}
+                        <div className="flex gap-1.5 py-1">
+                          {beds.map((bed,i) => {
+                            const isOcc = bed.status==="occupied"||!!bed.tenantId;
+                            return (
+                              <div key={i}
+                                onClick={() => openAssignModal(room, i)}
+                                title={isOcc ? `Occupied${bed.tenantName ? ` — ${bed.tenantName}` : ""}` : "Vacant — Click to assign"}
+                                className={cn("flex-1 h-9 rounded-md grid place-items-center text-[10.5px] font-semibold transition-colors",
+                                  isOcc
+                                    ? "bg-primary/80 text-primary-foreground cursor-pointer hover:bg-primary/70"
+                                    : i===0&&beds.length>2
+                                      ? "bg-warning/30 text-foreground cursor-pointer hover:bg-warning/50"
+                                      : "border border-dashed border-border text-muted-foreground cursor-pointer hover:bg-muted bg-card")}
+                              >
+                                {String.fromCharCode(65+i)}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Bottom Info and Manage Button */}
+                        <div className="flex items-center justify-between pt-2.5 border-t border-border/30">
+                          <span className="text-[11px] text-muted-foreground">₹{(room.rent||0).toLocaleString("en-IN")}/bed</span>
+                          <button type="button" onClick={() => {
+                            const firstVacant = beds.findIndex(b=>!(b.status==="occupied"||b.tenantId));
+                            openAssignModal(room, firstVacant !== -1 ? firstVacant : 0);
+                          }} className="text-[11px] font-semibold text-primary hover:underline">Manage</button>
+                        </div>
                       </div>
                     </div>
                   );

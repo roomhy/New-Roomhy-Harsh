@@ -155,6 +155,32 @@ export default function Owner() {
     return { total, verified, pending: total - verified, properties };
   }, [owners]);
 
+  const handleToggleDeactivate = async (owner) => {
+    const id = owner.loginId || owner._id;
+    if (!id) {
+      alert("Owner ID not found");
+      return;
+    }
+    const isCurrentlyActive = owner.isActive !== false;
+    const action = isCurrentlyActive ? "deactivate" : "reactivate";
+    if (!window.confirm(`Are you sure you want to ${action} owner ${owner.name || "this owner"}?`)) {
+      return;
+    }
+    try {
+      setLoading(true);
+      const res = await fetchJson(`/api/owners/${encodeURIComponent(id)}/${action}`, {
+        method: "POST",
+        headers: getAuthHeader()
+      });
+      alert(res.message || `Owner ${action}d successfully`);
+      loadOwners();
+    } catch (err) {
+      alert(`Failed to ${action} owner: ` + (err.body || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (!window.confirm(`Are you sure you want to delete owner ${id}?`)) return;
     try {
@@ -453,6 +479,12 @@ export default function Owner() {
                                     <p className="text-base font-bold text-slate-800 tracking-tight">{o.name || "Unknown Partner"}</p>
                                     <div className="flex items-center gap-2 mt-2">
                                        <span className="text-[9px] font-black bg-blue-600 text-white px-2 py-0.5 rounded-lg uppercase tracking-widest">{o.loginId || "ID-GEN"}</span>
+                                       <span className={cn(
+                                          "text-[8px] font-black px-2 py-0.5 rounded-lg uppercase tracking-widest ml-2",
+                                          o.isActive === false ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
+                                       )}>
+                                          {o.isActive === false ? "suspended" : "active"}
+                                       </span>
                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-2">{o.phone || "No Pulse"}</span>
                                     </div>
                                  </div>
@@ -492,15 +524,28 @@ export default function Owner() {
                                 </span>
                               )}
                            </td>
-                           <td className="px-10 py-8 text-right">
+                           <td className="px-10 py-8 text-right" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-end gap-3">
                                  <button 
-                                   className="p-3.5 rounded-2xl bg-white text-slate-400 hover:text-blue-600 hover:border-blue-100 transition-all border border-slate-100 shadow-md active:scale-95"
+                                   onClick={() => handleToggleDeactivate(o)}
+                                   title={o.isActive === false ? "Reactivate Account" : "Deactivate Account"}
+                                   className={cn(
+                                      "p-3.5 rounded-2xl border transition-all shadow-md active:scale-95",
+                                      o.isActive === false 
+                                         ? "bg-rose-50 text-rose-600 border-rose-100 hover:bg-rose-100" 
+                                         : "bg-white text-slate-400 border-slate-100 hover:text-slate-600 hover:border-slate-300"
+                                   )}
+                                 >
+                                    <Shield size={20} className={o.isActive === false ? "animate-pulse" : ""} />
+                                 </button>
+                                 <button 
+                                    onClick={() => setSelectedOwner(o)}
+                                    className="p-3.5 rounded-2xl bg-white text-slate-400 hover:text-blue-600 hover:border-blue-100 transition-all border border-slate-100 shadow-md active:scale-95"
                                  >
                                     <Eye className="w-5 h-5" />
                                  </button>
                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); handleDelete(o.loginId || o._id); }}
+                                    onClick={() => handleDelete(o.loginId || o._id)}
                                     className="p-3.5 rounded-2xl bg-white text-slate-400 hover:text-rose-600 hover:border-rose-100 transition-all border border-slate-100 shadow-md active:scale-95"
                                  >
                                     <Trash2 className="w-5 h-5" />
@@ -601,12 +646,30 @@ export default function Owner() {
               </div>
 
               <div className="px-10 py-10 border-t border-slate-50 bg-slate-50/50 flex justify-between items-center">
-                 <button 
-                   onClick={() => handleDelete(selectedOwner.loginId || selectedOwner._id)}
-                   className="text-[10px] font-bold text-rose-500 uppercase tracking-widest hover:underline"
-                 >
-                    Purge Stakeholder
-                 </button>
+                 <div className="flex items-center gap-4">
+                    <button 
+                       onClick={() => {
+                          handleDelete(selectedOwner.loginId || selectedOwner._id);
+                          setSelectedOwner(null);
+                       }}
+                       className="text-[10px] font-bold text-rose-500 uppercase tracking-widest hover:underline"
+                    >
+                       Purge Stakeholder
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button 
+                       onClick={() => {
+                          handleToggleDeactivate(selectedOwner);
+                          setSelectedOwner(null);
+                       }}
+                       className={cn(
+                          "text-[10px] font-bold uppercase tracking-widest hover:underline",
+                          selectedOwner.isActive === false ? "text-emerald-600" : "text-amber-600"
+                       )}
+                    >
+                       {selectedOwner.isActive === false ? "Reactivate Account" : "Deactivate Account"}
+                    </button>
+                 </div>
                  <div className="flex gap-4">
                     <button 
                       onClick={() => handleKycUpdate(selectedOwner.loginId || selectedOwner._id, "rejected", "Documents unclear")}
