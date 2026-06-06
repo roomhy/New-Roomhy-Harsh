@@ -17,9 +17,11 @@ export default function Ownerlogin() {
     htmlAttrs: { lang: "en" },
     metas: [
       { charset: "UTF-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1.0" }
+      { name: "viewport", content: "width=device-width, initial-scale=1.0" },
+      { name: "description", content: "Login to your Roomhy owner portal to manage your properties." }
     ],
     links: [
+      { rel: "canonical", href: "https://roomhy.com/propertyowner/ownerlogin" },
       { href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap", rel: "stylesheet" },
       { rel: "stylesheet", href: "/propertyowner/assets/css/ownerlogin.css" }
     ],
@@ -228,7 +230,7 @@ export default function Ownerlogin() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+    <main className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       <div className="bg-card rounded-xl shadow-soft w-full max-w-md p-8 text-center relative overflow-hidden border border-border">
         <div className="text-3xl font-bold text-primary mb-2">Roomhy</div>
 
@@ -238,10 +240,11 @@ export default function Ownerlogin() {
             <p className="text-gray-500 mb-6">Enter your Owner ID or Phone Number.</p>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 text-left mb-2">Login ID or Phone Number</label>
+              <label htmlFor="loginIdInput" className="block text-sm font-medium text-gray-700 text-left mb-2">Login ID or Phone Number</label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><i data-lucide="user" className="w-5 h-5"></i></span>
                 <input
+                  id="loginIdInput"
                   type="text"
                   className="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 transition-colors"
                   placeholder="ROOMHY001 or 9876543210"
@@ -251,10 +254,11 @@ export default function Ownerlogin() {
               </div>
             </div>
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 text-left mb-2">Password</label>
+              <label htmlFor="passwordInput" className="block text-sm font-medium text-gray-700 text-left mb-2">Password</label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><i data-lucide="key" className="w-5 h-5"></i></span>
                 <input
+                  id="passwordInput"
                   type={showPassword ? "text" : "password"}
                   className="w-full pl-10 pr-10 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 transition-colors"
                   placeholder="********"
@@ -263,6 +267,7 @@ export default function Ownerlogin() {
                 />
                 <button
                   type="button"
+                  aria-label="Toggle password visibility"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
                 >
@@ -296,9 +301,10 @@ export default function Ownerlogin() {
             <p className="text-gray-500 mb-6">This is your first login. Please set a new password.</p>
 
             <div className="mb-4 text-left">
-              <label className="text-sm font-medium text-gray-700 mb-2 block">New Password</label>
+              <label htmlFor="newPasswordInput" className="text-sm font-medium text-gray-700 mb-2 block">New Password</label>
               <div className="relative">
                 <input
+                  id="newPasswordInput"
                   type={showNewPassword ? "text" : "password"}
                   className="w-full p-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition"
                   placeholder="Min 6 chars"
@@ -307,6 +313,7 @@ export default function Ownerlogin() {
                 />
                 <button
                   type="button"
+                  aria-label="Toggle password visibility"
                   onClick={() => setShowNewPassword(!showNewPassword)}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
                 >
@@ -315,9 +322,10 @@ export default function Ownerlogin() {
               </div>
             </div>
             <div className="mb-6 text-left">
-              <label className="text-sm font-medium text-gray-700 mb-2 block">Confirm Password</label>
+              <label htmlFor="confirmPasswordInput" className="text-sm font-medium text-gray-700 mb-2 block">Confirm Password</label>
               <div className="relative">
                 <input
+                  id="confirmPasswordInput"
                   type={showConfirmPassword ? "text" : "password"}
                   className="w-full p-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition"
                   placeholder="Confirm Password"
@@ -326,6 +334,7 @@ export default function Ownerlogin() {
                 />
                 <button
                   type="button"
+                  aria-label="Toggle password visibility"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
                 >
@@ -353,7 +362,7 @@ export default function Ownerlogin() {
           if (event.target.id === "forgot-modal") closeForgot();
         }} id="forgot-modal">
           <div className="bg-card w-full max-w-md rounded-xl border border-gray-200 shadow-soft p-6 relative">
-            <button type="button" onClick={closeForgot} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
+            <button type="button" aria-label="Close forgot password modal" onClick={closeForgot} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
               <i data-lucide="x" className="w-5 h-5"></i>
             </button>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Reset Password</h2>
@@ -429,7 +438,7 @@ export default function Ownerlogin() {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }
 

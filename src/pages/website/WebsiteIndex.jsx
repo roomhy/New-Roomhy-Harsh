@@ -115,10 +115,12 @@ export default function WebsiteIndex() {
     metas: [
       { "charset": "UTF-8" },
       { "name": "viewport", "content": "width=device-width, initial-scale=1.0" },
-      { "name": "referrer", "content": "no-referrer-when-downgrade" }
+      { "name": "referrer", "content": "no-referrer-when-downgrade" },
+      { "name": "description", "content": "Find verified PGs, hostels & co-living spaces across 50+ Indian cities. Zero brokerage, smart bidding system." }
     ],
     bases: [],
     links: [
+      { "rel": "canonical", "href": "https://roomhy.com/website/index" },
       { "rel": "preconnect", "href": "https://fonts.googleapis.com" },
       { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": true },
       { "href": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap", "rel": "stylesheet" },
@@ -173,6 +175,7 @@ export default function WebsiteIndex() {
                   disabled={!canGoBack}
                   className={`p-2 rounded-md transition-colors ${canGoBack ? 'hover:bg-gray-100 text-gray-600' : 'text-gray-300 cursor-not-allowed'}`}
                   title="Go Back"
+                  aria-label="Go Back"
                 >
                   <i data-lucide="chevron-left" className="w-5 h-5"></i>
                 </button>
@@ -181,12 +184,13 @@ export default function WebsiteIndex() {
                   disabled={!canGoNext}
                   className={`p-2 rounded-md transition-colors ${canGoNext ? 'hover:bg-gray-100 text-gray-600' : 'text-gray-300 cursor-not-allowed'}`}
                   title="Go Forward"
+                  aria-label="Go Forward"
                 >
                   <i data-lucide="chevron-right" className="w-5 h-5"></i>
                 </button>
               </div>
               <a href="#" className="flex-shrink-0">
-                <img src="https://res.cloudinary.com/dpwgvcibj/image/upload/v1768990260/roomhy/website/logoroomhy.png" alt="Roomhy Logo" className="h-10 w-25" />
+                <img src="https://res.cloudinary.com/dpwgvcibj/image/upload/v1768990260/roomhy/website/logoroomhy.png" alt="Roomhy Logo" width="100" height="40" className="h-10 w-auto" />
               </a>
             </div>
             
@@ -207,7 +211,7 @@ export default function WebsiteIndex() {
                 <span className="text-3xl font-bold">+</span>
               </a>
               
-              <button id="menu-toggle" className="p-2 rounded-md hover:bg-gray-100 transition-colors">
+              <button id="menu-toggle" aria-label="Toggle Menu" className="p-2 rounded-md hover:bg-gray-100 transition-colors">
                 <i data-lucide="menu" className="w-7 h-7 text-gray-800"></i>
               </button>
             </div>
@@ -217,7 +221,7 @@ export default function WebsiteIndex() {
 
       <section className="relative py-20 md:py-28 text-white">
         <div className="absolute inset-0 w-full h-full overflow-hidden">
-          <img src="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=1980&auto=format&fit=crop" alt="Hero background" className="absolute inset-0 w-full h-full object-cover animate-kenburns" />
+          <img src="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=1980&auto=format&fit=crop" fetchpriority="high" width="1980" height="1080" alt="Hero background" className="absolute inset-0 w-full h-full object-cover animate-kenburns" />
           <div className="absolute inset-0 w-full h-full bg-black/60"></div> 
         </div>
 
@@ -227,7 +231,7 @@ export default function WebsiteIndex() {
           </h1>
           <div className="relative w-full max-w-2xl mx-auto">
             <input type="text" placeholder="Search for 'PG near me' or 'Hostel in Kota'" className="w-full p-4 pl-5 pr-14 rounded-md bg-white text-gray-900 border-transparent focus:ring-4 focus:ring-cyan-300/50 focus:outline-none placeholder-gray-500 shadow-lg" />
-            <button type="submit" className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2.5 bg-blue-600 hover:bg-blue-700 rounded-md transition-colors">
+            <button type="submit" aria-label="Search" className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2.5 bg-blue-600 hover:bg-blue-700 rounded-md transition-colors">
               <i data-lucide="search" className="w-5 h-5 text-white"></i>
             </button>
           </div>
@@ -256,6 +260,9 @@ export default function WebsiteIndex() {
                       src={item.images?.[0] || item.image || `https://res.cloudinary.com/dpwgvcibj/image/upload/v1768990227/roomhy/website/${idx === 0 ? 'angels-hostel' : idx === 1 ? '401230348' : idx === 2 ? 'pg' : 'post'}.jpg`} 
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                       alt={item.title} 
+                      loading="lazy"
+                      width="400"
+                      height="300"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent">
                       <div className="absolute bottom-0 left-0 right-0 p-4">
@@ -284,13 +291,13 @@ export default function WebsiteIndex() {
             </div>
             <div className="w-full max-w-3xl mx-auto grid grid-cols-2 grid-rows-2 gap-4 mt-8 lg:mt-0 lg:order-1">
               <div className="row-span-2 col-span-1">
-                <img src="https://res.cloudinary.com/dpwgvcibj/image/upload/v1768990242/roomhy/website/hostel1.png.jpg" className="h-full w-full object-cover rounded-2xl shadow-lg" alt="Student accommodation" />
+                <img src="https://res.cloudinary.com/dpwgvcibj/image/upload/v1768990242/roomhy/website/hostel1.png.jpg" loading="lazy" width="400" height="600" className="h-full w-full object-cover rounded-2xl shadow-lg" alt="Student accommodation" />
               </div>
               <div className="col-span-1">
-                <img src="https://res.cloudinary.com/dpwgvcibj/image/upload/v1768990244/roomhy/website/hostel2.jpg" className="h-full w-full object-cover rounded-2xl shadow-lg" alt="Common room" />
+                <img src="https://res.cloudinary.com/dpwgvcibj/image/upload/v1768990244/roomhy/website/hostel2.jpg" loading="lazy" width="400" height="300" className="h-full w-full object-cover rounded-2xl shadow-lg" alt="Common room" />
               </div>
               <div className="col-span-1">
-                <img src="https://res.cloudinary.com/dpwgvcibj/image/upload/v1768990245/roomhy/website/hostel3.jpg" className="h-full w-full object-cover rounded-2xl shadow-lg" alt="Student hallway" />
+                <img src="https://res.cloudinary.com/dpwgvcibj/image/upload/v1768990245/roomhy/website/hostel3.jpg" loading="lazy" width="400" height="300" className="h-full w-full object-cover rounded-2xl shadow-lg" alt="Student hallway" />
               </div>
             </div>
           </div>

@@ -15,6 +15,7 @@ import {
 import { fetchSuperadminStats } from "../../utils/api";
 import { PageHeader } from "../../components/superadmin/PageHeader";
 import { StatCard } from "../../components/superadmin/StatCard";
+import useSEO from "../../hooks/useSEO";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -49,6 +50,12 @@ const colorMap = {
 export default function SuperadminDashboard() {
   const [stats, setStats] = useState({ totalUsers: 0, properties: 0, bookings: 0, revenue: 0 });
   const [loading, setLoading] = useState(true);
+
+  useSEO({
+    title: "Superadmin Dashboard - Roomhy",
+    description: "Manage properties, tenants, owners and platform statistics securely.",
+    canonical: "https://roomhy.com/superadmin/superadmin"
+  });
 
   useEffect(() => {
     const loadStats = async () => {
@@ -93,7 +100,7 @@ export default function SuperadminDashboard() {
   const isEmployee = ["employee", "areamanager", "manager"].includes(roleLower);
 
   return (
-    <div className="space-y-6">
+    <main className="space-y-6">
       <PageHeader
         title="Dashboard"
         subtitle={`Welcome back, ${userName}! Here's what's happening with Roomhy.`}
@@ -148,7 +155,7 @@ export default function SuperadminDashboard() {
         <div className="lg:col-span-2 panel">
           <div className="flex items-center justify-between mb-8">
             <h3 className="font-bold text-lg text-slate-900">Revenue Overview</h3>
-            <select className="h-9 px-3 rounded-xl border border-border bg-slate-50 text-xs font-bold text-slate-500 outline-none">
+            <select aria-label="Revenue period" className="h-9 px-3 rounded-xl border border-border bg-slate-50 text-xs font-bold text-slate-500 outline-none">
               <option>This Month</option>
               <option>Last Month</option>
             </select>
@@ -256,6 +263,6 @@ export default function SuperadminDashboard() {
         </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }
