@@ -651,6 +651,7 @@ export default function PropertyOwnerLayout({
         <header className="h-16 bg-card/90 backdrop-blur-md border-b border-border flex items-center justify-between px-8 z-30 shrink-0">
           <div className="flex items-center gap-4">
             <button
+              aria-label="Open Menu"
               className="lg:hidden p-2 text-slate-500 hover:bg-slate-50 rounded-xl transition-all"
               onClick={() => setMobileOpen(true)}
             >
@@ -716,7 +717,7 @@ export default function PropertyOwnerLayout({
             </div>
 
             {/* Messages */}
-            <button onClick={() => navigate("/propertyowner/ownerchat")} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all relative group hidden sm:block">
+            <button aria-label="Messages" onClick={() => navigate("/propertyowner/ownerchat")} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all relative group hidden sm:block">
               <MessageSquare size={20} className="group-hover:scale-110 transition-transform" />
             </button>
 
@@ -729,6 +730,7 @@ export default function PropertyOwnerLayout({
 
             <div className="relative">
               <button 
+                aria-label="Notifications"
                 className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all relative group"
                 onClick={() => setNotificationOpen(!notificationOpen)}
               >
