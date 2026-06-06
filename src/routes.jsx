@@ -1,7 +1,7 @@
 import React, { lazy } from "react";
 
 const pageModules = import.meta.glob("./pages/**/*.jsx");
-const rootModules = import.meta.glob("./*.jsx");
+const rootModules = import.meta.glob("./HomePage.jsx");
 const frontendModules = import.meta.glob("../../Frontend/src/*.jsx");
 
 // Merge all modules
