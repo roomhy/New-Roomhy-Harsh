@@ -6,7 +6,8 @@ import {
   ArrowUpRight, ArrowDownRight, MoreVertical, 
   Filter, Globe, MapPin, Zap, Sheet, Trash2, 
   Pencil, Phone, Mail, User, Image as ImageIcon, ChevronRight,
-  Activity, Home, CheckCircle2, XCircle, RefreshCw, Layers, Plus, UploadCloud, Loader2
+  Activity, Home, CheckCircle2, XCircle, RefreshCw, Layers, Plus, UploadCloud, Loader2,
+  Eye, AlertCircle, ChevronDown, ChevronUp, BadgeCheck, Ban
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { getApiBase } from "../../utils/api";
@@ -57,8 +58,28 @@ export default function SuperadminProperties() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [viewProperty, setViewProperty] = useState(null);
+  const [viewLoading, setViewLoading] = useState(false);
 
   const getApiUrl = getApiBase;
+
+  const fetchPropertyDetail = async (id) => {
+    try {
+      setViewLoading(true);
+      const res = await fetch(`${getApiUrl()}/api/properties/${id}`);
+      const data = await res.json();
+      if (data.success && data.property) {
+        setViewProperty(data.property);
+      } else {
+        toast.error("Failed to load property details");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error loading property");
+    } finally {
+      setViewLoading(false);
+    }
+  };
 
   const fetchProperties = async (pNum = 1) => {
     try {
@@ -247,8 +268,9 @@ export default function SuperadminProperties() {
                        </td>
                        <td className="py-3 text-right">
                           <div className="flex items-center justify-end gap-2">
-                             <button onClick={() => navigate(`?view=add&editId=${p.id}`)} className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-blue-600 transition-all border border-slate-100 shadow-sm"><Pencil className="w-3.5 h-3.5" /></button>
-                             <button onClick={() => handleDeleteProperty(p.id)} className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-rose-600 transition-all border border-slate-100 shadow-sm"><Trash2 className="w-3.5 h-3.5" /></button>
+                             <button onClick={() => fetchPropertyDetail(p.id)} className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-indigo-600 transition-all border border-slate-100 shadow-sm" title="View Property"><Eye className="w-3.5 h-3.5" /></button>
+                             <button onClick={() => navigate(`?view=add&editId=${p.id}`)} className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-blue-600 transition-all border border-slate-100 shadow-sm" title="Edit Property"><Pencil className="w-3.5 h-3.5" /></button>
+                             <button onClick={() => handleDeleteProperty(p.id)} className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-rose-600 transition-all border border-slate-100 shadow-sm" title="Delete Property"><Trash2 className="w-3.5 h-3.5" /></button>
                           </div>
                        </td>
                     </tr>
@@ -295,7 +317,29 @@ export default function SuperadminProperties() {
     </div>
   );
 
-  return view === "add" ? <AddPropertyView editId={editId} onBack={() => { fetchProperties(); navigate("?view=list"); }} apiUrl={getApiUrl()} /> : listView;
+  return (
+    <>
+      {view === "add" ? <AddPropertyView editId={editId} onBack={() => { fetchProperties(); navigate("?view=list"); }} apiUrl={getApiUrl()} /> : listView}
+      {/* View Loading Overlay */}
+      {viewLoading && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center">
+          <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-4 shadow-2xl">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <p className="text-sm font-bold text-slate-600 uppercase tracking-widest">Loading Property...</p>
+          </div>
+        </div>
+      )}
+      {/* Property View Modal */}
+      {viewProperty && !viewLoading && (
+        <PropertyViewModal
+          property={viewProperty}
+          onClose={() => setViewProperty(null)}
+          apiUrl={getApiUrl()}
+          onRefresh={() => { fetchProperties(); fetchPropertyDetail(viewProperty._id); }}
+        />
+      )}
+    </>
+  );
 }
 
 function AddPropertyView({ onBack, apiUrl, editId }) {
@@ -1119,6 +1163,430 @@ function AddPropertyView({ onBack, apiUrl, editId }) {
            </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// =====================================================================
+// PROPERTY VIEW MODAL — Beautiful full-detail modal for Superadmin
+// =====================================================================
+function PropertyViewModal({ property: p, onClose, apiUrl, onRefresh }) {
+  const [approvingChanges, setApprovingChanges] = useState(false);
+  const [rejectingChanges, setRejectingChanges] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [showRejectInput, setShowRejectInput] = useState(false);
+  const [activeImgTab, setActiveImgTab] = useState(0);
+  const [expandedSection, setExpandedSection] = useState(null);
+
+  const hasPending = p.pendingChanges && p.pendingChanges.status === "pending";
+
+  const allImages = [
+    ...(p.images || []),
+    ...((p.propertyViews || []).flatMap(v => v.images || []))
+  ].filter(Boolean);
+
+  const handleApprove = async () => {
+    if (!window.confirm("Approve these changes? They will go live immediately.")) return;
+    setApprovingChanges(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/properties/${p._id}/approve-changes`, { method: "PUT", headers: { "Content-Type": "application/json" } });
+      const data = await res.json();
+      if (data.success) { toast.success("Changes approved & live!"); onRefresh(); }
+      else toast.error(data.message || "Failed to approve");
+    } catch (err) { toast.error("Error approving changes"); } finally { setApprovingChanges(false); }
+  };
+
+  const handleReject = async () => {
+    setRejectingChanges(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/properties/${p._id}/reject-changes`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rejectReason })
+      });
+      const data = await res.json();
+      if (data.success) { toast.success("Changes rejected."); setShowRejectInput(false); onRefresh(); }
+      else toast.error(data.message || "Failed to reject");
+    } catch (err) { toast.error("Error rejecting changes"); } finally { setRejectingChanges(false); }
+  };
+
+  const fmt = (val) => {
+    if (val === null || val === undefined || val === "") return "—";
+    if (typeof val === "boolean") return val ? "Yes" : "No";
+    if (Array.isArray(val)) {
+      if (val.length === 0) return "—";
+      return val.map(item => {
+        if (typeof item === "object" && item !== null) return item.name || item.title || item.label || Object.values(item).filter(v => typeof v === "string").join(" ") || JSON.stringify(item);
+        return String(item);
+      }).join(", ");
+    }
+    if (typeof val === "object") {
+      return Object.entries(val)
+        .filter(([, v]) => v !== null && v !== "" && v !== undefined)
+        .map(([k, v]) => `${k.replace(/([A-Z])/g, " $1").trim()}: ${typeof v === "boolean" ? (v ? "Yes" : "No") : v}`)
+        .join(" • ");
+    }
+    return String(val);
+  };
+
+  const Section = ({ title, icon: Icon, color = "blue", children, id }) => (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <button
+        onClick={() => setExpandedSection(expandedSection === id ? null : id)}
+        className={`w-full flex items-center justify-between p-4 bg-${color}-50 border-b border-${color}-100 hover:bg-${color}-100 transition-colors`}
+      >
+        <div className="flex items-center gap-2">
+          <Icon className={`w-4 h-4 text-${color}-600`} />
+          <span className={`text-xs font-bold text-${color}-700 uppercase tracking-widest`}>{title}</span>
+        </div>
+        {expandedSection === id ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+      </button>
+      {(expandedSection === id || expandedSection === null) && (
+        <div className="p-4">{children}</div>
+      )}
+    </div>
+  );
+
+  const Field = ({ label, value, highlight }) => (
+    <div className="space-y-1">
+      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
+      <div className={`text-[11px] font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border ${highlight ? "border-amber-300 bg-amber-50 text-amber-800" : "border-slate-100"} break-words`}>
+        {fmt(value) || "—"}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-[150] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-[#F8FAFC] rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-100 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+              <Building2 className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 leading-tight">{p.title || "Property Details"}</h2>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{p.city || ""} {p.locality ? `• ${p.locality}` : ""} {p.locationCode ? `• ${p.locationCode}` : ""}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className={`text-[8px] font-bold px-2 py-1 rounded-lg border uppercase tracking-wider ${
+              p.isLiveOnWebsite ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+              p.status === "active" ? "bg-blue-50 text-blue-600 border-blue-100" :
+              "bg-amber-50 text-amber-600 border-amber-100"
+            }`}>{p.isLiveOnWebsite ? "Live on Website" : p.status || "Inactive"}</span>
+            {hasPending && (
+              <span className="text-[8px] font-bold px-2 py-1 rounded-lg border uppercase tracking-wider bg-amber-50 text-amber-600 border-amber-200 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" /> Pending Changes
+              </span>
+            )}
+            <button onClick={onClose} className="p-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"><XCircle className="w-5 h-5" /></button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 p-6 space-y-4">
+
+          {/* Pending Changes Section */}
+          {hasPending && (
+            <div className="bg-amber-50 rounded-2xl border-2 border-amber-200 p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-amber-600" />
+                  <span className="text-sm font-bold text-amber-800 uppercase tracking-tight">Owner Edit Request — Pending Approval</span>
+                </div>
+                <span className="text-[9px] text-amber-600 font-bold">{p.pendingChanges?.requestedBy} • {p.pendingChanges?.requestedAt ? new Date(p.pendingChanges.requestedAt).toLocaleDateString("en-IN") : ""}</span>
+              </div>
+              {p.pendingChanges?.reason && (
+                <p className="text-xs text-amber-700 bg-amber-100 px-3 py-2 rounded-lg mb-4 border border-amber-200"><strong>Reason:</strong> {p.pendingChanges.reason}</p>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                {Object.entries(p.pendingChanges?.data || {}).filter(([k, v]) => v !== undefined && v !== null && v !== "").map(([key, val]) => (
+                  <div key={key} className="space-y-1">
+                    <p className="text-[9px] font-bold text-amber-500 uppercase tracking-widest">{key.replace(/([A-Z])/g, " $1").trim()} (Proposed)</p>
+                    <div className="text-[11px] font-semibold text-amber-900 bg-white px-3 py-2 rounded-lg border border-amber-300 break-words">{fmt(val)}</div>
+                  </div>
+                ))}
+              </div>
+              {!showRejectInput ? (
+                <div className="flex gap-3">
+                  <button onClick={handleApprove} disabled={approvingChanges} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200/50 disabled:opacity-50">
+                    {approvingChanges ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BadgeCheck className="w-3.5 h-3.5" />} Approve & Go Live
+                  </button>
+                  <button onClick={() => setShowRejectInput(true)} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-rose-50 text-rose-600 border border-rose-200 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-rose-100 transition-all">
+                    <Ban className="w-3.5 h-3.5" /> Reject Changes
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <input
+                    value={rejectReason}
+                    onChange={e => setRejectReason(e.target.value)}
+                    placeholder="Reason for rejection (optional)..."
+                    className="w-full bg-white border border-rose-200 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-rose-100"
+                  />
+                  <div className="flex gap-3">
+                    <button onClick={() => setShowRejectInput(false)} className="flex-1 py-2 rounded-xl text-[10px] font-bold text-slate-500 bg-slate-100 hover:bg-slate-200">Cancel</button>
+                    <button onClick={handleReject} disabled={rejectingChanges} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-rose-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-rose-700 disabled:opacity-50">
+                      {rejectingChanges ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />} Confirm Reject
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Images */}
+          {allImages.length > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-slate-100 flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-purple-600" />
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-widest">Property Images ({allImages.length})</span>
+              </div>
+              <div className="p-4">
+                <div className="relative w-full h-56 rounded-xl overflow-hidden mb-3 bg-slate-100">
+                  <img src={allImages[activeImgTab]} alt="Property" className="w-full h-full object-cover" />
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {allImages.map((img, i) => (
+                    <button key={i} onClick={() => setActiveImgTab(i)} className={`shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-all ${ i === activeImgTab ? "border-blue-500" : "border-slate-200 opacity-60 hover:opacity-100"}`}>
+                      <img src={img} alt="" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Basic Info */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-blue-50 flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-blue-600" />
+              <span className="text-xs font-bold text-blue-700 uppercase tracking-widest">Basic Information</span>
+            </div>
+            <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+              <Field label="Title" value={p.title} />
+              <Field label="Property Type" value={p.propertyType} />
+              <Field label="Gender" value={p.gender} />
+              <Field label="City" value={p.city} />
+              <Field label="Locality" value={p.locality} />
+              <Field label="Location Code" value={p.locationCode} />
+              <Field label="Address" value={p.address} />
+              <Field label="Landmark" value={p.landmark} />
+              <Field label="State" value={p.state} />
+              <Field label="Pincode" value={p.pincode} />
+              <Field label="Latitude" value={p.latitude} />
+              <Field label="Longitude" value={p.longitude} />
+            </div>
+          </div>
+
+          {/* Contact & Owner */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-emerald-50 flex items-center gap-2">
+              <User className="w-4 h-4 text-emerald-600" />
+              <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest">Contact & Owner</span>
+            </div>
+            <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+              <Field label="Owner Name" value={p.ownerName} />
+              <Field label="Owner Phone" value={p.ownerPhone} />
+              <Field label="Owner Login ID" value={p.ownerLoginId} />
+              <Field label="Contact Name" value={p.contact?.name} />
+              <Field label="Contact Number" value={p.contact?.number} />
+              <Field label="Contact Email" value={p.contact?.email} />
+            </div>
+          </div>
+
+          {/* Pricing */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-indigo-50 flex items-center gap-2">
+              <Layers className="w-4 h-4 text-indigo-600" />
+              <span className="text-xs font-bold text-indigo-700 uppercase tracking-widest">Pricing</span>
+            </div>
+            <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+              <Field label="Monthly Rent" value={p.monthlyRent ? `₹${p.monthlyRent?.toLocaleString()}` : null} />
+              <Field label="Discount" value={p.discount ? `₹${p.discount}` : "0"} />
+              <Field label="Rent Type" value={p.pricing?.rentType} />
+              <Field label="Security Deposit" value={p.pricing?.securityDeposit} />
+              <Field label="Advance Rent" value={p.pricing?.advanceRent} />
+              <Field label="Notice Period" value={p.pricing?.noticePeriod} />
+              <Field label="Lock-in Period" value={p.pricing?.lockInPeriod} />
+              <Field label="Discount %" value={p.pricing?.discountPercent} />
+              {(p.pricing?.additionalCharges || []).length > 0 && (
+                <div className="md:col-span-3 space-y-1">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Additional Charges</p>
+                  <div className="flex flex-wrap gap-2">
+                    {(p.pricing?.additionalCharges || []).map((c, i) => (
+                      <span key={i} className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded-lg border border-indigo-100 font-semibold">{c.name}: ₹{c.amount}/{c.per}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Property Details */}
+          {p.propertyDetails && Object.values(p.propertyDetails).some(v => v) && (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-amber-50 flex items-center gap-2">
+                <Home className="w-4 h-4 text-amber-600" />
+                <span className="text-xs font-bold text-amber-700 uppercase tracking-widest">Property Details</span>
+              </div>
+              <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                <Field label="Total Area" value={p.propertyDetails?.totalArea} />
+                <Field label="Year Built" value={p.propertyDetails?.yearBuilt} />
+                <Field label="Property Age" value={p.propertyDetails?.propertyAge} />
+                <Field label="Floors" value={p.propertyDetails?.floors} />
+                <Field label="Lift Available" value={p.propertyDetails?.liftAvailable} />
+                <Field label="Parking" value={p.propertyDetails?.parkingAvailable} />
+                <Field label="Notice Period" value={p.propertyDetails?.noticePeriod} />
+                <Field label="Gender Pref" value={p.propertyDetails?.genderPref} />
+                <Field label="Preferred For" value={p.propertyDetails?.preferredFor} />
+              </div>
+            </div>
+          )}
+
+          {/* Policies */}
+          {p.policies && Object.values(p.policies).some(v => v) && (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-rose-50 flex items-center gap-2">
+                <Shield className="w-4 h-4 text-rose-600" />
+                <span className="text-xs font-bold text-rose-700 uppercase tracking-widest">Policies / House Rules</span>
+              </div>
+              <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                <Field label="Smoking" value={p.policies?.smokingAllowed} />
+                <Field label="Alcohol" value={p.policies?.alcoholAllowed} />
+                <Field label="Pets" value={p.policies?.petsAllowed} />
+                <Field label="Cooking" value={p.policies?.cookingAllowed} />
+                <Field label="Visitors" value={p.policies?.visitorsAllowed} />
+                <Field label="Visitor Timing" value={p.policies?.visitorTiming} />
+                <Field label="Party" value={p.policies?.partyAllowed} />
+                <Field label="Outside Food" value={p.policies?.outsideFood} />
+                <Field label="Quiet Hours" value={p.policies?.quietHours} />
+                <Field label="Quiet Hours Timing" value={p.policies?.quietHoursTiming} />
+                <Field label="Early Check-in" value={p.policies?.earlyCheckIn} />
+              </div>
+            </div>
+          )}
+
+          {/* Facilities */}
+          {p.facilities && Object.values(p.facilities).some(Boolean) && (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-teal-50 flex items-center gap-2">
+                <Zap className="w-4 h-4 text-teal-600" />
+                <span className="text-xs font-bold text-teal-700 uppercase tracking-widest">Facilities</span>
+              </div>
+              <div className="p-4 flex flex-wrap gap-2">
+                {Object.entries(p.facilities || {}).map(([k, v]) => (
+                  <span key={k} className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border uppercase tracking-wider ${
+                    v ? "bg-teal-50 text-teal-600 border-teal-100" : "bg-slate-50 text-slate-400 border-slate-100"
+                  }`}>
+                    {v ? "✓" : "✗"} {k.replace(/([A-Z])/g, " $1").trim()}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Amenities */}
+          {(p.amenities || []).length > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-purple-50 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-purple-600" />
+                <span className="text-xs font-bold text-purple-700 uppercase tracking-widest">Amenities ({p.amenities.length})</span>
+              </div>
+              <div className="p-4 flex flex-wrap gap-2">
+                {(p.amenities || []).map((am, i) => (
+                  <span key={i} className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-100 uppercase tracking-wider">
+                    {typeof am === "string" ? am : am.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Room Types */}
+          {(p.roomTypes || []).length > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+                <Users className="w-4 h-4 text-slate-600" />
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-widest">Room Types</span>
+              </div>
+              <div className="p-4 space-y-3">
+                {(p.roomTypes || []).map((rt, i) => (
+                  <div key={i} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    <p className="text-xs font-bold text-slate-700 mb-2">{rt.type || `Room Type ${i+1}`}</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Field label="Occupancy" value={rt.occupancy} />
+                      <Field label="Price/Bed" value={rt.pricePerBed ? `₹${rt.pricePerBed}` : null} />
+                      <Field label="Price/Room" value={rt.pricePerRoom ? `₹${rt.pricePerRoom}` : null} />
+                      <Field label="Total Rooms" value={rt.totalRooms} />
+                      <Field label="Total Beds" value={rt.totalBeds} />
+                      <Field label="Description" value={rt.desc} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Occupancy Stats */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-slate-600" />
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-widest">Occupancy & Stats</span>
+            </div>
+            <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Field label="Total Rooms" value={p.totalRooms || p.roomCount} />
+              <Field label="Occupied Rooms" value={p.occupiedRooms} />
+              <Field label="Vacant Rooms" value={p.vacantRooms} />
+              <Field label="Total Beds" value={p.bedCount} />
+              <Field label="Occupied Beds" value={p.occupiedBeds} />
+              <Field label="Vacant Beds" value={p.vacantBeds} />
+              <Field label="Beds Per Room" value={p.bedsPerRoom} />
+              <Field label="Views" value={p.views} />
+              <Field label="Clicks" value={p.clicks} />
+            </div>
+          </div>
+
+          {/* Description */}
+          {(p.description || p.tenantDescription) && (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+                <Globe className="w-4 h-4 text-slate-600" />
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-widest">Description</span>
+              </div>
+              <div className="p-4 space-y-3">
+                {p.description && <Field label="Property Description" value={p.description} />}
+                {p.tenantDescription && <Field label="Tenant Description" value={p.tenantDescription} />}
+              </div>
+            </div>
+          )}
+
+          {/* Status & Admin Fields */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+              <Shield className="w-4 h-4 text-slate-600" />
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-widest">Status & Admin</span>
+            </div>
+            <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+              <Field label="Status" value={p.status} />
+              <Field label="Is Published" value={p.isPublished} />
+              <Field label="Is Live on Website" value={p.isLiveOnWebsite} />
+              <Field label="Property Category" value={p.propertyCategory} />
+              <Field label="Title" value={p.title} />
+              <Field label="Created At" value={p.createdAt ? new Date(p.createdAt).toLocaleDateString("en-IN") : null} />
+              <Field label="Updated At" value={p.updatedAt ? new Date(p.updatedAt).toLocaleDateString("en-IN") : null} />
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 bg-white border-t border-slate-100 shrink-0">
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">ID: {p._id}</p>
+          <button onClick={onClose} className="px-5 py-2 rounded-xl bg-slate-800 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-slate-700 transition-colors">Close</button>
+        </div>
+      </div>
     </div>
   );
 }

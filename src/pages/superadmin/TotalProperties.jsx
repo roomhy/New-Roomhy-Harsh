@@ -409,13 +409,422 @@ export default function TotalProperties() {
           </div>
         </div>
       </div>
-      {/* Property Details Modal */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* FULL DETAIL VIEW MODAL — same as superadmin properties.jsx style  */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
       {viewModalOpen && selectedProp && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-           <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
-              {/* Modal Header */}
-              <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                 <div className="flex items-center gap-4">
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={e => e.target === e.currentTarget && (setViewModalOpen(false), setFullDetails(null))}>
+          <div className="bg-[#F8FAFC] rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200">
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-800 leading-tight">{selectedProp.title}</h2>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                    {selectedProp.city}{selectedProp.locality && selectedProp.locality !== "-" ? ` • ${selectedProp.locality}` : ""} • ID: {selectedProp.propId}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={cn("text-[8px] font-bold px-2 py-1 rounded-lg border uppercase tracking-wider", STATUS_COLORS[selectedProp.status] || "bg-slate-100 text-slate-500 border-slate-200")}>
+                  {selectedProp.status}
+                </span>
+                {fullDetails?.pendingChanges?.status === "pending" && (
+                  <span className="text-[8px] font-bold px-2 py-1 rounded-lg border uppercase tracking-wider bg-amber-50 text-amber-600 border-amber-200 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> Pending Changes
+                  </span>
+                )}
+                <button onClick={() => { setViewModalOpen(false); setFullDetails(null); }}
+                  className="p-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="overflow-y-auto flex-1 p-6 space-y-4">
+              {detailsLoading ? (
+                <div className="flex flex-col items-center justify-center h-64 gap-4">
+                  <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Loading full details...</p>
+                </div>
+              ) : fullDetails ? (
+                <>
+                  {/* Pending Changes Section */}
+                  {fullDetails.pendingChanges?.status === "pending" && (
+                    <PendingChangesSection prop={fullDetails} apiUrl={apiUrl} onRefresh={() => { fetchProps(page); openViewModal(selectedProp); }} />
+                  )}
+
+                  {/* Images */}
+                  {(() => {
+                    const imgs = [...(fullDetails.images || []), ...((fullDetails.propertyViews || []).flatMap(v => v.images || []))].filter(Boolean);
+                    return imgs.length > 0 && <ImageGallerySection images={imgs} />;
+                  })()}
+
+                  {/* Basic Info */}
+                  <InfoSection title="Basic Information" icon={Building2} colorClass="blue">
+                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <F label="Title" val={fullDetails.title} />
+                      <F label="Property Type" val={fullDetails.propertyType} />
+                      <F label="Gender" val={fullDetails.gender} />
+                      <F label="City" val={fullDetails.city} />
+                      <F label="Locality" val={fullDetails.locality} />
+                      <F label="Location Code" val={fullDetails.locationCode} />
+                      <F label="Address" val={fullDetails.address} />
+                      <F label="Landmark" val={fullDetails.landmark} />
+                      <F label="State" val={fullDetails.state} />
+                      <F label="Pincode" val={fullDetails.pincode} />
+                      <F label="Latitude" val={fullDetails.latitude} />
+                      <F label="Longitude" val={fullDetails.longitude} />
+                    </div>
+                  </InfoSection>
+
+                  {/* Contact & Owner */}
+                  <InfoSection title="Contact & Owner" icon={Home} colorClass="emerald">
+                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <F label="Owner Name" val={fullDetails.ownerName} />
+                      <F label="Owner Phone" val={fullDetails.ownerPhone} />
+                      <F label="Owner Login ID" val={fullDetails.ownerLoginId} />
+                      <F label="Contact Name" val={fullDetails.contact?.name} />
+                      <F label="Contact Number" val={fullDetails.contact?.number} />
+                      <F label="Contact Email" val={fullDetails.contact?.email} />
+                    </div>
+                  </InfoSection>
+
+                  {/* Pricing */}
+                  <InfoSection title="Pricing" icon={Layers} colorClass="indigo">
+                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <F label="Monthly Rent" val={fullDetails.monthlyRent ? `₹${fullDetails.monthlyRent?.toLocaleString()}` : null} />
+                      <F label="Discount" val={fullDetails.discount ? `₹${fullDetails.discount}` : "0"} />
+                      <F label="Rent Type" val={fullDetails.pricing?.rentType} />
+                      <F label="Security Deposit" val={fullDetails.pricing?.securityDeposit} />
+                      <F label="Advance Rent" val={fullDetails.pricing?.advanceRent} />
+                      <F label="Notice Period" val={fullDetails.pricing?.noticePeriod} />
+                      <F label="Lock-in Period" val={fullDetails.pricing?.lockInPeriod} />
+                      <F label="Discount %" val={fullDetails.pricing?.discountPercent} />
+                      {(fullDetails.pricing?.additionalCharges || []).length > 0 && (
+                        <div className="md:col-span-3 space-y-1">
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Additional Charges</p>
+                          <div className="flex flex-wrap gap-2">
+                            {(fullDetails.pricing?.additionalCharges || []).map((c, i) => (
+                              <span key={i} className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded-lg border border-indigo-100 font-semibold">{c.name}: ₹{c.amount}/{c.per}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </InfoSection>
+
+                  {/* Property Details */}
+                  {fullDetails.propertyDetails && Object.values(fullDetails.propertyDetails).some(v => v) && (
+                    <InfoSection title="Property Details" icon={Home} colorClass="amber">
+                      <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <F label="Total Area" val={fullDetails.propertyDetails?.totalArea} />
+                        <F label="Year Built" val={fullDetails.propertyDetails?.yearBuilt} />
+                        <F label="Property Age" val={fullDetails.propertyDetails?.propertyAge} />
+                        <F label="Floors" val={fullDetails.propertyDetails?.floors} />
+                        <F label="Lift Available" val={fullDetails.propertyDetails?.liftAvailable} />
+                        <F label="Parking" val={fullDetails.propertyDetails?.parkingAvailable} />
+                        <F label="Notice Period" val={fullDetails.propertyDetails?.noticePeriod} />
+                        <F label="Gender Pref" val={fullDetails.propertyDetails?.genderPref} />
+                        <F label="Preferred For" val={fullDetails.propertyDetails?.preferredFor} />
+                      </div>
+                    </InfoSection>
+                  )}
+
+                  {/* Policies */}
+                  {fullDetails.policies && Object.values(fullDetails.policies).some(v => v) && (
+                    <InfoSection title="Policies / House Rules" icon={Home} colorClass="rose">
+                      <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <F label="Smoking" val={fullDetails.policies?.smokingAllowed} />
+                        <F label="Alcohol" val={fullDetails.policies?.alcoholAllowed} />
+                        <F label="Pets" val={fullDetails.policies?.petsAllowed} />
+                        <F label="Cooking" val={fullDetails.policies?.cookingAllowed} />
+                        <F label="Visitors" val={fullDetails.policies?.visitorsAllowed} />
+                        <F label="Visitor Timing" val={fullDetails.policies?.visitorTiming} />
+                        <F label="Party" val={fullDetails.policies?.partyAllowed} />
+                        <F label="Outside Food" val={fullDetails.policies?.outsideFood} />
+                        <F label="Quiet Hours" val={fullDetails.policies?.quietHours} />
+                        <F label="Quiet Hours Timing" val={fullDetails.policies?.quietHoursTiming} />
+                        <F label="Early Check-in" val={fullDetails.policies?.earlyCheckIn} />
+                      </div>
+                    </InfoSection>
+                  )}
+
+                  {/* Facilities */}
+                  {fullDetails.facilities && Object.values(fullDetails.facilities).some(Boolean) && (
+                    <InfoSection title="Facilities" icon={Home} colorClass="teal">
+                      <div className="p-4 flex flex-wrap gap-2">
+                        {Object.entries(fullDetails.facilities || {}).map(([k, v]) => (
+                          <span key={k} className={cn("text-[10px] font-bold px-3 py-1.5 rounded-lg border uppercase tracking-wider",
+                            v ? "bg-teal-50 text-teal-600 border-teal-100" : "bg-slate-50 text-slate-400 border-slate-100")}>
+                            {v ? "✓" : "✗"} {k.replace(/([A-Z])/g, " $1").trim()}
+                          </span>
+                        ))}
+                      </div>
+                    </InfoSection>
+                  )}
+
+                  {/* Amenities */}
+                  {(fullDetails.amenities || []).length > 0 && (
+                    <InfoSection title={`Amenities (${fullDetails.amenities.length})`} icon={Home} colorClass="purple">
+                      <div className="p-4 flex flex-wrap gap-2">
+                        {(fullDetails.amenities || []).map((am, i) => (
+                          <span key={i} className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-100 uppercase tracking-wider">
+                            {typeof am === "string" ? am : am.name}
+                          </span>
+                        ))}
+                      </div>
+                    </InfoSection>
+                  )}
+
+                  {/* Room Types */}
+                  {(fullDetails.roomTypes || []).length > 0 && (
+                    <InfoSection title="Room Types" icon={Users} colorClass="slate">
+                      <div className="p-4 space-y-3">
+                        {(fullDetails.roomTypes || []).map((rt, i) => (
+                          <div key={i} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                            <p className="text-xs font-bold text-slate-700 mb-2">{rt.type || `Room Type ${i + 1}`}</p>
+                            <div className="grid grid-cols-3 gap-2">
+                              <F label="Occupancy" val={rt.occupancy} />
+                              <F label="Price/Bed" val={rt.pricePerBed ? `₹${rt.pricePerBed}` : null} />
+                              <F label="Price/Room" val={rt.pricePerRoom ? `₹${rt.pricePerRoom}` : null} />
+                              <F label="Total Rooms" val={rt.totalRooms} />
+                              <F label="Total Beds" val={rt.totalBeds} />
+                              <F label="Description" val={rt.desc} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </InfoSection>
+                  )}
+
+                  {/* Occupancy Stats */}
+                  <InfoSection title="Occupancy & Stats" icon={Users} colorClass="slate">
+                    <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <F label="Total Rooms" val={fullDetails.totalRooms || fullDetails.roomCount} />
+                      <F label="Occupied Rooms" val={fullDetails.occupiedRooms} />
+                      <F label="Vacant Rooms" val={fullDetails.vacantRooms} />
+                      <F label="Total Beds" val={fullDetails.bedCount} />
+                      <F label="Occupied Beds" val={fullDetails.occupiedBeds} />
+                      <F label="Vacant Beds" val={fullDetails.vacantBeds} />
+                      <F label="Views" val={fullDetails.views} />
+                      <F label="Clicks" val={fullDetails.clicks} />
+                    </div>
+                  </InfoSection>
+
+                  {/* Description */}
+                  {(fullDetails.description || fullDetails.tenantDescription) && (
+                    <InfoSection title="Description" icon={Home} colorClass="slate">
+                      <div className="p-4 space-y-3">
+                        {fullDetails.description && <F label="Property Description" val={fullDetails.description} />}
+                        {fullDetails.tenantDescription && <F label="Tenant Description" val={fullDetails.tenantDescription} />}
+                      </div>
+                    </InfoSection>
+                  )}
+
+                  {/* Status & Admin */}
+                  <InfoSection title="Status & Admin" icon={Home} colorClass="slate">
+                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <F label="Status" val={fullDetails.status} />
+                      <F label="Is Published" val={fullDetails.isPublished} />
+                      <F label="Is Live on Website" val={fullDetails.isLiveOnWebsite} />
+                      <F label="Property Category" val={fullDetails.propertyCategory} />
+                      <F label="Created At" val={fullDetails.createdAt ? new Date(fullDetails.createdAt).toLocaleDateString("en-IN") : null} />
+                      <F label="Updated At" val={fullDetails.updatedAt ? new Date(fullDetails.updatedAt).toLocaleDateString("en-IN") : null} />
+                    </div>
+                  </InfoSection>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+                  <AlertCircle className="w-12 h-12 mb-2 opacity-20" />
+                  <p className="text-xs font-black uppercase tracking-widest">Data unavailable for this property</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-6 py-4 bg-white border-t border-slate-100 shrink-0">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">ID: {selectedProp.id}</p>
+              <div className="flex gap-3">
+                <button onClick={() => { setViewModalOpen(false); setFullDetails(null); }}
+                  className="px-5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-slate-500 bg-slate-100 hover:bg-slate-200">
+                  Close
+                </button>
+                <button onClick={() => { setViewModalOpen(false); navigate(`/superadmin/add-property?editId=${selectedProp.id}`); }}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-blue-700 shadow-lg shadow-blue-200/50">
+                  <Pencil className="w-3.5 h-3.5" /> Edit Property
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Helper components for the full-detail modal ──────────────────────────────
+const fmtVal = (val) => {
+  if (val === null || val === undefined || val === "") return "—";
+  if (typeof val === "boolean") return val ? "Yes" : "No";
+  if (Array.isArray(val)) {
+    if (val.length === 0) return "—";
+    return val.map(item => {
+      if (typeof item === "object" && item !== null)
+        return item.name || item.title || item.label || Object.values(item).filter(v => typeof v === "string").join(" ") || JSON.stringify(item);
+      return String(item);
+    }).join(", ");
+  }
+  if (typeof val === "object") {
+    return Object.entries(val).filter(([, v]) => v !== null && v !== "" && v !== undefined)
+      .map(([k, v]) => `${k.replace(/([A-Z])/g, " $1").trim()}: ${typeof v === "boolean" ? (v ? "Yes" : "No") : v}`)
+      .join(" • ");
+  }
+  return String(val);
+};
+
+function F({ label, val }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
+      <div className="text-[11px] font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 break-words">
+        {fmtVal(val) || "—"}
+      </div>
+    </div>
+  );
+}
+
+const colorCfg = {
+  blue:    ["bg-blue-50 border-blue-100",   "text-blue-600",   "text-blue-700"],
+  emerald: ["bg-emerald-50 border-emerald-100", "text-emerald-600", "text-emerald-700"],
+  indigo:  ["bg-indigo-50 border-indigo-100",  "text-indigo-600",  "text-indigo-700"],
+  amber:   ["bg-amber-50 border-amber-100",    "text-amber-600",   "text-amber-700"],
+  rose:    ["bg-rose-50 border-rose-100",      "text-rose-600",    "text-rose-700"],
+  teal:    ["bg-teal-50 border-teal-100",      "text-teal-600",    "text-teal-700"],
+  purple:  ["bg-purple-50 border-purple-100",  "text-purple-600",  "text-purple-700"],
+  slate:   ["bg-slate-50 border-slate-100",    "text-slate-600",   "text-slate-700"],
+};
+
+function InfoSection({ title, icon: Icon, colorClass = "blue", children }) {
+  const [bg, iconCls, textCls] = colorCfg[colorClass] || colorCfg.slate;
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className={cn("p-4 border-b flex items-center gap-2", bg)}>
+        <Icon className={cn("w-4 h-4", iconCls)} />
+        <span className={cn("text-xs font-bold uppercase tracking-widest", textCls)}>{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ImageGallerySection({ images }) {
+  const [activeImg, setActiveImg] = useState(0);
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="p-4 border-b border-slate-100 flex items-center gap-2">
+        <ImageIcon className="w-4 h-4 text-purple-600" />
+        <span className="text-xs font-bold text-slate-700 uppercase tracking-widest">Property Images ({images.length})</span>
+      </div>
+      <div className="p-4">
+        <div className="relative w-full h-56 rounded-xl overflow-hidden mb-3 bg-slate-100">
+          <img src={images[activeImg]} alt="Property" className="w-full h-full object-cover" />
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {images.map((img, i) => (
+            <button key={i} onClick={() => setActiveImg(i)}
+              className={cn("shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-all", i === activeImg ? "border-blue-500" : "border-slate-200 opacity-60 hover:opacity-100")}>
+              <img src={img} alt="" className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PendingChangesSection({ prop, apiUrl, onRefresh }) {
+  const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [showReject, setShowReject] = useState(false);
+  const [reason, setReason] = useState("");
+
+  const approve = async () => {
+    if (!window.confirm("Approve these changes? They will go live immediately.")) return;
+    setApproving(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/properties/${prop._id}/approve-changes`, { method: "PUT", headers: { "Content-Type": "application/json" } });
+      const data = await res.json();
+      if (data.success) { alert("✅ Changes approved & live!"); onRefresh(); }
+      else alert(data.message || "Failed to approve");
+    } catch { alert("Error approving changes"); } finally { setApproving(false); }
+  };
+
+  const reject = async () => {
+    setRejecting(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/properties/${prop._id}/reject-changes`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rejectReason: reason }) });
+      const data = await res.json();
+      if (data.success) { alert("Changes rejected."); setShowReject(false); onRefresh(); }
+      else alert(data.message || "Failed to reject");
+    } catch { alert("Error rejecting changes"); } finally { setRejecting(false); }
+  };
+
+  return (
+    <div className="bg-amber-50 rounded-2xl border-2 border-amber-200 p-5 shadow-sm">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 text-amber-600" />
+          <span className="text-sm font-bold text-amber-800 uppercase tracking-tight">Owner Edit Request — Pending Approval</span>
+        </div>
+        <span className="text-[9px] text-amber-600 font-bold">
+          {prop.pendingChanges?.requestedBy} • {prop.pendingChanges?.requestedAt ? new Date(prop.pendingChanges.requestedAt).toLocaleDateString("en-IN") : ""}
+        </span>
+      </div>
+      {prop.pendingChanges?.reason && (
+        <p className="text-xs text-amber-700 bg-amber-100 px-3 py-2 rounded-lg mb-4 border border-amber-200"><strong>Reason:</strong> {prop.pendingChanges.reason}</p>
+      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        {Object.entries(prop.pendingChanges?.data || {}).filter(([, v]) => v !== undefined && v !== null && v !== "").map(([key, val]) => (
+          <div key={key} className="space-y-1">
+            <p className="text-[9px] font-bold text-amber-500 uppercase tracking-widest">{key.replace(/([A-Z])/g, " $1").trim()} (Proposed)</p>
+            <div className="text-[11px] font-semibold text-amber-900 bg-white px-3 py-2 rounded-lg border border-amber-300 break-words">{fmtVal(val)}</div>
+          </div>
+        ))}
+      </div>
+      {!showReject ? (
+        <div className="flex gap-3">
+          <button onClick={approve} disabled={approving} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-700 disabled:opacity-50">
+            {approving ? "Approving..." : "✓ Approve & Go Live"}
+          </button>
+          <button onClick={() => setShowReject(true)} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-rose-50 text-rose-600 border border-rose-200 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-rose-100">
+            ✗ Reject Changes
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <input value={reason} onChange={e => setReason(e.target.value)} placeholder="Reason for rejection (optional)..."
+            className="w-full bg-white border border-rose-200 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-rose-100" />
+          <div className="flex gap-3">
+            <button onClick={() => setShowReject(false)} className="flex-1 py-2 rounded-xl text-[10px] font-bold text-slate-500 bg-slate-100 hover:bg-slate-200">Cancel</button>
+            <button onClick={reject} disabled={rejecting} className="flex-1 py-2.5 bg-rose-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-rose-700 disabled:opacity-50">
+              {rejecting ? "Rejecting..." : "Confirm Reject"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
                     <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-200">
                        <Building2 className="w-6 h-6 text-white" />
                     </div>

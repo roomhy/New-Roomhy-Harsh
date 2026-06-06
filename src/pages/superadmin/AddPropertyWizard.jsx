@@ -180,16 +180,25 @@ export default function AddPropertyWizard() {
     }).catch(console.error);
   }, []);
 
-  // Fetch all owners for Contact Person dropdown autofill
-  useEffect(() => {
-    fetch(`${apiUrl}/api/owners?limit=500`)
-      .then(r => r.json())
-      .then(data => {
+  // Debounced search-as-you-type for owners (no bulk load)
+  const [ownersLoading, setOwnersLoading] = useState(false);
+  const ownerSearchTimeout = useRef(null);
+
+  const fetchOwnersBySearch = (query) => {
+    if (ownerSearchTimeout.current) clearTimeout(ownerSearchTimeout.current);
+    if (!query.trim()) { setOwnersList([]); setShowOwnerDropdown(false); return; }
+    ownerSearchTimeout.current = setTimeout(async () => {
+      setOwnersLoading(true);
+      try {
+        const res = await fetch(`${apiUrl}/api/owners?search=${encodeURIComponent(query)}&limit=10&page=1`);
+        const data = await res.json();
         const list = Array.isArray(data) ? data : (Array.isArray(data?.owners) ? data.owners : []);
         setOwnersList(list);
-      })
-      .catch(console.error);
-  }, [apiUrl]);
+        setShowOwnerDropdown(true);
+      } catch (e) { console.error(e); }
+      finally { setOwnersLoading(false); }
+    }, 350);
+  };
 
   // Close owner dropdown on outside click
   useEffect(() => {
@@ -213,13 +222,11 @@ export default function AddPropertyWizard() {
     setEmail(ownerEmail);
     setOwnerLoginId(owner.loginId || "");
     setShowOwnerDropdown(false);
+    setOwnersList([]);
   };
 
-  // Filtered owners based on search
-  const filteredOwners = ownersList.filter(o => {
-    const name = (o.name || o.profile?.name || "").toLowerCase();
-    return name.includes(ownerSearch.toLowerCase());
-  });
+  // Owners list is already filtered by API — no client-side filter needed
+  const filteredOwners = ownersList;
 
   // Step 2 — Property Details
   const [roomTypes, setRoomTypes] = useState(ROOM_TYPES_DEFAULT);
@@ -785,10 +792,10 @@ export default function AddPropertyWizard() {
                           onChange={e => {
                             setOwnerSearch(e.target.value);
                             setContactName(e.target.value);
-                            setShowOwnerDropdown(true);
+                            fetchOwnersBySearch(e.target.value);
                           }}
-                          onFocus={() => setShowOwnerDropdown(true)}
-                          placeholder="Type or select owner name"
+                          onFocus={() => { if (ownerSearch.trim()) fetchOwnersBySearch(ownerSearch); }}
+                          placeholder="Type name to search owner..."
                           className="w-full bg-transparent text-[10px] font-black text-slate-800 outline-none placeholder:text-slate-300"
                         />
                         {contactName && (
@@ -802,15 +809,19 @@ export default function AddPropertyWizard() {
                         )}
                       </div>
 
-                      {/* Dropdown list */}
                       {showOwnerDropdown && (
                         <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-100 rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
-                          {filteredOwners.length === 0 ? (
+                          {ownersLoading ? (
+                            <div className="px-4 py-3 flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+                              <svg className="w-3.5 h-3.5 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                              Searching...
+                            </div>
+                          ) : filteredOwners.length === 0 ? (
                             <div className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-tight">
-                              {ownersList.length === 0 ? "Loading owners..." : "No owner found"}
+                              {ownerSearch.trim() ? "No owner found" : "Type a name to search"}
                             </div>
                           ) : (
-                            filteredOwners.slice(0, 40).map((owner, i) => {
+                            filteredOwners.map((owner, i) => {
                               const name = owner.name || owner.profile?.name || "";
                               const phone = owner.phone || owner.checkinPhone || owner.profile?.phone || "";
                               const ownerEmail = owner.email || owner.profile?.email || "";

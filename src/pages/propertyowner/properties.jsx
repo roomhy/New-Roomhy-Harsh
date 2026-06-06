@@ -1,29 +1,972 @@
 import React, { useEffect, useState } from "react";
-import { fetchJson, getApiBase, getAuthHeader } from "../../utils/api";
+import { getApiBase, getAuthHeader } from "../../utils/api";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
-import PropertiesMobile from "./mobile/PropertiesMobile";
 import { requireOwnerSession } from "../../utils/ownerSession";
 import { fetchOwnerProperties } from "../../utils/propertyowner";
 import {
-  Plus, MapPin, BedDouble, IndianRupee, ArrowRight, Search, Star, Check, Tv, Wifi, Wind, Zap, Edit, Eye, ShieldCheck, Home, X, Mail
+  Plus, MapPin, BedDouble, Search, Star, Check, Edit, Eye, ShieldCheck, Home, X,
+  Building2, User, Layers, Shield, Activity, Globe, Zap, CheckCircle2, Users,
+  Image as ImageIcon, AlertCircle, Loader2, Clock, UploadCloud, Trash2,
+  Wifi, IndianRupee, Info, UtensilsCrossed, Camera, ChevronDown, ChevronUp
 } from "lucide-react";
 
-const Pill = ({ tone = "muted", children }) => {
-  const toneMap = {
-    primary: "bg-primary/10 text-primary",
-    success: "bg-success/15 text-success-foreground",
-    warning: "bg-warning/20 text-foreground",
-    info: "bg-info/15 text-foreground",
-    danger: "bg-destructive/15 text-destructive",
-    muted: "bg-muted text-muted-foreground",
-  };
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11.5px] font-medium ${toneMap[tone] || toneMap.muted}`}>
-      {children}
-    </span>
-  );
+// ─── Constants (same as AddPropertyWizard) ─────────────────────────────────────
+const AMENITY_CATEGORIES = [
+  { label: "Essentials", items: ["WiFi", "Power Backup", "24x7 Water", "RO Water", "Air Conditioning", "Heating"] },
+  { label: "Security & Safety", items: ["CCTV", "Security Guard", "Fire Extinguisher", "Smoke Detector", "First Aid Kit", "Secure Entry"] },
+  { label: "Room Amenities", items: ["Attached Bathroom", "Study Table", "Wardrobe", "Chair", "Bed with Mattress", "Mirror"] },
+  { label: "Facilities", items: ["Kitchen", "Refrigerator", "Microwave", "Induction Cooktop", "Geyser", "Utensils"] },
+  { label: "Common Areas", items: ["Living Room", "Dining Area", "Lounge", "Balcony / Terrace", "Garden", "Parking"] },
+];
+
+const PROPERTY_TYPES = ["hostel", "pg", "apartment", "co-living", "room"];
+const GENDER_OPTIONS = ["Co-ed", "Male Only", "Female Only", "any", "male", "female"];
+const CANCELLATION_POLICIES = ["Flexible", "Moderate", "Strict"];
+const INCLUDED_IN_RENT_OPTIONS = ["Electricity", "Water", "WiFi", "Gas", "Maintenance", "Housekeeping", "Laundry"];
+const HOUSE_RULES_FIELDS = [
+  { key: "smokingAllowed", label: "Smoking" },
+  { key: "alcoholAllowed", label: "Alcohol" },
+  { key: "petsAllowed", label: "Pets" },
+  { key: "cookingAllowed", label: "Cooking" },
+  { key: "visitorsAllowed", label: "Visitors" },
+  { key: "partyAllowed", label: "Party / Gathering" },
+  { key: "outsideFood", label: "Outside Food" },
+  { key: "quietHours", label: "Quiet Hours" },
+  { key: "earlyCheckIn", label: "Early Check-In" },
+];
+
+// ─── Shared helpers ─────────────────────────────────────────────────────────────
+const cn = (...c) => c.filter(Boolean).join(" ");
+const fmtVal = (val) => {
+  if (val === null || val === undefined || val === "") return "—";
+  if (typeof val === "boolean") return val ? "Yes" : "No";
+  if (Array.isArray(val)) {
+    if (val.length === 0) return "—";
+    return val.map(item => typeof item === "object" && item !== null
+      ? (item.name || item.title || Object.values(item).filter(v => typeof v === "string").join(" "))
+      : String(item)).join(", ");
+  }
+  if (typeof val === "object") {
+    return Object.entries(val).filter(([, v]) => v !== null && v !== "" && v !== undefined)
+      .map(([k, v]) => `${k.replace(/([A-Z])/g, " $1").trim()}: ${typeof v === "boolean" ? (v ? "Yes" : "No") : v}`)
+      .join(" • ");
+  }
+  return String(val);
 };
 
+// ─── Sub-UI Components ──────────────────────────────────────────────────────────
+function SectionCard({ title, icon: Icon, colorClass = "blue", defaultOpen = true, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const colorMap = {
+    blue:    { bg: "bg-blue-50 border-blue-100",      icon: "text-blue-600",    text: "text-blue-700" },
+    emerald: { bg: "bg-emerald-50 border-emerald-100", icon: "text-emerald-600", text: "text-emerald-700" },
+    indigo:  { bg: "bg-indigo-50 border-indigo-100",   icon: "text-indigo-600",  text: "text-indigo-700" },
+    amber:   { bg: "bg-amber-50 border-amber-100",     icon: "text-amber-600",   text: "text-amber-700" },
+    rose:    { bg: "bg-rose-50 border-rose-100",       icon: "text-rose-600",    text: "text-rose-700" },
+    teal:    { bg: "bg-teal-50 border-teal-100",       icon: "text-teal-600",    text: "text-teal-700" },
+    purple:  { bg: "bg-purple-50 border-purple-100",   icon: "text-purple-600",  text: "text-purple-700" },
+    slate:   { bg: "bg-slate-50 border-slate-100",     icon: "text-slate-600",   text: "text-slate-700" },
+  };
+  const c = colorMap[colorClass] || colorMap.slate;
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <button onClick={() => setOpen(v => !v)} className={cn("w-full p-4 border-b flex items-center gap-2 text-left", c.bg)}>
+        <Icon className={cn("w-4 h-4", c.icon)} />
+        <span className={cn("text-xs font-bold uppercase tracking-widest flex-1", c.text)}>{title}</span>
+        {open ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+      </button>
+      {open && children}
+    </div>
+  );
+}
+
+function ViewField({ label, value }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
+      <div className="text-[11px] font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 break-words min-h-[32px]">
+        {fmtVal(value) || "—"}
+      </div>
+    </div>
+  );
+}
+
+function EditInput({ label, field, formData, setFormData, type = "text", placeholder = "" }) {
+  return (
+    <div>
+      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">{label}</label>
+      <input type={type} value={formData[field] ?? ""} placeholder={placeholder}
+        onChange={e => setFormData(prev => ({ ...prev, [field]: e.target.value }))}
+        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all" />
+    </div>
+  );
+}
+
+function EditSelect({ label, field, formData, setFormData, options }) {
+  return (
+    <div>
+      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">{label}</label>
+      <select value={formData[field] ?? ""} onChange={e => setFormData(prev => ({ ...prev, [field]: e.target.value }))}
+        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 transition-all">
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+function EditTextarea({ label, field, formData, setFormData, rows = 3, placeholder = "" }) {
+  return (
+    <div>
+      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">{label}</label>
+      <textarea rows={rows} value={formData[field] ?? ""} placeholder={placeholder}
+        onChange={e => setFormData(prev => ({ ...prev, [field]: e.target.value }))}
+        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all resize-none" />
+    </div>
+  );
+}
+
+// ─── View Modal ─────────────────────────────────────────────────────────────────
+function PropertyViewModal({ property, onClose }) {
+  const [activeImg, setActiveImg] = useState(0);
+  const allImgs = [...(property.images || []), ...((property.propertyViews || []).flatMap(v => v.images || []))].filter(Boolean);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-[#F8FAFC] rounded-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-100 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+              <Building2 className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800">{property.title || property.name || "Property"}</h2>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                {[property.city, property.locality].filter(Boolean).join(" • ")}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {property.pendingChanges?.status === "pending" && (
+              <span className="text-[8px] font-bold px-2 py-1 rounded-lg bg-amber-50 text-amber-600 border border-amber-200 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" /> Edit Pending Approval
+              </span>
+            )}
+            <button onClick={onClose} className="p-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200"><X className="w-5 h-5" /></button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 p-5 space-y-4">
+
+          {/* Pending Notice */}
+          {property.pendingChanges?.status === "pending" && (
+            <div className="bg-amber-50 rounded-2xl border-2 border-amber-200 p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-amber-800">Edit Request Awaiting Admin Approval</p>
+                <p className="text-xs text-amber-700 mt-1">Your proposed changes are under review. They will go live once approved.</p>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 1 — Basic Info */}
+          <SectionCard title="Basic Information" icon={Building2} colorClass="blue">
+            <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+              <ViewField label="Property Name" value={property.title} />
+              <ViewField label="Property Type" value={property.propertyType} />
+              <ViewField label="Property Category" value={property.propertyCategory} />
+              <ViewField label="Gender" value={property.gender} />
+              <ViewField label="Status" value={property.status} />
+              <ViewField label="Live on Website" value={property.isLiveOnWebsite} />
+            </div>
+            <div className="px-4 pb-4">
+              <ViewField label="Description" value={property.description} />
+            </div>
+          </SectionCard>
+
+          {/* Location */}
+          <SectionCard title="Location Details" icon={MapPin} colorClass="emerald">
+            <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+              <ViewField label="Address" value={property.address} />
+              <ViewField label="Locality / Area" value={property.locality} />
+              <ViewField label="City" value={property.city} />
+              <ViewField label="State" value={property.state} />
+              <ViewField label="Pincode" value={property.pincode} />
+              <ViewField label="Landmark" value={property.landmark} />
+              <ViewField label="Latitude" value={property.latitude} />
+              <ViewField label="Longitude" value={property.longitude} />
+              <ViewField label="Location Code" value={property.locationCode} />
+            </div>
+          </SectionCard>
+
+          {/* Contact */}
+          <SectionCard title="Contact Person" icon={User} colorClass="indigo">
+            <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+              <ViewField label="Contact Name" value={property.contact?.name || property.ownerName} />
+              <ViewField label="Contact Number" value={property.contact?.number || property.ownerPhone} />
+              <ViewField label="Email" value={property.contact?.email} />
+              <ViewField label="Owner Login ID" value={property.ownerLoginId} />
+            </div>
+          </SectionCard>
+
+          {/* STEP 2 — Property Details */}
+          <SectionCard title="Property Details" icon={Home} colorClass="amber">
+            <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+              <ViewField label="Total Area (sq.ft)" value={property.propertyDetails?.totalArea} />
+              <ViewField label="Year Built" value={property.propertyDetails?.yearBuilt} />
+              <ViewField label="Property Age" value={property.propertyDetails?.propertyAge} />
+              <ViewField label="Total Floors" value={property.propertyDetails?.floors} />
+              <ViewField label="Lift Available" value={property.propertyDetails?.liftAvailable} />
+              <ViewField label="Parking" value={property.propertyDetails?.parkingAvailable} />
+              <ViewField label="Notice Period" value={property.propertyDetails?.noticePeriod} />
+              <ViewField label="Gender Preference" value={property.propertyDetails?.genderPref || property.gender} />
+              <ViewField label="Preferred For" value={property.propertyDetails?.preferredFor} />
+            </div>
+            {/* Room Types */}
+            {(property.roomTypes || []).length > 0 && (
+              <div className="px-4 pb-4 space-y-3">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Room Types</p>
+                {property.roomTypes.map((rt, i) => (
+                  <div key={i} className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                    <p className="text-xs font-bold text-slate-700 mb-2">{rt.type || `Room ${i + 1}`}</p>
+                    <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+                      <ViewField label="Occupancy" value={rt.occupancy} />
+                      <ViewField label="Total Rooms" value={rt.totalRooms} />
+                      <ViewField label="Total Beds" value={rt.totalBeds} />
+                      <ViewField label="Price/Bed" value={rt.pricePerBed ? `₹${rt.pricePerBed}` : null} />
+                      <ViewField label="Price/Room" value={rt.pricePerRoom ? `₹${rt.pricePerRoom}` : null} />
+                      <ViewField label="Description" value={rt.desc} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </SectionCard>
+
+          {/* STEP 3 — Amenities */}
+          {(property.amenities || []).length > 0 && (
+            <SectionCard title={`Amenities (${property.amenities.length})`} icon={CheckCircle2} colorClass="purple">
+              <div className="p-4 flex flex-wrap gap-2">
+                {property.amenities.map((am, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-100 rounded-lg text-[11px] font-bold uppercase tracking-wide">
+                    <Check className="w-3 h-3" /> {typeof am === "string" ? am : am.name}
+                  </span>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* STEP 4 — Photos */}
+          {allImgs.length > 0 && (
+            <SectionCard title={`Photos & Gallery (${allImgs.length})`} icon={ImageIcon} colorClass="teal">
+              <div className="p-4">
+                <div className="relative w-full h-56 rounded-xl overflow-hidden bg-slate-100 mb-3">
+                  <img src={allImgs[activeImg]} alt="" className="w-full h-full object-cover" />
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {allImgs.map((img, i) => (
+                    <button key={i} onClick={() => setActiveImg(i)}
+                      className={cn("shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition-all",
+                        i === activeImg ? "border-teal-500" : "border-slate-200 opacity-60 hover:opacity-100")}>
+                      <img src={img} alt="" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
+          {/* STEP 5a — Policies */}
+          {property.policies && Object.values(property.policies).some(Boolean) && (
+            <SectionCard title="House Policies" icon={Shield} colorClass="rose">
+              <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                {HOUSE_RULES_FIELDS.map(({ key, label }) => (
+                  <ViewField key={key} label={label} value={property.policies?.[key]} />
+                ))}
+                <ViewField label="Visitor Timing" value={property.policies?.visitorTiming} />
+                <ViewField label="Quiet Hours Timing" value={property.policies?.quietHoursTiming} />
+              </div>
+            </SectionCard>
+          )}
+
+          {/* STEP 5b — Pricing */}
+          <SectionCard title="Pricing & Terms" icon={IndianRupee} colorClass="indigo">
+            <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+              <ViewField label="Monthly Rent" value={property.monthlyRent ? `₹${property.monthlyRent?.toLocaleString()}` : null} />
+              <ViewField label="Rent Type" value={property.pricing?.rentType} />
+              <ViewField label="Security Deposit" value={property.pricing?.securityDeposit ? `₹${property.pricing.securityDeposit}` : null} />
+              <ViewField label="Advance Rent" value={property.pricing?.advanceRent ? `₹${property.pricing.advanceRent}` : null} />
+              <ViewField label="Notice Period" value={property.pricing?.noticePeriod} />
+              <ViewField label="Lock-in Period" value={property.pricing?.lockInPeriod} />
+              <ViewField label="Discount %" value={property.pricing?.discountPercent} />
+              <ViewField label="Cancellation Policy" value={property.pricing?.cancellationPolicy} />
+            </div>
+            {/* Included in Rent */}
+            {property.pricing?.includedInRent && (
+              <div className="px-4 pb-3">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Included in Rent</p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(property.pricing.includedInRent).filter(([, v]) => v).map(([k]) => (
+                    <span key={k} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100">{k}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Additional Charges */}
+            {(property.pricing?.additionalCharges || []).length > 0 && (
+              <div className="px-4 pb-4">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Additional Charges</p>
+                <div className="flex flex-wrap gap-2">
+                  {property.pricing.additionalCharges.map((c, i) => (
+                    <span key={i} className="text-[10px] px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 font-semibold">
+                      {c.name}: ₹{c.amount}/{c.per}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="px-4 pb-4">
+              <ViewField label="Tenant Description" value={property.tenantDescription} />
+            </div>
+          </SectionCard>
+
+          {/* Occupancy Stats */}
+          <SectionCard title="Occupancy & Stats" icon={Activity} colorClass="slate">
+            <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+              <ViewField label="Total Rooms" value={property.totalRooms} />
+              <ViewField label="Occupied Rooms" value={property.occupiedRooms} />
+              <ViewField label="Total Beds" value={property.bedCount} />
+              <ViewField label="Occupied Beds" value={property.occupiedBeds} />
+              <ViewField label="Views" value={property.views} />
+              <ViewField label="Clicks" value={property.clicks} />
+              <ViewField label="Rating" value={property.rating} />
+              <ViewField label="Created At" value={property.createdAt ? new Date(property.createdAt).toLocaleDateString("en-IN") : null} />
+            </div>
+          </SectionCard>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 bg-white border-t border-slate-100 shrink-0">
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">ID: {property._id}</p>
+          <button onClick={onClose} className="px-5 py-2 rounded-xl bg-slate-800 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-slate-700">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Edit Modal ─────────────────────────────────────────────────────────────────
+function PropertyEditModal({ property, owner, apiBase, onClose, onSuccess }) {
+  const [step, setStep] = useState(1);
+  const STEPS = [
+    { num: 1, label: "Basic Info" },
+    { num: 2, label: "Property Details" },
+    { num: 3, label: "Amenities" },
+    { num: 4, label: "Photos" },
+    { num: 5, label: "Pricing & Policies" },
+  ];
+
+  // Step 1 — Basic
+  const [form, setForm] = useState({
+    title: property.title || property.name || "",
+    propertyType: property.propertyType || "hostel",
+    propertyCategory: property.propertyCategory || "",
+    description: property.description || "",
+    address: property.address || "",
+    locality: property.locality || "",
+    city: property.city || "",
+    state: property.state || "",
+    pincode: property.pincode || "",
+    landmark: property.landmark || "",
+    contactName: property.contact?.name || property.ownerName || "",
+    contactNumber: property.contact?.number || property.ownerPhone || "",
+    email: property.contact?.email || "",
+    // Step 2 — Details
+    totalArea: property.propertyDetails?.totalArea || "",
+    yearBuilt: property.propertyDetails?.yearBuilt || "",
+    propertyAge: property.propertyDetails?.propertyAge || "",
+    floors: property.propertyDetails?.floors || "",
+    liftAvailable: property.propertyDetails?.liftAvailable || "Yes",
+    parkingAvailable: property.propertyDetails?.parkingAvailable || "Yes",
+    noticePeriod: property.propertyDetails?.noticePeriod || "30 Days",
+    genderPref: property.propertyDetails?.genderPref || property.gender || "Co-ed",
+    // Step 5 — Pricing
+    monthlyRent: property.monthlyRent || "",
+    rentType: property.pricing?.rentType || "Per Bed",
+    securityDeposit: property.pricing?.securityDeposit || "",
+    advanceRent: property.pricing?.advanceRent || "",
+    pricingNoticePeriod: property.pricing?.noticePeriod || "30 Days",
+    lockInPeriod: property.pricing?.lockInPeriod || "3 Months",
+    discountPercent: property.pricing?.discountPercent || "0",
+    cancellationPolicy: property.pricing?.cancellationPolicy || "Moderate",
+    tenantDescription: property.tenantDescription || "",
+    reason: "",
+  });
+
+  // Step 2 — Room Types
+  const [roomTypes, setRoomTypes] = useState(
+    (property.roomTypes || []).length > 0
+      ? property.roomTypes
+      : [{ type: "Single Sharing", desc: "", totalRooms: "1", totalBeds: "1", occupancy: 1, pricePerBed: "0", pricePerRoom: "0" }]
+  );
+
+  // Step 2 — Preferred For
+  const [preferredFor, setPreferredFor] = useState(property.propertyDetails?.preferredFor || { students: false, professionals: false, both: false, family: false });
+
+  // Step 3 — Amenities
+  const [selectedAmenities, setSelectedAmenities] = useState(
+    new Set((property.amenities || []).map(a => typeof a === "string" ? a : a.name))
+  );
+  const [customAmenity, setCustomAmenity] = useState("");
+
+  // Step 4 — Images
+  const [images, setImages] = useState(property.images || []);
+  const [uploadingImgs, setUploadingImgs] = useState(false);
+
+  // Step 5 — Included in Rent
+  const [includedInRent, setIncludedInRent] = useState(
+    property.pricing?.includedInRent || { Electricity: false, Water: false, WiFi: false, Gas: false, Maintenance: false, Housekeeping: false, Laundry: false }
+  );
+
+  // Step 5 — Additional Charges
+  const [additionalCharges, setAdditionalCharges] = useState(property.pricing?.additionalCharges || []);
+
+  // Step 5 — House Policies
+  const [houseRules, setHouseRules] = useState(property.policies || {
+    smokingAllowed: "No", alcoholAllowed: "No", petsAllowed: "No", cookingAllowed: "Yes",
+    visitorsAllowed: "Yes", visitorTiming: "8AM - 8PM", partyAllowed: "No",
+    outsideFood: "Yes", quietHours: "Yes", quietHoursTiming: "10PM - 7AM", earlyCheckIn: "Yes",
+  });
+
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const handleImgUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    setUploadingImgs(true);
+    for (const file of files) {
+      const fd = new FormData();
+      fd.append("image", file);
+      try {
+        const res = await fetch(`${apiBase}/api/upload`, { method: "POST", body: fd, headers: getAuthHeader() });
+        const json = await res.json();
+        if (json.url) setImages(prev => [...prev, json.url]);
+      } catch (e) { console.error(e); }
+    }
+    setUploadingImgs(false);
+  };
+
+  const toggleAmenity = (name) => setSelectedAmenities(prev => {
+    const n = new Set(prev);
+    n.has(name) ? n.delete(name) : n.add(name);
+    return n;
+  });
+
+  const updateRoom = (idx, field, val) => {
+    const updated = [...roomTypes];
+    updated[idx] = { ...updated[idx], [field]: val };
+    setRoomTypes(updated);
+  };
+
+  const handleSubmit = async () => {
+    setSending(true);
+    setResult(null);
+    try {
+      const propId = property._id || property.id;
+      const updatedData = {
+        title: form.title,
+        propertyType: form.propertyType,
+        propertyCategory: form.propertyCategory,
+        description: form.description,
+        address: form.address,
+        locality: form.locality,
+        city: form.city,
+        state: form.state,
+        pincode: form.pincode,
+        landmark: form.landmark,
+        monthlyRent: Number(form.monthlyRent) || 0,
+        contact: { name: form.contactName, number: form.contactNumber, email: form.email },
+        propertyDetails: {
+          totalArea: form.totalArea,
+          yearBuilt: form.yearBuilt,
+          propertyAge: form.propertyAge,
+          floors: form.floors,
+          liftAvailable: form.liftAvailable,
+          parkingAvailable: form.parkingAvailable,
+          noticePeriod: form.noticePeriod,
+          genderPref: form.genderPref,
+          preferredFor,
+        },
+        roomTypes,
+        amenities: Array.from(selectedAmenities).map(name => ({ name, icon: "check", category: "basic" })),
+        images,
+        policies: houseRules,
+        pricing: {
+          rentType: form.rentType,
+          securityDeposit: form.securityDeposit,
+          advanceRent: form.advanceRent,
+          noticePeriod: form.pricingNoticePeriod,
+          lockInPeriod: form.lockInPeriod,
+          discountPercent: form.discountPercent,
+          cancellationPolicy: form.cancellationPolicy,
+          includedInRent,
+          additionalCharges,
+        },
+        tenantDescription: form.tenantDescription,
+        gender: form.genderPref?.toLowerCase().includes("male only") ? "male" : form.genderPref?.toLowerCase().includes("female only") ? "female" : "any",
+      };
+      const res = await fetch(`${apiBase}/api/properties/${propId}/owner-edit-request`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({ updatedData, reason: form.reason, ownerLoginId: owner?.loginId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setResult({ success: true, message: "✅ Edit request submitted! Awaiting admin approval." });
+        setTimeout(() => { onSuccess && onSuccess(); onClose(); }, 2000);
+      } else {
+        setResult({ success: false, message: data.message || "Failed to submit request" });
+      }
+    } catch (err) {
+      setResult({ success: false, message: err?.message || "Something went wrong" });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-[#F8FAFC] rounded-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-100 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center">
+              <Edit className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800">Edit Property Request</h2>
+              <p className="text-[9px] font-bold text-amber-500 uppercase tracking-widest flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" /> Changes require Superadmin approval before going live
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200"><X className="w-5 h-5" /></button>
+        </div>
+
+        {/* Step Tabs */}
+        <div className="flex items-center gap-1 px-6 py-3 bg-white border-b border-slate-100 shrink-0 overflow-x-auto">
+          {STEPS.map(s => (
+            <button key={s.num} onClick={() => setStep(s.num)}
+              className={cn("shrink-0 px-4 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
+                step === s.num ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200")}>
+              {s.num}. {s.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 p-5 space-y-4">
+
+          {/* ── STEP 1: Basic Info ── */}
+          {step === 1 && (
+            <>
+              <SectionCard title="Basic Information" icon={Building2} colorClass="blue">
+                <div className="p-4 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <EditInput label="Property Name *" field="title" formData={form} setFormData={setForm} placeholder="e.g. Rohini PG - Block A" />
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Property Type</label>
+                      <select value={form.propertyType} onChange={e => setForm(p => ({ ...p, propertyType: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 transition-all">
+                        {PROPERTY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Property Category</label>
+                      <select value={form.propertyCategory} onChange={e => setForm(p => ({ ...p, propertyCategory: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 transition-all">
+                        <option value="">Select category</option>
+                        <option>Boys PG</option><option>Girls PG</option><option>Co-living</option>
+                      </select>
+                    </div>
+                    <EditInput label="Monthly Rent (₹)" field="monthlyRent" formData={form} setFormData={setForm} type="number" placeholder="₹ 0" />
+                  </div>
+                  <EditTextarea label="Property Description" field="description" formData={form} setFormData={setForm} rows={4} placeholder="Describe your property..." />
+                </div>
+              </SectionCard>
+
+              <SectionCard title="Location Details" icon={MapPin} colorClass="emerald">
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <EditInput label="Full Address *" field="address" formData={form} setFormData={setForm} placeholder="House/building name, Street address" />
+                  </div>
+                  <EditInput label="Locality / Area *" field="locality" formData={form} setFormData={setForm} placeholder="e.g. Koramangala" />
+                  <EditInput label="City *" field="city" formData={form} setFormData={setForm} placeholder="e.g. Chandigarh" />
+                  <EditInput label="State" field="state" formData={form} setFormData={setForm} placeholder="e.g. Punjab" />
+                  <EditInput label="Pincode" field="pincode" formData={form} setFormData={setForm} placeholder="Enter pincode" />
+                  <div className="md:col-span-2">
+                    <EditInput label="Landmark (optional)" field="landmark" formData={form} setFormData={setForm} placeholder="e.g. Near Punjab University" />
+                  </div>
+                </div>
+              </SectionCard>
+
+              <SectionCard title="Contact Person" icon={User} colorClass="indigo">
+                <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <EditInput label="Contact Name *" field="contactName" formData={form} setFormData={setForm} placeholder="Owner name" />
+                  <EditInput label="Contact Number *" field="contactNumber" formData={form} setFormData={setForm} placeholder="Phone number" />
+                  <EditInput label="Email" field="email" formData={form} setFormData={setForm} placeholder="Email address" />
+                </div>
+              </SectionCard>
+            </>
+          )}
+
+          {/* ── STEP 2: Property Details ── */}
+          {step === 2 && (
+            <>
+              <SectionCard title="Property Details" icon={Home} colorClass="amber">
+                <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <EditInput label="Total Area (sq.ft)" field="totalArea" formData={form} setFormData={setForm} placeholder="e.g. 5000" />
+                  <EditInput label="Year Built" field="yearBuilt" formData={form} setFormData={setForm} placeholder="e.g. 2020" />
+                  <EditInput label="Property Age" field="propertyAge" formData={form} setFormData={setForm} placeholder="e.g. 3-5 Years" />
+                  <EditInput label="Total Floors" field="floors" formData={form} setFormData={setForm} placeholder="e.g. G+3" />
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Lift Available</label>
+                    <select value={form.liftAvailable} onChange={e => setForm(p => ({ ...p, liftAvailable: e.target.value }))}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 transition-all">
+                      <option>Yes</option><option>No</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Parking Available</label>
+                    <select value={form.parkingAvailable} onChange={e => setForm(p => ({ ...p, parkingAvailable: e.target.value }))}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 transition-all">
+                      <option>Yes</option><option>No</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Gender Preference</label>
+                    <select value={form.genderPref} onChange={e => setForm(p => ({ ...p, genderPref: e.target.value }))}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 transition-all">
+                      <option>Co-ed</option><option>Male Only</option><option>Female Only</option>
+                    </select>
+                  </div>
+                  <EditInput label="Notice Period" field="noticePeriod" formData={form} setFormData={setForm} placeholder="e.g. 30 Days" />
+                </div>
+                <div className="px-4 pb-4">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Preferred For</p>
+                  <div className="flex flex-wrap gap-3">
+                    {["students", "professionals", "family", "both"].map(k => (
+                      <button key={k} onClick={() => setPreferredFor(p => ({ ...p, [k]: !p[k] }))}
+                        className={cn("px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all capitalize",
+                          preferredFor[k] ? "bg-amber-500 text-white border-amber-500" : "bg-slate-50 text-slate-600 border-slate-200 hover:border-amber-300")}>
+                        {k}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </SectionCard>
+
+              <SectionCard title="Room Types" icon={BedDouble} colorClass="blue">
+                <div className="p-4 space-y-4">
+                  {roomTypes.map((rt, i) => (
+                    <div key={i} className="bg-slate-50 border border-slate-100 rounded-xl p-4 relative">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs font-bold text-slate-700">Room Type {i + 1}</p>
+                        {roomTypes.length > 1 && (
+                          <button onClick={() => setRoomTypes(prev => prev.filter((_, idx) => idx !== i))}
+                            className="text-rose-400 hover:text-rose-600"><Trash2 className="w-4 h-4" /></button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Room Type Name</label>
+                          <input value={rt.type || ""} onChange={e => updateRoom(i, "type", e.target.value)} placeholder="e.g. Single Sharing"
+                            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-400 transition-all" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Occupancy (persons)</label>
+                          <input type="number" value={rt.occupancy || ""} onChange={e => updateRoom(i, "occupancy", e.target.value)} placeholder="1"
+                            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-400 transition-all" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Total Rooms</label>
+                          <input type="number" value={rt.totalRooms || ""} onChange={e => updateRoom(i, "totalRooms", e.target.value)} placeholder="10"
+                            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-400 transition-all" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Total Beds</label>
+                          <input type="number" value={rt.totalBeds || ""} onChange={e => updateRoom(i, "totalBeds", e.target.value)} placeholder="10"
+                            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-400 transition-all" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Price / Bed (₹)</label>
+                          <input type="number" value={rt.pricePerBed || ""} onChange={e => updateRoom(i, "pricePerBed", e.target.value)} placeholder="5000"
+                            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-400 transition-all" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Price / Room (₹)</label>
+                          <input type="number" value={rt.pricePerRoom || ""} onChange={e => updateRoom(i, "pricePerRoom", e.target.value)} placeholder="5000"
+                            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-400 transition-all" />
+                        </div>
+                        <div className="md:col-span-3">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Description</label>
+                          <input value={rt.desc || ""} onChange={e => updateRoom(i, "desc", e.target.value)} placeholder="Brief description..."
+                            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-400 transition-all" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <button onClick={() => setRoomTypes(prev => [...prev, { type: "", desc: "", totalRooms: "1", totalBeds: "1", occupancy: 1, pricePerBed: "0", pricePerRoom: "0" }])}
+                    className="flex items-center gap-2 text-[11px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 hover:bg-blue-100 transition-all">
+                    <Plus className="w-4 h-4" /> Add Room Type
+                  </button>
+                </div>
+              </SectionCard>
+            </>
+          )}
+
+          {/* ── STEP 3: Amenities ── */}
+          {step === 3 && (
+            <SectionCard title="Amenities" icon={CheckCircle2} colorClass="purple">
+              <div className="p-4 space-y-5">
+                {AMENITY_CATEGORIES.map(cat => (
+                  <div key={cat.label}>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">{cat.label}</p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      {cat.items.map(item => {
+                        const active = selectedAmenities.has(item);
+                        return (
+                          <button key={item} onClick={() => toggleAmenity(item)}
+                            className={cn("flex items-center gap-2 px-3 py-2.5 rounded-xl text-[11px] font-bold border transition-all text-left",
+                              active ? "bg-purple-50 border-purple-300 text-purple-700" : "bg-slate-50 border-slate-200 text-slate-600 hover:border-purple-200")}>
+                            <div className={cn("w-4 h-4 rounded-md border-2 flex items-center justify-center shrink-0 transition-all",
+                              active ? "bg-purple-600 border-purple-600" : "border-slate-300")}>
+                              {active && <Check className="w-2.5 h-2.5 text-white" />}
+                            </div>
+                            {item}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                {/* Custom amenity */}
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Custom Amenity</p>
+                  <div className="flex gap-2">
+                    <input value={customAmenity} onChange={e => setCustomAmenity(e.target.value)}
+                      placeholder="Type custom amenity..."
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:border-purple-400 transition-all" />
+                    <button onClick={() => { if (customAmenity.trim()) { toggleAmenity(customAmenity.trim()); setCustomAmenity(""); } }}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-xl text-xs font-bold hover:bg-purple-700">
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {Array.from(selectedAmenities).map(am => (
+                    <span key={am} className="inline-flex items-center gap-1 px-3 py-1 bg-purple-50 text-purple-700 border border-purple-100 rounded-lg text-[11px] font-bold">
+                      {am}
+                      <button onClick={() => toggleAmenity(am)} className="ml-1 hover:text-rose-500"><X className="w-3 h-3" /></button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ── STEP 4: Photos ── */}
+          {step === 4 && (
+            <SectionCard title="Property Photos" icon={ImageIcon} colorClass="teal">
+              <div className="p-4">
+                <div className="grid grid-cols-3 md:grid-cols-5 gap-3 mb-4">
+                  {images.map((img, i) => (
+                    <div key={i} className="aspect-square rounded-xl overflow-hidden relative group border border-slate-100">
+                      <img src={img} className="w-full h-full object-cover" alt="" />
+                      <div className="absolute inset-0 bg-slate-900/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button onClick={() => setImages(prev => prev.filter((_, idx) => idx !== i))} className="text-white hover:text-rose-300">
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <label className="aspect-square rounded-xl border-2 border-dashed border-teal-200 bg-teal-50/50 flex flex-col items-center justify-center cursor-pointer hover:bg-teal-50 transition-colors">
+                    <input type="file" multiple accept="image/*" className="hidden" onChange={handleImgUpload} disabled={uploadingImgs} />
+                    {uploadingImgs ? <Loader2 className="w-6 h-6 text-teal-400 animate-spin" /> : <UploadCloud className="w-6 h-6 text-teal-400" />}
+                    <span className="text-[10px] font-bold text-teal-500 mt-1">Upload</span>
+                  </label>
+                </div>
+                {images.length === 0 && !uploadingImgs && (
+                  <p className="text-center text-sm text-slate-400 py-4">No photos uploaded yet. Click Upload to add photos.</p>
+                )}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ── STEP 5: Policies & Pricing ── */}
+          {step === 5 && (
+            <>
+              <SectionCard title="House Policies / Rules" icon={Shield} colorClass="rose">
+                <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {HOUSE_RULES_FIELDS.map(({ key, label }) => (
+                    <div key={key}>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">{label}</label>
+                      <select value={houseRules[key] || "No"} onChange={e => setHouseRules(p => ({ ...p, [key]: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 transition-all">
+                        <option>Yes</option><option>No</option>
+                      </select>
+                    </div>
+                  ))}
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Visitor Timing</label>
+                    <input value={houseRules.visitorTiming || ""} onChange={e => setHouseRules(p => ({ ...p, visitorTiming: e.target.value }))} placeholder="8AM - 8PM"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 transition-all" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Quiet Hours Timing</label>
+                    <input value={houseRules.quietHoursTiming || ""} onChange={e => setHouseRules(p => ({ ...p, quietHoursTiming: e.target.value }))} placeholder="10PM - 7AM"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 transition-all" />
+                  </div>
+                </div>
+              </SectionCard>
+
+              <SectionCard title="Pricing & Terms" icon={IndianRupee} colorClass="indigo">
+                <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Rent Type</label>
+                    <select value={form.rentType} onChange={e => setForm(p => ({ ...p, rentType: e.target.value }))}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 transition-all">
+                      <option>Per Bed</option><option>Per Room</option><option>Per Person</option>
+                    </select>
+                  </div>
+                  <EditInput label="Security Deposit (₹)" field="securityDeposit" formData={form} setFormData={setForm} type="number" placeholder="10000" />
+                  <EditInput label="Advance Rent (₹)" field="advanceRent" formData={form} setFormData={setForm} type="number" placeholder="5000" />
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Notice Period</label>
+                    <select value={form.pricingNoticePeriod} onChange={e => setForm(p => ({ ...p, pricingNoticePeriod: e.target.value }))}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 transition-all">
+                      <option>15 Days</option><option>30 Days</option><option>45 Days</option><option>60 Days</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Lock-in Period</label>
+                    <select value={form.lockInPeriod} onChange={e => setForm(p => ({ ...p, lockInPeriod: e.target.value }))}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 transition-all">
+                      <option>No Lock-in</option><option>1 Month</option><option>2 Months</option><option>3 Months</option><option>6 Months</option>
+                    </select>
+                  </div>
+                  <EditInput label="Discount %" field="discountPercent" formData={form} setFormData={setForm} type="number" placeholder="0" />
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Cancellation Policy</label>
+                    <select value={form.cancellationPolicy} onChange={e => setForm(p => ({ ...p, cancellationPolicy: e.target.value }))}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 transition-all">
+                      {CANCELLATION_POLICIES.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Included in Rent */}
+                <div className="px-4 pb-4">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Included in Rent</p>
+                  <div className="flex flex-wrap gap-2">
+                    {INCLUDED_IN_RENT_OPTIONS.map(k => (
+                      <button key={k} onClick={() => setIncludedInRent(p => ({ ...p, [k]: !p[k] }))}
+                        className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all",
+                          includedInRent[k] ? "bg-emerald-50 border-emerald-300 text-emerald-700" : "bg-slate-50 border-slate-200 text-slate-600 hover:border-emerald-200")}>
+                        <div className={cn("w-3.5 h-3.5 rounded-md border-2 flex items-center justify-center transition-all",
+                          includedInRent[k] ? "bg-emerald-600 border-emerald-600" : "border-slate-300")}>
+                          {includedInRent[k] && <Check className="w-2 h-2 text-white" />}
+                        </div>
+                        {k}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Additional Charges */}
+                <div className="px-4 pb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Additional Charges</p>
+                    <button onClick={() => setAdditionalCharges(p => [...p, { name: "", amount: "", per: "Month" }])}
+                      className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1"><Plus className="w-3 h-3" />Add</button>
+                  </div>
+                  <div className="space-y-2">
+                    {additionalCharges.map((c, i) => (
+                      <div key={i} className="flex gap-2 items-center">
+                        <input value={c.name} onChange={e => { const u = [...additionalCharges]; u[i] = { ...u[i], name: e.target.value }; setAdditionalCharges(u); }}
+                          placeholder="e.g. Parking" className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium outline-none focus:border-blue-400 transition-all" />
+                        <input type="number" value={c.amount} onChange={e => { const u = [...additionalCharges]; u[i] = { ...u[i], amount: e.target.value }; setAdditionalCharges(u); }}
+                          placeholder="₹ Amount" className="w-28 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium outline-none focus:border-blue-400 transition-all" />
+                        <select value={c.per} onChange={e => { const u = [...additionalCharges]; u[i] = { ...u[i], per: e.target.value }; setAdditionalCharges(u); }}
+                          className="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs font-medium outline-none focus:border-blue-400 transition-all">
+                          <option>Month</option><option>Day</option><option>One-time</option>
+                        </select>
+                        <button onClick={() => setAdditionalCharges(prev => prev.filter((_, idx) => idx !== i))} className="text-rose-400 hover:text-rose-600"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="px-4 pb-4">
+                  <EditTextarea label="Tenant Description" field="tenantDescription" formData={form} setFormData={setForm} rows={3}
+                    placeholder="A comfortable stay for students and professionals..." />
+                </div>
+              </SectionCard>
+
+              {/* Reason for Edit */}
+              <SectionCard title="Reason for Edit Request (Optional)" icon={AlertCircle} colorClass="amber">
+                <div className="p-4">
+                  <EditTextarea label="Why are you making these changes?" field="reason" formData={form} setFormData={setForm} rows={3}
+                    placeholder="Helps admin review faster..." />
+                </div>
+              </SectionCard>
+            </>
+          )}
+
+          {/* Result */}
+          {result && (
+            <div className={cn("p-4 rounded-xl border text-sm font-semibold flex items-center gap-2",
+              result.success ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-rose-50 border-rose-200 text-rose-700")}>
+              {result.success ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+              {result.message}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 bg-white border-t border-slate-100 shrink-0">
+          <div className="flex gap-3">
+            {step > 1 && (
+              <button onClick={() => setStep(s => s - 1)} className="px-5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-slate-500 bg-slate-100 hover:bg-slate-200">← Previous</button>
+            )}
+          </div>
+          <div className="flex gap-3">
+            <button onClick={onClose} disabled={sending} className="px-5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-slate-500 bg-slate-100 hover:bg-slate-200">Cancel</button>
+            {step < 5 ? (
+              <button onClick={() => setStep(s => s + 1)} className="px-6 py-2.5 rounded-xl bg-blue-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-blue-700">
+                Next Step →
+              </button>
+            ) : (
+              <button onClick={handleSubmit} disabled={sending || result?.success}
+                className="px-6 py-2.5 rounded-xl bg-blue-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 shadow-lg shadow-blue-200/50">
+                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                {sending ? "Submitting..." : "Submit Edit Request"}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ──────────────────────────────────────────────────────────────────
 export default function Properties() {
   const [owner, setOwner] = useState(null);
   const [properties, setProperties] = useState([]);
@@ -31,154 +974,18 @@ export default function Properties() {
   const [errorMsg, setErrorMsg] = useState("");
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
-
   const [viewProperty, setViewProperty] = useState(null);
   const [editProperty, setEditProperty] = useState(null);
-  const [editFormData, setEditFormData] = useState({});
-  const [editRequestMsg, setEditRequestMsg] = useState("");
-  const [requestSending, setRequestSending] = useState(false);
-  const [requestResult, setRequestResult] = useState(null);
+  const apiBase = getApiBase();
 
-  const handleEditClick = (p) => {
-    setEditProperty(p);
-    setEditFormData({
-      title: p.title || p.name || "",
-      rent: p.rent || p.monthlyRent || "",
-      discount: p.discount || 0,
-      city: p.city || "",
-      locality: p.locality || "",
-      address: p.address || "",
-      type: p.type || p.propertyType || "PG",
-      gender: p.gender || "any",
-      status: p.status || "active",
-      isLiveOnWebsite: p.isLiveOnWebsite || false,
-      latitude: p.latitude || "",
-      longitude: p.longitude || "",
-      landmark: p.landmark || "",
-      description: p.description || "",
-      images: p.images || p.professionalPhotos || [p.image].filter(Boolean) || [],
-      propertyViews: p.propertyViews || [{ label: "Main", images: [] }]
-    });
-    setEditRequestMsg("");
-  };
-
-  const handleEditFormChange = (e) => {
-    const { name, value } = e.target;
-    setEditFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handlePropertyImageUpload = async (e) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const loadProps = async (session) => {
     try {
-      const uploadPromises = Array.from(files).map(async (file) => {
-        const formData = new FormData();
-        formData.append("image", file);
-        const base = getApiBase();
-        const res = await fetch(`${base}/api/upload`, { 
-          method: "POST", 
-          body: formData,
-          headers: getAuthHeader()
-        });
-        
-        let data;
-        const contentType = res.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          data = await res.json();
-        } else {
-          const text = await res.text();
-          throw new Error(text || `HTTP error ${res.status}`);
-        }
-        
-        if (!res.ok) throw new Error(data.error || "Upload failed");
-        return data.url;
-      });
-      const urls = await Promise.all(uploadPromises);
-      setEditFormData(prev => ({ ...prev, images: [...(prev.images || []), ...urls] }));
+      const props = await fetchOwnerProperties(session.loginId);
+      setProperties(props);
     } catch (err) {
-      alert("Failed to upload image: " + err.message);
-    }
-  };
-
-  const handleViewUpload = async (e, viewIndex) => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-    const uploadedUrls = [];
-    for (const file of files) {
-      const data = new FormData();
-      data.append("image", file);
-      try {
-        const base = getApiBase();
-        const res = await fetch(`${base}/api/upload`, { 
-          method: "POST", 
-          body: data,
-          headers: getAuthHeader()
-        });
-        
-        let json;
-        const contentType = res.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          json = await res.json();
-        } else {
-          const text = await res.text();
-          throw new Error(text || `HTTP error ${res.status}`);
-        }
-        
-        if (res.ok && json.url) {
-          uploadedUrls.push(json.url);
-        } else {
-          console.error("Upload failed", json?.error || "Empty response");
-        }
-      } catch (err) { console.error(err); }
-    }
-    setEditFormData(prev => {
-      const newViews = [...(prev.propertyViews || [])];
-      newViews[viewIndex] = {
-         ...newViews[viewIndex],
-         images: [...(newViews[viewIndex].images || []), ...uploadedUrls]
-      };
-      return { ...prev, propertyViews: newViews };
-    });
-  };
-
-  const addCustomView = () => {
-    setEditFormData(prev => ({
-      ...prev,
-      propertyViews: [...(prev.propertyViews || []), { label: "New Category", images: [] }]
-    }));
-  };
-
-  const handleEditRequest = async () => {
-    if (!editProperty) return;
-    setRequestSending(true);
-    setRequestResult(null);
-    try {
-      await fetchJson("/api/notifications", {
-        method: "POST",
-        body: JSON.stringify({
-          toRole: "superadmin",
-          from: owner?.name || owner?.loginId || "Property Owner",
-          type: "edit_request",
-          meta: {
-            propertyId: editProperty._id,
-            propertyName: editProperty.title || editProperty.name,
-            ownerLoginId: owner?.loginId,
-            message: editRequestMsg,
-            updatedData: editFormData
-          }
-        })
-      });
-      setRequestResult({ success: true, message: "Edit request sent to Superadmin successfully!" });
-      setTimeout(() => {
-        setEditProperty(null);
-        setEditRequestMsg("");
-        setEditFormData({});
-        setRequestResult(null);
-      }, 2000);
-    } catch (err) {
-      setRequestResult({ success: false, message: err?.body || err?.message || "Failed to send request" });
+      setErrorMsg(err?.body || err?.message || "Failed to load properties.");
     } finally {
-      setRequestSending(false);
+      setLoading(false);
     }
   };
 
@@ -186,51 +993,20 @@ export default function Properties() {
     const session = requireOwnerSession();
     if (!session) return;
     setOwner(session);
-    const load = async () => {
-      try {
-        const props = await fetchOwnerProperties(session.loginId);
-        setProperties(props);
-      } catch (err) {
-        setErrorMsg(err?.body || err?.message || "Failed to load properties.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    loadProps(session);
   }, []);
 
-  const filters = ["All", "PG", "Hostel", "Flat"];
+  const filters = ["All", "PG", "Hostel", "Flat", "Apartment"];
   const filtered = properties.filter(p => {
-    const pType = String(p.type || p.propertyType || p.category || "").toLowerCase();
-    const matchFilter = filter === "All" || pType === filter.toLowerCase() || pType.includes(filter.toLowerCase());
-    const matchSearch = !search || (p.title || p.name || "").toLowerCase().includes(search.toLowerCase()) || (p.city || "").toLowerCase().includes(search.toLowerCase());
-    return matchFilter && matchSearch;
+    const pType = String(p.type || p.propertyType || "").toLowerCase();
+    const matchF = filter === "All" || pType === filter.toLowerCase() || pType.includes(filter.toLowerCase());
+    const matchS = !search || (p.title || p.name || "").toLowerCase().includes(search.toLowerCase()) || (p.city || "").toLowerCase().includes(search.toLowerCase());
+    return matchF && matchS;
   });
-
-  const formatPropertyValue = (val) => {
-    if (val === null || val === undefined) return '';
-    if (typeof val === 'boolean') return val ? 'Yes' : 'No';
-    if (Array.isArray(val)) {
-      return val.map(item => {
-        if (typeof item === 'object' && item !== null) {
-          return item.name || item.title || item.label || Object.values(item).filter(v => typeof v === 'string').join(' ') || JSON.stringify(item);
-        }
-        return String(item);
-      }).join(', ');
-    }
-    if (typeof val === 'object' && val !== null) {
-      return Object.entries(val)
-        .filter(([_, v]) => v !== null && v !== '' && (!Array.isArray(v) || v.length > 0))
-        .map(([k, v]) => `${k.replace(/([A-Z])/g, ' $1').trim()}: ${typeof v === 'boolean' ? (v ? 'Yes' : 'No') : v}`)
-        .join(', ');
-    }
-    return String(val);
-  };
 
   return (
     <PropertyOwnerLayout owner={owner} title="Properties" onLogout={() => { window.location.href = "/propertyowner/ownerlogin"; }}>
-
-      {/* Page Header */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
         <div>
           <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Your properties</h1>
@@ -238,64 +1014,47 @@ export default function Properties() {
         </div>
         <div className="flex items-center gap-2 md:mt-2">
           <a href="/propertyowner/add-property" className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg bg-foreground text-background text-[13px] font-medium hover:opacity-90 transition-opacity">
-            <Plus className="size-4" /> Add property
+            <Plus className="size-4" /> Add Property
           </a>
         </div>
       </div>
 
       {errorMsg && <div className="text-sm text-destructive mb-4 bg-destructive/10 px-4 py-3 rounded-lg">{errorMsg}</div>}
 
-      {/* Search + Filter Bar */}
+      {/* Filter bar */}
       <div className="flex flex-col sm:flex-row gap-3 mb-5">
         <div className="relative flex-1">
           <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name or city…"
-            className="w-full h-10 pl-9 pr-3 rounded-lg bg-card border border-border text-[13.5px] focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground"
-          />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or city…"
+            className="w-full h-10 pl-9 pr-3 rounded-lg bg-card border border-border text-[13.5px] focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground" />
         </div>
-        <div className="flex gap-2">
-          {filters.map((f, i) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={[
-                "h-10 px-3.5 rounded-lg text-[12.5px] font-medium border transition-colors",
-                filter === f ? "bg-foreground text-background border-foreground" : "bg-card border-border hover:border-primary/40 text-muted-foreground"
-              ].join(" ")}
-            >
+        <div className="flex gap-2 flex-wrap">
+          {filters.map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className={cn("h-10 px-3.5 rounded-lg text-[12.5px] font-medium border transition-colors",
+                filter === f ? "bg-foreground text-background border-foreground" : "bg-card border-border hover:border-primary/40 text-muted-foreground")}>
               {f}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Properties Grid */}
+      {/* Properties List */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {[1, 2, 3].map(i => (
             <div key={i} className="rounded-2xl border border-border bg-card overflow-hidden shadow-soft animate-pulse">
-              <div className="h-40 bg-muted" />
-              <div className="p-4 space-y-3">
-                <div className="h-5 bg-muted rounded w-2/3" />
-                <div className="h-3 bg-muted rounded w-1/2" />
-                <div className="h-2 bg-muted rounded" />
-                <div className="h-3 bg-muted rounded w-3/4" />
-              </div>
+              <div className="h-40 bg-muted" /><div className="p-4 space-y-3"><div className="h-5 bg-muted rounded w-2/3" /></div>
             </div>
           ))}
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl border border-border bg-card p-12 shadow-soft flex flex-col items-center justify-center text-center">
-          <div className="w-16 h-16 bg-muted/60 rounded-full flex items-center justify-center mb-4">
-            <BedDouble className="size-8 text-muted-foreground" />
-          </div>
+          <div className="w-16 h-16 bg-muted/60 rounded-full flex items-center justify-center mb-4"><BedDouble className="size-8 text-muted-foreground" /></div>
           <h3 className="font-serif text-[22px] text-foreground mb-1">No properties found</h3>
           <p className="text-[13.5px] text-muted-foreground mb-4">Add your first property to get started.</p>
           <a href="/propertyowner/add-property" className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg bg-foreground text-background text-[13px] font-medium hover:opacity-90">
-            <Plus className="size-4" /> Add property
+            <Plus className="size-4" /> Add Property
           </a>
         </div>
       ) : (
@@ -309,26 +1068,18 @@ export default function Properties() {
             const hasDiscount = discountAmount > 0;
             const originalPrice = hasDiscount ? (actualRent + discountAmount) : actualRent;
             const discountPercent = hasDiscount ? Math.round((discountAmount / originalPrice) * 100) : 0;
-            
             const amenities = p.amenities && p.amenities.length > 0 ? p.amenities : [];
-            
-            const displayImage = p.image || (p.images && p.images.length > 0 ? p.images[0] : null) || (p.professionalPhotos && p.professionalPhotos.length > 0 ? p.professionalPhotos[0] : null);
+            const displayImage = p.image || (p.images?.[0]) || (p.professionalPhotos?.[0]) || null;
+            const hasPendingChanges = p.pendingChanges?.status === "pending";
 
             return (
-              <div
-                key={p._id}
-                className="bg-white rounded-lg shadow-sm hover:shadow-xl transition-all border border-border hover:border-primary/30 overflow-hidden md:h-[185px] cursor-pointer group"
-              >
+              <div key={p._id} className="bg-white rounded-lg shadow-sm hover:shadow-xl transition-all border border-border hover:border-primary/30 overflow-hidden md:h-[185px] cursor-pointer group">
                 <div className="flex flex-col md:flex-row h-full">
-                  {/* Image Section */}
+                  {/* Image */}
                   <div className="w-full md:w-[280px] h-48 md:h-full flex-shrink-0 relative border-b md:border-b-0 md:border-r border-border">
                     <div className="w-full h-full overflow-hidden relative">
                       {displayImage ? (
-                        <img 
-                          src={displayImage} 
-                          alt={p.title || p.name} 
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
-                        />
+                        <img src={displayImage} alt={p.title || p.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-muted">
                           <Home className="size-10 text-primary/40" />
@@ -337,93 +1088,70 @@ export default function Properties() {
                       <div className="absolute top-2 left-2 bg-foreground/80 text-background text-[9px] font-bold px-2 py-1 rounded uppercase tracking-wider shadow-sm flex items-center gap-1">
                         <ShieldCheck className="w-3 h-3" /> Verified
                       </div>
+                      {hasPendingChanges && (
+                        <div className="absolute top-2 right-2 bg-amber-500 text-white text-[9px] font-bold px-2 py-1 rounded uppercase tracking-wider shadow-sm flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> Pending Review
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  {/* Main Info Section */}
+                  {/* Info */}
                   <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-start">
-                         <h3 className="text-[19px] font-bold text-foreground leading-tight truncate group-hover:text-primary transition-colors">
-                           {p.title || p.name || "Property"}
-                         </h3>
-                         {p.rating && (
-                           <div className="bg-success/90 text-success-foreground px-2 py-0.5 rounded flex items-center gap-1 text-[11px] font-bold shadow-sm shrink-0">
-                             {p.rating} <Star className="w-3 h-3 fill-current" />
-                           </div>
-                         )}
+                        <h3 className="text-[19px] font-bold text-foreground leading-tight truncate group-hover:text-primary transition-colors">
+                          {p.title || p.name || "Property"}
+                        </h3>
+                        {p.rating && (
+                          <div className="bg-success/90 text-success-foreground px-2 py-0.5 rounded flex items-center gap-1 text-[11px] font-bold shadow-sm shrink-0">
+                            {p.rating} <Star className="w-3 h-3 fill-current" />
+                          </div>
+                        )}
                       </div>
-                      
                       <p className="text-[13px] text-muted-foreground font-medium flex items-center gap-1 truncate">
-                        <MapPin className="w-3.5 h-3.5" />
-                        {p.city || p.area || "Indore"}
+                        <MapPin className="w-3.5 h-3.5" /> {p.city || "—"}
                       </p>
-                      
-                      {/* Amenities Row */}
                       {amenities.length > 0 && (
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-muted-foreground font-medium py-1">
                           {amenities.slice(0, 4).map((amn, i) => (
                             <div key={i} className="flex items-center gap-1.5 shrink-0">
                               <Check className="w-3 h-3" />
-                              <span>{typeof amn === 'string' ? amn : amn.name}</span>
+                              <span>{typeof amn === "string" ? amn : amn.name}</span>
                             </div>
                           ))}
                         </div>
                       )}
-
-                      {/* Badges */}
                       <div className="flex items-center gap-2 pt-1.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 bg-rose-50 px-2 py-1 rounded border border-rose-100">
-                          {p.gender || "Any"}
-                        </span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 bg-slate-100 px-2 py-1 rounded border border-slate-200">
-                          {p.type || "PG"}
-                        </span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-100">
-                          Premium
-                        </span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 bg-rose-50 px-2 py-1 rounded border border-rose-100">{p.gender || "Any"}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 bg-slate-100 px-2 py-1 rounded border border-slate-200">{p.propertyType || p.type || "PG"}</span>
                       </div>
                     </div>
-                    
-                    {/* Bottom Status */}
                     <div className="mt-4 md:mt-auto pt-3 border-t border-border/60">
-                      <div className="flex items-center justify-between text-[11.5px] font-semibold text-muted-foreground">
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-success" /> Occupancy: {occ}%</div>
-                          <div className="flex items-center gap-1.5"><BedDouble className="w-3.5 h-3.5" /> {occupied}/{total} beds</div>
-                        </div>
+                      <div className="flex items-center gap-4 text-[11.5px] font-semibold text-muted-foreground">
+                        <div className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-success" /> Occupancy: {occ}%</div>
+                        <div className="flex items-center gap-1.5"><BedDouble className="w-3.5 h-3.5" /> {occupied}/{total} beds</div>
                       </div>
                     </div>
                   </div>
-
-                  {/* Pricing & Actions Section */}
+                  {/* Pricing & Actions */}
                   <div className="w-full md:w-[220px] flex flex-col justify-between border-t md:border-t-0 md:border-l border-border p-4 bg-muted/20 shrink-0">
                     <div className="text-right">
                       <div className="flex items-baseline justify-end gap-2">
-                        {hasDiscount && (
-                          <span className="text-[13px] text-muted-foreground line-through font-medium">₹{originalPrice.toLocaleString()}</span>
-                        )}
+                        {hasDiscount && <span className="text-[13px] text-muted-foreground line-through font-medium">₹{originalPrice.toLocaleString()}</span>}
                         <div className="text-[22px] font-black text-foreground tracking-tight">₹{actualRent.toLocaleString()}</div>
                       </div>
                       <div className="flex items-center justify-end gap-2 mt-1">
-                        {hasDiscount && (
-                          <div className="text-[11px] font-bold text-success bg-success/15 px-1.5 py-0.5 rounded">{discountPercent}% off</div>
-                        )}
+                        {hasDiscount && <div className="text-[11px] font-bold text-success bg-success/15 px-1.5 py-0.5 rounded">{discountPercent}% off</div>}
                         <p className="text-[10px] text-muted-foreground font-medium">+ taxes & fees</p>
                       </div>
                     </div>
-
                     <div className="flex gap-2 w-full mt-4 md:mt-0">
-                      <button 
-                        onClick={() => setViewProperty(p)}
-                        className="flex-1 flex items-center justify-center gap-1 py-2.5 border border-border text-foreground font-bold rounded-lg hover:bg-muted text-[11px] transition-all bg-card"
-                      >
+                      <button onClick={() => setViewProperty(p)}
+                        className="flex-1 flex items-center justify-center gap-1 py-2.5 border border-border text-foreground font-bold rounded-lg hover:bg-muted text-[11px] transition-all bg-card">
                         <Eye className="size-3.5" /> View
                       </button>
-                      <button 
-                        onClick={() => handleEditClick(p)}
-                        className="flex-1 flex items-center justify-center gap-1 py-2.5 bg-foreground text-background font-bold rounded-lg text-[11px] hover:opacity-90 transition-all shadow-sm"
-                      >
+                      <button onClick={() => setEditProperty(p)}
+                        className="flex-1 flex items-center justify-center gap-1 py-2.5 bg-foreground text-background font-bold rounded-lg text-[11px] hover:opacity-90 transition-all shadow-sm">
                         <Edit className="size-3.5" /> Edit
                       </button>
                     </div>
@@ -441,242 +1169,16 @@ export default function Properties() {
         </div>
       )}
 
-      {/* View Property Modal */}
-      {viewProperty && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-background rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative animate-in fade-in zoom-in-95 duration-200">
-            <div className="sticky top-0 bg-background/80 backdrop-blur border-b border-border p-4 flex items-center justify-between z-10">
-              <h2 className="text-xl font-bold font-serif">{viewProperty.title || viewProperty.name}</h2>
-              <button onClick={() => setViewProperty(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
-                <X className="size-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-6">
-              {viewProperty.image || (viewProperty.images && viewProperty.images.length > 0) ? (
-                <img src={viewProperty.image || viewProperty.images[0]} alt="Property" className="w-full h-64 object-cover rounded-xl" />
-              ) : (
-                <div className="w-full h-64 bg-muted flex items-center justify-center rounded-xl">
-                  <Home className="size-16 text-muted-foreground/30" />
-                </div>
-              )}
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[13px]">
-                {Object.entries(viewProperty)
-                  .filter(([k, v]) => {
-                    if (['_id', 'id', '__v', 'owner', 'ownerLoginId', 'images', 'image', 'professionalPhotos', 'createdAt', 'updatedAt'].includes(k)) return false;
-                    if (v === null || v === undefined || v === '') return false;
-                    if (Array.isArray(v) && v.length === 0) return false;
-                    if (typeof v === 'object' && v !== null && !Array.isArray(v) && Object.keys(v).length === 0) return false;
-                    if (formatPropertyValue(v) === '') return false;
-                    return true;
-                  })
-                  .map(([k, v]) => (
-                    <div key={k} className="space-y-1">
-                      <span className="text-muted-foreground capitalize font-medium">{k.replace(/([A-Z])/g, ' $1').trim()}</span>
-                      <div className="font-medium bg-muted/20 p-2.5 rounded-lg border border-border/50 text-foreground break-words max-h-32 overflow-y-auto">
-                        {formatPropertyValue(v) || 'N/A'}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-            <div className="p-4 border-t border-border bg-muted/30 flex justify-end">
-              <button onClick={() => setViewProperty(null)} className="px-5 py-2 bg-foreground text-background rounded-lg text-sm font-medium hover:opacity-90">Close</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Request Modal */}
+      {/* Modals */}
+      {viewProperty && <PropertyViewModal property={viewProperty} onClose={() => setViewProperty(null)} />}
       {editProperty && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-background rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative animate-in fade-in zoom-in-95 duration-200">
-            <div className="sticky top-0 bg-background/80 backdrop-blur border-b border-border p-4 flex items-center justify-between z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                  <Edit className="size-5 text-primary" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold font-serif leading-none">Edit Property</h2>
-                  <p className="text-xs text-muted-foreground mt-1">Changes require Superadmin approval</p>
-                </div>
-              </div>
-              <button onClick={() => setEditProperty(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
-                <X className="size-5" />
-              </button>
-            </div>
-             <div className="p-6">
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5">Property Name</label>
-                      <input type="text" name="title" value={editFormData.title} onChange={handleEditFormChange} className="w-full p-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5">Rent Amount</label>
-                      <input type="number" name="rent" value={editFormData.rent} onChange={handleEditFormChange} className="w-full p-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5">Property Type</label>
-                      <select name="type" value={editFormData.type} onChange={handleEditFormChange} className="w-full p-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
-                        <option value="PG">PG</option>
-                        <option value="Hostel">Hostel</option>
-                        <option value="Flat">Flat</option>
-                        <option value="Room">Room</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5">Discount (₹)</label>
-                      <input type="number" name="discount" value={editFormData.discount} onChange={handleEditFormChange} className="w-full p-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5">Gender Restriction</label>
-                      <select name="gender" value={editFormData.gender} onChange={handleEditFormChange} className="w-full p-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
-                        <option value="any">Any / Unisex</option>
-                        <option value="male">Male Only</option>
-                        <option value="female">Female Only</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5">City</label>
-                      <input type="text" name="city" value={editFormData.city} onChange={handleEditFormChange} className="w-full p-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5">Locality / Area</label>
-                      <input type="text" name="locality" value={editFormData.locality} onChange={handleEditFormChange} className="w-full p-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium mb-1.5">Address</label>
-                      <input type="text" name="address" value={editFormData.address} onChange={handleEditFormChange} className="w-full p-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium mb-1.5">Landmark</label>
-                      <input type="text" name="landmark" value={editFormData.landmark} onChange={handleEditFormChange} className="w-full p-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5">Latitude</label>
-                      <input type="number" step="any" name="latitude" value={editFormData.latitude} onChange={handleEditFormChange} className="w-full p-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5">Longitude</label>
-                      <input type="number" step="any" name="longitude" value={editFormData.longitude} onChange={handleEditFormChange} className="w-full p-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
-                    </div>
-                    <div className="md:col-span-2 flex gap-4">
-                      <label className="flex items-center gap-2 text-sm font-medium">
-                         <input type="checkbox" name="isLiveOnWebsite" checked={editFormData.isLiveOnWebsite} onChange={(e) => setEditFormData(p => ({...p, isLiveOnWebsite: e.target.checked}))} className="rounded border-border text-primary focus:ring-primary" />
-                         Live on Website (Subject to Approval)
-                      </label>
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium mb-1.5">Description</label>
-                      <textarea name="description" value={editFormData.description} onChange={handleEditFormChange} rows={3} className="w-full p-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"></textarea>
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium mb-1.5">Images (Main, Front, Room Views)</label>
-                      <div className="flex items-center gap-3 mb-2 flex-wrap">
-                        {(editFormData.images || []).map((imgUrl, i) => (
-                           <div key={i} className="relative group">
-                             <img src={imgUrl} alt={`img-${i}`} className="w-16 h-16 object-cover rounded-lg border border-border" />
-                             <button type="button" onClick={() => setEditFormData(prev => ({...prev, images: prev.images.filter((_, idx) => idx !== i)}))} className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                               <X className="size-3" />
-                             </button>
-                           </div>
-                        ))}
-                      </div>
-                      <input type="file" multiple accept="image/*" onChange={handlePropertyImageUpload} className="w-full p-2 rounded-lg border border-dashed border-border/60 bg-muted/30 text-sm focus:outline-none file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" />
-                    </div>
-
-                    <div className="md:col-span-2 mt-4 pt-4 border-t border-border">
-                      <div className="flex items-center justify-between mb-4">
-                        <label className="block text-sm font-medium">Categorized Property Images</label>
-                        <button type="button" onClick={addCustomView} className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
-                          <Plus className="size-3" /> Add Category
-                        </button>
-                      </div>
-
-                      {(editFormData.propertyViews || []).map((pv, index) => (
-                        <div key={index} className="bg-muted/20 rounded-xl p-4 border border-border relative mb-4">
-                          <button type="button" onClick={() => setEditFormData(prev => ({...prev, propertyViews: prev.propertyViews.filter((_, i) => i !== index)}))} className="absolute top-2 right-2 text-muted-foreground hover:text-destructive p-1">
-                             <X className="size-4" />
-                          </button>
-                          <div className="mb-3 w-3/4">
-                             <input 
-                               value={pv.label} 
-                               onChange={(e) => {
-                                 setEditFormData(prev => {
-                                   const newViews = [...prev.propertyViews];
-                                   newViews[index] = { ...newViews[index], label: e.target.value };
-                                   return { ...prev, propertyViews: newViews };
-                                 });
-                               }}
-                               placeholder="e.g. Main, Room, Interior, Building"
-                               className="w-full bg-transparent border-b border-border focus:border-primary text-sm font-semibold uppercase tracking-wider outline-none py-1 transition-colors"
-                             />
-                          </div>
-                          
-                          <div className="flex flex-wrap gap-2">
-                             {(pv.images || []).map((img, i) => (
-                                <div key={i} className="relative group/img">
-                                   <img src={img} className="w-16 h-16 object-cover rounded-lg border border-border" alt="" />
-                                   <button type="button" onClick={() => {
-                                     setEditFormData(prev => {
-                                       const newViews = [...prev.propertyViews];
-                                       newViews[index].images = newViews[index].images.filter((_, imgI) => imgI !== i);
-                                       return { ...prev, propertyViews: newViews };
-                                     });
-                                   }} className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground p-1 rounded-full opacity-0 group-hover/img:opacity-100 transition-opacity">
-                                      <X className="size-3" />
-                                   </button>
-                                </div>
-                             ))}
-                             <label className="w-16 h-16 rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors">
-                                <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleViewUpload(e, index)} />
-                                <Plus className="size-5 text-muted-foreground" />
-                             </label>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="pt-2">
-                    <label className="block text-sm font-medium mb-1.5">Reason for Edit (Optional)</label>
-                    <textarea 
-                      value={editRequestMsg}
-                      onChange={(e) => setEditRequestMsg(e.target.value)}
-                      placeholder="Why are you making these changes?"
-                      className="w-full p-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
-                      rows={2}
-                    ></textarea>
-                  </div>
-                  
-                  {requestResult && (
-                    <div className={`p-3 rounded-lg text-sm flex items-start gap-2 ${requestResult.success ? 'bg-success/10 text-success-foreground' : 'bg-destructive/10 text-destructive'}`}>
-                      {requestResult.success ? <Check className="size-4 shrink-0 mt-0.5" /> : <X className="size-4 shrink-0 mt-0.5" />}
-                      <p>{requestResult.message}</p>
-                    </div>
-                  )}
-                </div>
-             </div>
-             
-             <div className="p-4 border-t border-border bg-muted/30 flex justify-end gap-3 rounded-b-2xl">
-                <button 
-                  onClick={() => setEditProperty(null)} 
-                  disabled={requestSending}
-                  className="px-5 py-2 hover:bg-muted text-foreground rounded-lg text-sm font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleEditRequest}
-                  disabled={requestSending || requestResult?.success}
-                  className="px-5 py-2 bg-foreground text-background rounded-lg text-sm font-medium hover:opacity-90 flex items-center gap-2 disabled:opacity-50"
-                >
-                  {requestSending ? "Sending..." : "Submit Edit Request"} <Mail className="size-4" />
-                </button>
-             </div>
-          </div>
-        </div>
+        <PropertyEditModal
+          property={editProperty}
+          owner={owner}
+          apiBase={apiBase}
+          onClose={() => setEditProperty(null)}
+          onSuccess={() => { setEditProperty(null); if (owner) loadProps(owner); }}
+        />
       )}
     </PropertyOwnerLayout>
   );
