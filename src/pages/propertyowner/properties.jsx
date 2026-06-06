@@ -1085,9 +1085,23 @@ export default function Properties() {
                           <Home className="size-10 text-primary/40" />
                         </div>
                       )}
-                      <div className="absolute top-2 left-2 bg-foreground/80 text-background text-[9px] font-bold px-2 py-1 rounded uppercase tracking-wider shadow-sm flex items-center gap-1">
-                        <ShieldCheck className="w-3 h-3" /> Verified
-                      </div>
+                      {p.status === 'pending_approval' ? (
+                        <div className="absolute top-2 left-2 bg-amber-500 text-white text-[9px] font-bold px-2 py-1 rounded uppercase tracking-wider shadow-sm flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> Pending Approval
+                        </div>
+                      ) : p.status === 'blocked' ? (
+                        <div className="absolute top-2 left-2 bg-rose-600 text-white text-[9px] font-bold px-2 py-1 rounded uppercase tracking-wider shadow-sm flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> Blocked
+                        </div>
+                      ) : p.status === 'inactive' ? (
+                        <div className="absolute top-2 left-2 bg-slate-500 text-white text-[9px] font-bold px-2 py-1 rounded uppercase tracking-wider shadow-sm flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> Inactive
+                        </div>
+                      ) : (
+                        <div className="absolute top-2 left-2 bg-foreground/80 text-background text-[9px] font-bold px-2 py-1 rounded uppercase tracking-wider shadow-sm flex items-center gap-1">
+                          <ShieldCheck className="w-3 h-3" /> Verified
+                        </div>
+                      )}
                       {hasPendingChanges && (
                         <div className="absolute top-2 right-2 bg-amber-500 text-white text-[9px] font-bold px-2 py-1 rounded uppercase tracking-wider shadow-sm flex items-center gap-1">
                           <Clock className="w-3 h-3" /> Pending Review
