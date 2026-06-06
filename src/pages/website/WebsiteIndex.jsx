@@ -189,7 +189,7 @@ export default function WebsiteIndex() {
                   <i data-lucide="chevron-right" className="w-5 h-5"></i>
                 </button>
               </div>
-              <a href="#" className="flex-shrink-0">
+              <a href="#" aria-label="Roomhy Home" className="flex-shrink-0">
                 <img src="https://res.cloudinary.com/dpwgvcibj/image/upload/v1768990260/roomhy/website/logoroomhy.png" alt="Roomhy Logo" width="100" height="40" className="h-10 w-auto" />
               </a>
             </div>
@@ -207,7 +207,7 @@ export default function WebsiteIndex() {
                 </a>
               </div>
 
-              <a href="/website/list" className="flex-shrink-0 flex items-center justify-center px-3 sm:px-4 py-2 rounded-md text-sm font-semibold transition-colors w-10 h-10 sm:w-auto sm:h-auto sm:px-4">
+              <a href="/website/list" aria-label="List your property" className="flex-shrink-0 flex items-center justify-center px-3 sm:px-4 py-2 rounded-md text-sm font-semibold transition-colors w-10 h-10 sm:w-auto sm:h-auto sm:px-4">
                 <span className="text-3xl font-bold">+</span>
               </a>
               

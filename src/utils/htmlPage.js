@@ -848,6 +848,9 @@ export const useHtmlPage = ({
     });
 
     links.forEach((link) => {
+      if (link.rel === "canonical") {
+        document.querySelectorAll('link[rel="canonical"]').forEach((el) => el.remove());
+      }
       const key = `link:${link.href || ""}`;
       const { element, owned } = ensureElement(key, () => {
         const el = document.createElement("link");
