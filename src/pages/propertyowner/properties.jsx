@@ -58,14 +58,14 @@ const fmtVal = (val) => {
 function SectionCard({ title, icon: Icon, colorClass = "blue", defaultOpen = true, children }) {
   const [open, setOpen] = useState(defaultOpen);
   const colorMap = {
-    blue:    { bg: "bg-blue-50 border-blue-100",      icon: "text-blue-600",    text: "text-blue-700" },
+    blue: { bg: "bg-blue-50 border-blue-100", icon: "text-blue-600", text: "text-blue-700" },
     emerald: { bg: "bg-emerald-50 border-emerald-100", icon: "text-emerald-600", text: "text-emerald-700" },
-    indigo:  { bg: "bg-indigo-50 border-indigo-100",   icon: "text-indigo-600",  text: "text-indigo-700" },
-    amber:   { bg: "bg-amber-50 border-amber-100",     icon: "text-amber-600",   text: "text-amber-700" },
-    rose:    { bg: "bg-rose-50 border-rose-100",       icon: "text-rose-600",    text: "text-rose-700" },
-    teal:    { bg: "bg-teal-50 border-teal-100",       icon: "text-teal-600",    text: "text-teal-700" },
-    purple:  { bg: "bg-purple-50 border-purple-100",   icon: "text-purple-600",  text: "text-purple-700" },
-    slate:   { bg: "bg-slate-50 border-slate-100",     icon: "text-slate-600",   text: "text-slate-700" },
+    indigo: { bg: "bg-indigo-50 border-indigo-100", icon: "text-indigo-600", text: "text-indigo-700" },
+    amber: { bg: "bg-amber-50 border-amber-100", icon: "text-amber-600", text: "text-amber-700" },
+    rose: { bg: "bg-rose-50 border-rose-100", icon: "text-rose-600", text: "text-rose-700" },
+    teal: { bg: "bg-teal-50 border-teal-100", icon: "text-teal-600", text: "text-teal-700" },
+    purple: { bg: "bg-purple-50 border-purple-100", icon: "text-purple-600", text: "text-purple-700" },
+    slate: { bg: "bg-slate-50 border-slate-100", icon: "text-slate-600", text: "text-slate-700" },
   };
   const c = colorMap[colorClass] || colorMap.slate;
   return (
@@ -452,85 +452,73 @@ function PropertyEditModal({ property, owner, apiBase, onClose, onSuccess }) {
       const fd = new FormData();
       fd.append("image", file);
       try {
-        const res = await fetch(`${apiBase}/api/upload`, { method: "POST", body: fd, headers: getAuthHeader() });
-        const json = await res.json();
-        if (json.url) setImages(prev => [...prev, json.url]);
-      } catch (e) { console.error(e); }
+        const base = getApiBase();
+        const res = await fetch(`${base}/api/upload`, {
+          method: "POST",
+          body: data,
+          headers: getAuthHeader()
+        });
+
+        let json;
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          json = await res.json();
+        } else {
+          const text = await res.text();
+          throw new Error(text || `HTTP error ${res.status}`);
+        }
+
+        if (res.ok && json.url) {
+          uploadedUrls.push(json.url);
+        } else {
+          console.error("Upload failed", json?.error || "Empty response");
+        }
+      } catch (err) { console.error(err); }
     }
-    setUploadingImgs(false);
-  };
-
-  const toggleAmenity = (name) => setSelectedAmenities(prev => {
-    const n = new Set(prev);
-    n.has(name) ? n.delete(name) : n.add(name);
-    return n;
-  });
-
-  const updateRoom = (idx, field, val) => {
-    const updated = [...roomTypes];
-    updated[idx] = { ...updated[idx], [field]: val };
-    setRoomTypes(updated);
-  };
-
-  const handleSubmit = async () => {
-    setSending(true);
-    setResult(null);
-    try {
-      const propId = property._id || property.id;
-      const updatedData = {
-        title: form.title,
-        propertyType: form.propertyType,
-        propertyCategory: form.propertyCategory,
-        description: form.description,
-        address: form.address,
-        locality: form.locality,
-        city: form.city,
-        state: form.state,
-        pincode: form.pincode,
-        landmark: form.landmark,
-        monthlyRent: Number(form.monthlyRent) || 0,
-        contact: { name: form.contactName, number: form.contactNumber, email: form.email },
-        propertyDetails: {
-          totalArea: form.totalArea,
-          yearBuilt: form.yearBuilt,
-          propertyAge: form.propertyAge,
-          floors: form.floors,
-          liftAvailable: form.liftAvailable,
-          parkingAvailable: form.parkingAvailable,
-          noticePeriod: form.noticePeriod,
-          genderPref: form.genderPref,
-          preferredFor,
-        },
-        roomTypes,
-        amenities: Array.from(selectedAmenities).map(name => ({ name, icon: "check", category: "basic" })),
-        images,
-        policies: houseRules,
-        pricing: {
-          rentType: form.rentType,
-          securityDeposit: form.securityDeposit,
-          advanceRent: form.advanceRent,
-          noticePeriod: form.pricingNoticePeriod,
-          lockInPeriod: form.lockInPeriod,
-          discountPercent: form.discountPercent,
-          cancellationPolicy: form.cancellationPolicy,
-          includedInRent,
-          additionalCharges,
-        },
-        tenantDescription: form.tenantDescription,
-        gender: form.genderPref?.toLowerCase().includes("male only") ? "male" : form.genderPref?.toLowerCase().includes("female only") ? "female" : "any",
+    setEditFormData(prev => {
+      const newViews = [...(prev.propertyViews || [])];
+      newViews[viewIndex] = {
+        ...newViews[viewIndex],
+        images: [...(newViews[viewIndex].images || []), ...uploadedUrls]
       };
-      const res = await fetch(`${apiBase}/api/properties/${propId}/owner-edit-request`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", ...getAuthHeader() },
-        body: JSON.stringify({ updatedData, reason: form.reason, ownerLoginId: owner?.loginId }),
+      return { ...prev, propertyViews: newViews };
+    });
+  };
+
+  const addCustomView = () => {
+    setEditFormData(prev => ({
+      ...prev,
+      propertyViews: [...(prev.propertyViews || []), { label: "New Category", images: [] }]
+    }));
+  };
+
+  const handleEditRequest = async () => {
+    if (!editProperty) return;
+    setRequestSending(true);
+    setRequestResult(null);
+    try {
+      await fetchJson("/api/notifications", {
+        method: "POST",
+        body: JSON.stringify({
+          toRole: "superadmin",
+          from: owner?.name || owner?.loginId || "Property Owner",
+          type: "edit_request",
+          meta: {
+            propertyId: editProperty._id,
+            propertyName: editProperty.title || editProperty.name,
+            ownerLoginId: owner?.loginId,
+            message: editRequestMsg,
+            updatedData: editFormData
+          }
+        })
       });
-      const data = await res.json();
-      if (data.success) {
-        setResult({ success: true, message: "✅ Edit request submitted! Awaiting admin approval." });
-        setTimeout(() => { onSuccess && onSuccess(); onClose(); }, 2000);
-      } else {
-        setResult({ success: false, message: data.message || "Failed to submit request" });
-      }
+      setRequestResult({ success: true, message: "Edit request sent to Superadmin successfully!" });
+      setTimeout(() => {
+        setEditProperty(null);
+        setEditRequestMsg("");
+        setEditFormData({});
+        setRequestResult(null);
+      }, 2000);
     } catch (err) {
       setResult({ success: false, message: err?.message || "Something went wrong" });
     } finally {
