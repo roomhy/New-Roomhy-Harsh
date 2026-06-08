@@ -8,9 +8,14 @@ export default function InstallPWA() {
   const location = useLocation();
 
   useEffect(() => {
-    // Only show on property owner routes
-    if (!location.pathname.startsWith('/propertyowner')) {
+    // Only show on login page
+    if (location.pathname !== '/propertyowner/ownerlogin') {
       return;
+    }
+
+    // Check if dismissed previously
+    if (sessionStorage.getItem('pwa_prompt_dismissed')) {
+        return;
     }
 
     const handler = (e) => {
@@ -22,13 +27,7 @@ export default function InstallPWA() {
 
     window.addEventListener('beforeinstallprompt', handler);
 
-    // FORCE SHOW for the user to see it even if browser blocks the event
-    const timer = setTimeout(() => {
-      setShowPrompt(true);
-    }, 1500);
-
     return () => {
-      clearTimeout(timer);
       window.removeEventListener('beforeinstallprompt', handler);
     };
   }, [location.pathname]);

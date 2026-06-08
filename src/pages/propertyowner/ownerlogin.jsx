@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useHtmlPage } from "../../utils/htmlPage";
 import { fetchJson } from "../../utils/api";
+import { User, Key, Eye, EyeOff, ArrowRight, Lock, X } from "lucide-react";
 
 const resolvePanelPath = (folder, fileName) => {
   const path = (window.location.pathname || "").toLowerCase();
@@ -50,7 +51,7 @@ export default function Ownerlogin() {
   const [forgotError, setForgotError] = useState("");
 
   useEffect(() => {
-    if (window?.lucide) window.lucide.createIcons();
+    // Icons are now rendered via lucide-react components
   }, [step, forgotOpen, forgotStep]);
 
   const storeAuth = (data) => {
@@ -242,7 +243,7 @@ export default function Ownerlogin() {
             <div className="mb-4">
               <label htmlFor="loginIdInput" className="block text-sm font-medium text-gray-700 text-left mb-2">Login ID or Phone Number</label>
               <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><i data-lucide="user" className="w-5 h-5"></i></span>
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><User className="w-5 h-5" /></span>
                 <input
                   id="loginIdInput"
                   type="text"
@@ -256,7 +257,7 @@ export default function Ownerlogin() {
             <div className="mb-6">
               <label htmlFor="passwordInput" className="block text-sm font-medium text-gray-700 text-left mb-2">Password</label>
               <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><i data-lucide="key" className="w-5 h-5"></i></span>
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><Key className="w-5 h-5" /></span>
                 <input
                   id="passwordInput"
                   type={showPassword ? "text" : "password"}
@@ -271,7 +272,7 @@ export default function Ownerlogin() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
                 >
-                  <i data-lucide={showPassword ? "eye-off" : "eye"} className="w-5 h-5"></i>
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
               <div className="mt-2 text-right">
@@ -289,14 +290,14 @@ export default function Ownerlogin() {
               disabled={loading}
               className="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-colors flex justify-center items-center gap-2"
             >
-              {loading ? "Logging in..." : "Login"} <i data-lucide="arrow-right" className="w-4 h-4"></i>
+              {loading ? "Logging in..." : "Login"} <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         )}
 
         {step === "setPassword" && (
           <div className="fade-in">
-            <div className="flex justify-center mb-4"><div className="bg-green-100 p-3 rounded-full"><i data-lucide="lock" className="w-8 h-8 text-green-600"></i></div></div>
+            <div className="flex justify-center mb-4"><div className="bg-green-100 p-3 rounded-full"><Lock className="w-8 h-8 text-green-600" /></div></div>
             <h1 className="text-2xl font-semibold text-gray-800 mb-2">Set New Password</h1>
             <p className="text-gray-500 mb-6">This is your first login. Please set a new password.</p>
 
@@ -317,7 +318,7 @@ export default function Ownerlogin() {
                   onClick={() => setShowNewPassword(!showNewPassword)}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
                 >
-                  <i data-lucide={showNewPassword ? "eye-off" : "eye"} className="w-5 h-5"></i>
+                  {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
             </div>
@@ -338,7 +339,7 @@ export default function Ownerlogin() {
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
                 >
-                  <i data-lucide={showConfirmPassword ? "eye-off" : "eye"} className="w-5 h-5"></i>
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
             </div>
@@ -351,7 +352,7 @@ export default function Ownerlogin() {
               disabled={loading}
               className="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition-colors flex justify-center items-center gap-2"
             >
-              {loading ? "Saving..." : "Update & Continue"} <i data-lucide="arrow-right" className="w-4 h-4"></i>
+              {loading ? "Saving..." : "Update & Continue"} <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         )}
@@ -363,7 +364,7 @@ export default function Ownerlogin() {
         }} id="forgot-modal">
           <div className="bg-card w-full max-w-md rounded-xl border border-gray-200 shadow-soft p-6 relative">
             <button type="button" aria-label="Close forgot password modal" onClick={closeForgot} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
-              <i data-lucide="x" className="w-5 h-5"></i>
+              <X className="w-5 h-5" />
             </button>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Reset Password</h2>
             <p className="text-sm text-gray-500 mb-5">Follow the steps to reset your owner password.</p>
