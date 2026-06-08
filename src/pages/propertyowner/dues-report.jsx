@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
 import { fetchInvoices, fetchPenaltyConfigs, sendReminder, recordPayment } from "../../utils/rentCollectionApi";
-import { Search, Send, IndianRupee, RefreshCw } from "lucide-react";
+import { Search, Send, IndianRupee, RefreshCw, Smartphone, CreditCard, Banknote } from "lucide-react";
 
 function calcDaysSinceDue(dueDate) {
   if (!dueDate) return 0;
@@ -82,6 +82,7 @@ export default function DuesReportPage() {
   const [reminding, setReminding]       = useState(null);
   const [payingId, setPayingId]         = useState(null);
   const [payAmount, setPayAmount]       = useState("");
+  const [payMethod, setPayMethod]       = useState("cash");
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -159,14 +160,15 @@ export default function DuesReportPage() {
     }
   };
 
-  const handleRecordCash = async (row) => {
+  const handleRecordPayment = async (row) => {
     const amt = parseFloat(payAmount);
     if (!amt || amt <= 0) { showToast("Enter a valid amount", "error"); return; }
     try {
-      await recordPayment(row.id, amt, "cash");
+      await recordPayment(row.id, amt, payMethod);
       showToast(`₹${amt.toLocaleString("en-IN")} recorded for ${row.name}`);
       setPayingId(null);
       setPayAmount("");
+      setPayMethod("cash");
       load();
     } catch (err) {
       showToast(err.message || "Payment failed", "error");
@@ -322,41 +324,66 @@ export default function DuesReportPage() {
                           Send Alert
                         </button>
                         <button
-                          onClick={() => { setPayingId(payingId === d.id ? null : d.id); setPayAmount(""); }}
+                          onClick={() => { setPayingId(payingId === d.id ? null : d.id); setPayAmount(""); setPayMethod("cash"); }}
                           className="h-8 px-3 border border-border rounded-lg text-xs font-bold text-muted-foreground hover:text-foreground"
                         >
-                          Record Cash
+                          Record Payment
                         </button>
                       </td>
                     </tr>
 
-                    {/* Inline cash payment row */}
+                    {/* Inline payment row */}
                     {payingId === d.id && (
                       <tr className="bg-muted/30">
-                        <td colSpan={10} className="px-6 py-3">
-                          <div className="flex items-center gap-3">
-                            <span className="text-[12px] text-muted-foreground font-medium">Record cash payment for {d.name}:</span>
-                            <input
-                              type="number"
-                              min="1"
-                              placeholder="Amount (₹)"
-                              value={payAmount}
-                              onChange={e => setPayAmount(e.target.value)}
-                              className="h-8 w-40 rounded-lg border border-border bg-white px-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
-                              autoFocus
-                            />
-                            <button
-                              onClick={() => handleRecordCash(d)}
-                              className="h-8 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold"
-                            >
-                              Confirm
-                            </button>
-                            <button
-                              onClick={() => setPayingId(null)}
-                              className="h-8 px-3 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground"
-                            >
-                              Cancel
-                            </button>
+                        <td colSpan={10} className="px-6 py-4">
+                          <div className="space-y-3">
+                            {/* Method selector */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[12px] text-muted-foreground font-medium shrink-0">Payment method:</span>
+                              {[
+                                { key: "upi",          label: "UPI Received",  Icon: Smartphone },
+                                { key: "bank_transfer", label: "Bank Transfer", Icon: CreditCard },
+                                { key: "cash",         label: "Cash Given",    Icon: Banknote },
+                              ].map(({ key, label, Icon }) => (
+                                <button
+                                  key={key}
+                                  onClick={() => setPayMethod(key)}
+                                  className={[
+                                    "inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-medium border transition-colors",
+                                    payMethod === key
+                                      ? "border-primary bg-primary/10 text-primary"
+                                      : "border-border text-muted-foreground hover:border-primary/40"
+                                  ].join(" ")}
+                                >
+                                  <Icon className="size-3.5" />{label}
+                                </button>
+                              ))}
+                            </div>
+                            {/* Amount + confirm */}
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <span className="text-[12px] text-muted-foreground font-medium">Amount for {d.name}:</span>
+                              <input
+                                type="number"
+                                min="1"
+                                placeholder="Amount (₹)"
+                                value={payAmount}
+                                onChange={e => setPayAmount(e.target.value)}
+                                className="h-8 w-40 rounded-lg border border-border bg-white px-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => handleRecordPayment(d)}
+                                className="h-8 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold"
+                              >
+                                Confirm
+                              </button>
+                              <button
+                                onClick={() => { setPayingId(null); setPayMethod("cash"); }}
+                                className="h-8 px-3 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground"
+                              >
+                                Cancel
+                              </button>
+                            </div>
                           </div>
                         </td>
                       </tr>

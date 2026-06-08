@@ -66,7 +66,15 @@ export const recordPayment = (invoiceId, amount, paymentMethod = 'cash', notes =
   apiFetch(`${base()}/payments`, {
     method: 'POST',
     body: JSON.stringify({ invoiceId, amount, paymentMethod, notes }),
-  }).then(data => { cacheInvalidate('invoices:'); cacheInvalidate('dashboard:'); return data; });
+  }).then(data => { cacheInvalidate('invoices:'); cacheInvalidate('dashboard:'); cacheInvalidate('payments:'); return data; });
+
+export function fetchPayments(limit = 200) {
+  const key = `payments:all:${limit}`;
+  const hit = cacheGet(key);
+  if (hit) return Promise.resolve(hit);
+  return apiFetch(`${base()}/payments?limit=${limit}`)
+    .then(data => cacheSet(key, data, 60 * 1000));
+}
 
 // ── Penalty preview ──────────────────────────────────────────────────────────
 export const previewPenalty = (rentAmount, ownerId, propertyId, dueDate, paidAmount = 0) =>

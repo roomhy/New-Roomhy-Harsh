@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
-import { ownerApi } from "../../services/api";
-import { CheckCircle, Search, Download, IndianRupee, TrendingUp, Calendar } from "lucide-react";
+import { fetchPayments } from "../../utils/rentCollectionApi";
+import { CheckCircle, Search, IndianRupee, TrendingUp, Calendar } from "lucide-react";
 
 const fmt = (n) => "₹" + (n || 0).toLocaleString("en-IN");
 
@@ -41,19 +41,11 @@ export default function PaymentReceivedPage() {
   const [monthFilter, setMonthFilter] = useState("all");
 
   useEffect(() => {
-    ownerApi.getOwnerPayments(owner.loginId)
-      .then(data => {
-        const raw = Array.isArray(data) ? data : (data?.payments || data?.rents || data?.data || []);
-        // keep only actually-paid records
-        const paid = raw.filter(r =>
-          r.status === "paid" || r.status === "received" || r.status === "success" ||
-          r.paidAt || r.paidDate || r.paymentDate
-        );
-        setPayments(paid);
-      })
+    fetchPayments(300)
+      .then(data => setPayments(data?.payments || []))
       .catch(() => setPayments([]))
       .finally(() => setLoading(false));
-  }, [owner.loginId]);
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);

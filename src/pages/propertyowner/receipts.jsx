@@ -1,7 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
+import { fetchPayments } from "../../utils/rentCollectionApi";
 import { Search, Download, Eye, X, Printer } from "lucide-react";
+
+function billingLabel(billingMonth) {
+  if (!billingMonth) return "—";
+  const [yr, mo] = billingMonth.split("-");
+  if (!yr || !mo) return billingMonth;
+  return new Date(parseInt(yr), parseInt(mo) - 1).toLocaleString("en", { month: "long" }) + " " + yr;
+}
 
 function numberToWords(num) {
   const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven",
@@ -380,26 +388,48 @@ export default function ReceiptsPage() {
     return null;
   }
 
-  const [search, setSearch]   = useState("");
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [search, setSearch]     = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [viewing, setViewing] = useState(null);
+  const [viewing, setViewing]   = useState(null);
+
+  useEffect(() => {
+    fetchPayments(300)
+      .then(d => setPayments(d?.payments || []))
+      .catch(() => setPayments([]))
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(t);
   }, [search]);
 
-  const receiptsData = [
-    { id: "REC-2026-08451", tenant: "Amit Sharma", room: "101", date: "08 May 2026", amount: 8800, period: "May 2026", type: "Rent & Utility", phone: "+91-98765-00001", email: "amit@email.com" },
-    { id: "REC-2026-08422", tenant: "Vijay Kumar",  room: "101", date: "05 May 2026", amount: 8500, period: "May 2026", type: "Rent Only",      phone: "+91-98765-00002", email: "vijay@email.com" },
-    { id: "REC-2026-08390", tenant: "Sanjay Dutt",  room: "103", date: "02 May 2026", amount: 7000, period: "May 2026", type: "Rent Only",      phone: "+91-98765-00003", email: "sanjay@email.com", paid: 2008 }
-  ];
+  // Shape each payment into the receipt object the modal expects
+  const receipts = useMemo(() => payments.map(p => ({
+    id:     p.invoiceNumber || p.transactionId || String(p._id).slice(-8).toUpperCase(),
+    tenant: p.tenantName,
+    room:   p.roomNo,
+    phone:  p.tenantPhone,
+    email:  p.tenantEmail,
+    date:   new Date(p.paymentDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+    period: billingLabel(p.billingMonth),
+    amount: p.rentAmount || p.amount,
+    paid:   p.amount,
+    type:   p.electricityBill > 0 ? "Rent & Utility" : p.totalPenalty > 0 ? "Rent + Penalty" : "Rent Only",
+    _raw:   p,
+  })), [payments]);
 
-  const filtered = receiptsData.filter((r) =>
-    r.tenant.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-    r.room.includes(debouncedSearch) ||
-    r.id.toLowerCase().includes(debouncedSearch.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    if (!q) return receipts;
+    return receipts.filter(r =>
+      r.tenant.toLowerCase().includes(q) ||
+      String(r.room).toLowerCase().includes(q) ||
+      r.id.toLowerCase().includes(q)
+    );
+  }, [receipts, debouncedSearch]);
 
   const handleDownload = (r) => {
     const win = window.open("", "_blank", "width=860,height=960");
@@ -418,8 +448,13 @@ export default function ReceiptsPage() {
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
         <div>
           <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Issued Receipts</h1>
-          <p className="mt-1.5 text-[13.5px] text-muted-foreground">Search and download generated tax receipts, invoices, and payment summaries.</p>
+          <p className="mt-1.5 text-[13.5px] text-muted-foreground">Search and download generated receipts for every recorded payment.</p>
         </div>
+        {!loading && (
+          <span className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-3 py-1 font-semibold self-start md:mt-2">
+            {receipts.length} receipt{receipts.length !== 1 ? "s" : ""}
+          </span>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -428,7 +463,7 @@ export default function ReceiptsPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search receipts by receipt ID, Tenant, or Room..."
+            placeholder="Search by receipt ID, tenant, or room..."
             className="w-full h-10 pl-9 pr-3 rounded-xl bg-card border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground"
           />
         </div>
@@ -443,22 +478,24 @@ export default function ReceiptsPage() {
                 <th className="px-6 py-3.5 font-semibold">Tenant Name</th>
                 <th className="px-6 py-3.5 font-semibold">Room</th>
                 <th className="px-6 py-3.5 font-semibold">Billing Period</th>
-                <th className="px-6 py-3.5 font-semibold">Receipt Type</th>
+                <th className="px-6 py-3.5 font-semibold">Type</th>
                 <th className="px-6 py-3.5 font-semibold">Amount Paid</th>
                 <th className="px-6 py-3.5 font-semibold text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.length === 0 ? (
+              {loading ? (
+                <tr><td colSpan={7} className="px-6 py-10 text-center text-muted-foreground">Loading receipts...</td></tr>
+              ) : filtered.length === 0 ? (
                 <tr><td colSpan={7} className="px-6 py-10 text-center text-muted-foreground">No receipts found.</td></tr>
               ) : filtered.map((r) => (
-                <tr key={r.id} className="hover:bg-muted/40 transition-colors">
+                <tr key={r._raw._id} className="hover:bg-muted/40 transition-colors">
                   <td className="px-6 py-4 font-mono font-bold text-foreground">{r.id}</td>
                   <td className="px-6 py-4 font-semibold text-foreground">{r.tenant}</td>
                   <td className="px-6 py-4 font-bold text-foreground">Room {r.room}</td>
                   <td className="px-6 py-4 text-muted-foreground">{r.period}</td>
                   <td className="px-6 py-4 text-muted-foreground">{r.type}</td>
-                  <td className="px-6 py-4 font-bold text-emerald-600">₹{r.amount.toLocaleString("en-IN")}</td>
+                  <td className="px-6 py-4 font-bold text-emerald-600">₹{(r.paid || r.amount).toLocaleString("en-IN")}</td>
                   <td className="px-6 py-4 text-right space-x-2">
                     <button
                       onClick={() => setViewing(r)}

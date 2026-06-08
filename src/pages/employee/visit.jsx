@@ -1,6 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useHtmlPage } from "../../utils/htmlPage";
 import { fetchJson, getAuthHeader } from "../../utils/api";
+import {
+  Plus, ClipboardCheck, Clock, CheckCircle2, Camera, Search, RefreshCw,
+  Building2, Map, Trash, Edit3, Star, MapPin, X, ClipboardList, FileText,
+  Images, ImageOff, Upload, LayoutPanelTop, Droplets, BedDouble, CameraOff,
+  PlusCircle, UserPlus, Send, Check, ArrowLeft, ArrowRight, ImagePlus,
+  UploadCloud, Trash2, RotateCw
+} from "lucide-react";
 
 const readStoredUser = () => {
   try {
@@ -146,8 +153,6 @@ export default function Visit() {
       { rel: "stylesheet", href: "/superadmin/assets/css/visit.css" }
     ],
     scripts: [
-      { src: "https://cdn.tailwindcss.com" },
-      { src: "https://unpkg.com/lucide@latest" },
       { src: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" }
     ],
     inlineScripts: []
@@ -180,6 +185,7 @@ export default function Visit() {
     photo_bed: [],
     photo_extra: []
   });
+  const [step, setStep] = useState(1);
   const [showProfModal, setShowProfModal] = useState(false);
   const [profPreview, setProfPreview] = useState([]);
   const [showCamera, setShowCamera] = useState(false);
@@ -200,6 +206,8 @@ export default function Visit() {
   const cameraStreamRef = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const formRef = useRef(null);
+  const [formSnapshot, setFormSnapshot] = useState({});
 
   const staffName = user?.name || user?.staffName || user?.fullName || "Manager";
   const staffId = user?.loginId || user?.staffId || user?.id || user?._id || "";
@@ -319,9 +327,6 @@ export default function Visit() {
     return () => clearInterval(interval);
   }, [staffId, staffName, user]);
 
-  useEffect(() => {
-    if (window?.lucide) window.lucide.createIcons();
-  }, [showModal, showProfModal, showCamera, visits, captureGroups, profPhotos]);
 
 
   const generatePropertyId = () => {
@@ -361,6 +366,7 @@ export default function Visit() {
 
   const openModal = () => {
     resetModalDefaults();
+    setStep(1);
     setShowModal(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -371,7 +377,7 @@ export default function Visit() {
     }
   };
 
-  const closeModal = () => setShowModal(false);
+  const closeModal = () => { setShowModal(false); setStep(1); };
 
   const openEditModal = (visit) => {
     const record = normalizeVisit(visit);
@@ -401,7 +407,9 @@ export default function Visit() {
     setGeo({ lat: record.latitude || "", lng: record.longitude || "" });
     setModalAreaName(record.area || record.areaLocality || record.propertyInfo?.area || resolvedAreaName || "");
     setModalCityName(record.city || record.propertyInfo?.city || resolvedCityName || "");
+    setStep(1);
     setShowModal(true);
+    // bank fields are defaultValue-driven in JSX via editingVisit reference
   };
 
   const deleteVisit = async (visit) => {
@@ -612,9 +620,49 @@ export default function Visit() {
     setProfPhotos(list);
   };
 
-  const submitVisit = async (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+  const handleContinue = () => {
+    if (formRef.current) {
+      const fd = new FormData(formRef.current);
+      let patch = {};
+      if (step === 1) {
+        patch = { propertyType: fd.get("propertyType") || "PG" };
+      } else if (step === 2) {
+        patch = {
+          name: fd.get("name") || "",
+          address: fd.get("address") || "",
+          gender: fd.get("gender") || "",
+          landmark: fd.get("landmark") || "",
+          nearbyLocation: fd.get("nearbyLocation") || "",
+          ownerName: fd.get("ownerName") || "",
+          contactPhone: fd.get("contactPhone") || "",
+          ownerEmail: fd.get("ownerEmail") || "",
+          amenities: fd.getAll("amenities"),
+          monthlyRent: fd.get("monthlyRent") || "",
+          deposit: fd.get("deposit") || "",
+          vacantRooms: fd.get("vacantRooms") || "",
+          vacantBeds: fd.get("vacantBeds") || "",
+          occupiedRooms: fd.get("occupiedRooms") || "",
+          occupiedBeds: fd.get("occupiedBeds") || "",
+          electricityCharges: fd.get("electricityCharges") || "",
+          foodCharges: fd.get("foodCharges") || "",
+          maintenanceCharges: fd.get("maintenanceCharges") || "",
+          minStay: fd.get("minStay") || "",
+          entryExit: fd.get("entryExit") || "",
+          bankAccountHolderName: fd.get("bankAccountHolderName") || "",
+          bankAccountNumber: fd.get("bankAccountNumber") || "",
+          bankIfscCode: fd.get("bankIfscCode") || "",
+          bankName: fd.get("bankName") || "",
+          bankBranchName: fd.get("bankBranchName") || "",
+          bankUpiId: fd.get("bankUpiId") || "",
+        };
+      }
+      setFormSnapshot(prev => ({ ...prev, ...patch }));
+    }
+    setStep(s => s + 1);
+  };
+
+  const submitVisit = async () => {
+    const fd = new FormData(formRef.current);
     const visitIdValue = fd.get("visitId") || visitId || `v_${Date.now()}`;
     const visitDate = new Date().toLocaleString();
     const capturedPhotos = Object.values(captureGroups || {}).flat();
@@ -655,6 +703,12 @@ export default function Visit() {
       cookingAllowed: fd.get("cookingAllowed") || cookingAllowed,
       smokingAllowed: fd.get("smokingAllowed") || smokingAllowed,
       petsAllowed: fd.get("petsAllowed") || petsAllowed,
+      bankAccountHolderName: fd.get("bankAccountHolderName"),
+      bankAccountNumber: fd.get("bankAccountNumber"),
+      bankIfscCode: fd.get("bankIfscCode"),
+      bankName: fd.get("bankName"),
+      bankBranchName: fd.get("bankBranchName"),
+      bankUpiId: fd.get("bankUpiId"),
       internalRemarks: fd.get("internalRemarks"),
       studentReviews: fd.get("studentReviews"),
       cleanlinessNote: fd.get("cleanlinessNote"),
@@ -799,7 +853,7 @@ export default function Visit() {
         </div>
         <div className="flex items-center gap-3">
             <button onClick={openModal} className="bg-slate-800 text-white px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest shadow-lg shadow-slate-800/10 hover:bg-slate-900 transition-all flex items-center gap-2">
-              <i data-lucide="plus" className="w-3.5 h-3.5"></i> Add New Visit
+              <Plus className="w-3.5 h-3.5" /> Add New Visit
             </button>
         </div>
       </div>
@@ -808,7 +862,7 @@ export default function Visit() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-md flex items-start gap-3 group hover:translate-y-[-2px] transition-all">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border shadow-sm transition-transform group-hover:scale-105 bg-blue-50 text-blue-600 border-blue-100">
-             <i data-lucide="clipboard-check" className="w-5 h-5"/>
+             <ClipboardCheck className="w-5 h-5" />
           </div>
           <div className="min-w-0">
              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1 leading-none truncate">Total Visits</p>
@@ -817,7 +871,7 @@ export default function Visit() {
         </div>
         <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-md flex items-start gap-3 group hover:translate-y-[-2px] transition-all">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border shadow-sm transition-transform group-hover:scale-105 bg-indigo-50 text-indigo-600 border-indigo-100">
-             <i data-lucide="clock" className="w-5 h-5"/>
+             <Clock className="w-5 h-5" />
           </div>
           <div className="min-w-0">
              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1 leading-none truncate">Average Time</p>
@@ -826,7 +880,7 @@ export default function Visit() {
         </div>
         <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-md flex items-start gap-3 group hover:translate-y-[-2px] transition-all">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border shadow-sm transition-transform group-hover:scale-105 bg-emerald-50 text-emerald-600 border-emerald-100">
-             <i data-lucide="check-circle-2" className="w-5 h-5"/>
+             <CheckCircle2 className="w-5 h-5" />
           </div>
           <div className="min-w-0">
              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1 leading-none truncate">Approved</p>
@@ -835,7 +889,7 @@ export default function Visit() {
         </div>
         <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-md flex items-start gap-3 group hover:translate-y-[-2px] transition-all">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border shadow-sm transition-transform group-hover:scale-105 bg-amber-50 text-amber-600 border-amber-100">
-             <i data-lucide="camera" className="w-5 h-5"/>
+             <Camera className="w-5 h-5" />
           </div>
           <div className="min-w-0">
              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1 leading-none truncate">Photos Uploaded</p>
@@ -850,7 +904,7 @@ export default function Visit() {
             <h3 className="text-[10px] font-bold text-slate-800 uppercase tracking-widest leading-none">All Visit Reports</h3>
             <div className="flex items-center gap-3">
               <div className="relative group w-48">
-                  <i data-lucide="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
                   <input 
                     value={search} onChange={e => setSearch(e.target.value)}
                     placeholder="Search visits..." 
@@ -858,7 +912,7 @@ export default function Visit() {
                   />
               </div>
               <button onClick={loadVisits} className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-blue-600 transition-all border border-slate-100 shadow-sm">
-                  <i data-lucide="refresh-cw" className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
               </button>
             </div>
         </div>
@@ -896,7 +950,7 @@ export default function Visit() {
                         <td className="py-3">
                           <div className="flex items-center gap-3">
                               <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shadow-sm transition-transform group-hover:scale-105 shrink-0">
-                                <i data-lucide="building-2" className="w-4.5 h-4.5" />
+                                <Building2 className="w-4 h-4" />
                               </div>
                               <div className="min-w-0">
                                 <p className="text-[11px] font-bold text-slate-800 leading-none truncate max-w-[150px]">{v.propertyName || v.propertyInfo?.name || "Unknown Property"}</p>
@@ -914,7 +968,7 @@ export default function Visit() {
                           <div className="inline-flex flex-col items-center bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg shadow-sm">
                               <div className="flex text-amber-400 text-[8px] gap-0.5">
                                 {[...Array(5)].map((_, idx) => (
-                                    <i key={idx} data-lucide="star" className={`w-2 h-2 ${idx < (v.cleanlinessRating || 0) ? "fill-amber-400 text-amber-400" : "text-slate-200 fill-slate-200"}`} />
+                                    <Star key={idx} className={`w-2 h-2 ${idx < (v.cleanlinessRating || 0) ? "fill-amber-400 text-amber-400" : "text-slate-200 fill-slate-200"}`} />
                                 ))}
                               </div>
                               <p className="text-[7px] text-slate-400 font-bold uppercase tracking-widest mt-1 leading-none">{v.cleanlinessRating || 0}/5 Rating</p>
@@ -957,9 +1011,9 @@ export default function Visit() {
                         </td>
                         <td className="py-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                              <button onClick={() => viewMap(v)} className="p-1.5 rounded-lg bg-slate-50 text-slate-400 hover:text-blue-600 transition-all border border-slate-100 shadow-sm"><i data-lucide="map" className="w-3.5 h-3.5" /></button>
-                              <button onClick={() => deleteVisit(v)} className="p-1.5 rounded-lg bg-slate-50 text-slate-400 hover:text-rose-600 transition-all border border-slate-100 shadow-sm"><i data-lucide="trash" className="w-3.5 h-3.5" /></button>
-                              <button onClick={() => openEditModal(v)} className="p-1.5 rounded-lg bg-slate-50 text-slate-400 hover:text-indigo-600 transition-all border border-slate-100 shadow-sm"><i data-lucide="edit-3" className="w-3.5 h-3.5" /></button>
+                              <button onClick={() => viewMap(v)} className="p-1.5 rounded-lg bg-slate-50 text-slate-400 hover:text-blue-600 transition-all border border-slate-100 shadow-sm"><Map className="w-3.5 h-3.5" /></button>
+                              <button onClick={() => deleteVisit(v)} className="p-1.5 rounded-lg bg-slate-50 text-slate-400 hover:text-rose-600 transition-all border border-slate-100 shadow-sm"><Trash className="w-3.5 h-3.5" /></button>
+                              <button onClick={() => openEditModal(v)} className="p-1.5 rounded-lg bg-slate-50 text-slate-400 hover:text-indigo-600 transition-all border border-slate-100 shadow-sm"><Edit3 className="w-3.5 h-3.5" /></button>
                           </div>
                         </td>
                     </tr>
@@ -971,295 +1025,691 @@ export default function Visit() {
     </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-white rounded-lg w-full max-w-2xl p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-gray-900">{editingVisit ? "Edit Property Visit" : "New Property Visit"}</h3>
-              <button onClick={closeModal} className="text-gray-400">
-                <i data-lucide="x" className="w-5 h-5"></i>
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-card w-full max-w-2xl shadow-pop rounded-2xl max-h-[90vh] flex flex-col overflow-hidden border border-border">
+
+            {/* Gradient accent strip */}
+            <div className="h-[3px] bg-gradient-to-r from-violet-500 via-purple-500 to-indigo-500 flex-shrink-0 rounded-t-2xl" />
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center flex-shrink-0">
+                  <ClipboardList className="w-4 h-4 text-violet-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground leading-none mb-0.5">{editingVisit ? "Edit Property Visit" : "New Property Visit"}</h3>
+                  <p className="text-[10px] text-muted-foreground font-medium">Step {step} of 5 &mdash; {["Basic Details","Property Details","Gallery","Live Capture","Review & Submit"][step-1]}</p>
+                </div>
+              </div>
+              <button onClick={closeModal} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground transition-all">
+                <X className="w-4 h-4" />
               </button>
             </div>
-            <form key={editingVisit?.visitId || editingVisit?._id || "new-visit"} className="space-y-4" onSubmit={submitVisit}>
+
+            {/* Step Indicators */}
+            <div className="flex items-center px-6 py-3.5 border-b border-border flex-shrink-0 bg-muted/30">
+              {[
+                { n: 1, label: "Basics" },
+                { n: 2, label: "Property" },
+                { n: 3, label: "Gallery" },
+                { n: 4, label: "Capture" },
+                { n: 5, label: "Review" }
+              ].map((s, idx) => (
+                <React.Fragment key={s.n}>
+                  <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold transition-all duration-200 ${step > s.n ? 'bg-emerald-500 text-white shadow-sm' : step === s.n ? 'bg-violet-600 text-white ring-4 ring-violet-100' : 'bg-muted text-muted-foreground border border-border'}`}>
+                      {step > s.n ? '✓' : s.n}
+                    </div>
+                    <span className={`text-[9px] font-bold tracking-wide uppercase hidden sm:block whitespace-nowrap ${step === s.n ? 'text-violet-700' : step > s.n ? 'text-emerald-600' : 'text-muted-foreground'}`}>{s.label}</span>
+                  </div>
+                  {idx < 4 && <div className={`flex-1 h-[2px] mx-2 rounded-full transition-all duration-300 ${step > s.n ? 'bg-emerald-400' : 'bg-border'}`} />}
+                </React.Fragment>
+              ))}
+            </div>
+
+            {/* Form */}
+            <form ref={formRef} key={editingVisit?.visitId || editingVisit?._id || "new-visit"} className="flex flex-col flex-1 min-h-0" onSubmit={(e) => e.preventDefault()}>
               <input type="hidden" name="visitId" value={visitId} />
-              <div className="grid grid-cols-3 gap-3">
-                <input type="text" readOnly className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-gray-100 cursor-not-allowed" value={visitDateDisplay} placeholder="Visit Date & Time" />
-                <input type="text" name="staffName" readOnly className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-gray-100 cursor-not-allowed" value={staffName} placeholder="Staff Name" />
-                <input type="text" name="staffId" readOnly className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-gray-100 cursor-not-allowed" value={staffId} placeholder="Staff ID" />
-              </div>
               <input type="hidden" name="latitude" value={geo.lat} />
               <input type="hidden" name="longitude" value={geo.lng} />
               <input type="hidden" name="verifiedByCompany" value="true" />
               <input type="hidden" name="locationCode" value={locationCode} />
+              <input type="hidden" name="area" value={areaName} />
+              <input type="hidden" name="city" value={modalCityName || resolvedCityName} />
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="relative">
-                  <input name="propertyId" type="text" readOnly className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 cursor-not-allowed" value={propertyId} placeholder="Auto-generated Property ID" />
-                  <button type="button" onClick={generatePropertyId} title="Regenerate ID" className="absolute right-1 top-1/2 -translate-y-1/2 bg-gray-100 px-2 py-1 rounded text-xs border" disabled={!!editingVisit}>
-                    Regenerate
-                  </button>
-                </div>
-                <select name="propertyType" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" defaultValue={editingVisit?.propertyType || "PG"}>
-                  <option value="PG">PG</option>
-                  <option value="Hostel">Hostel</option>
-                  <option value="Room">Room</option>
-                  <option value="Flat">Flat</option>
-                </select>
-              </div>
-              <input name="name" type="text" required defaultValue={editingVisit?.propertyName || ""} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Property Name" />
-              <textarea name="address" rows="2" required defaultValue={editingVisit?.address || ""} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Full Address (Street, Area, City, Pin Code)"></textarea>
-              <div className="grid grid-cols-3 gap-3">
-                <input name="ownerName" type="text" required defaultValue={editingVisit?.ownerName || ""} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Owner Name" />
-                <input name="contactPhone" type="tel" required defaultValue={editingVisit?.contactPhone || editingVisit?.ownerPhone || ""} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Owner Contact (full number)" />
-                <input name="ownerEmail" type="email" required defaultValue={editingVisit?.ownerEmail || ""} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Owner Gmail" />
-              </div>
-              <div className="grid grid-cols-1 gap-3">
-                <select name="gender" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" defaultValue={editingVisit?.gender || ""}>
-                  <option value="">Select Gender Preference</option>
-                  <option value="Male Only">Male Only</option>
-                  <option value="Female Only">Female Only</option>
-                  <option value="Co-Ed">Co-Ed</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <input name="areaLocality" type="text" readOnly className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-gray-100 cursor-not-allowed" placeholder="Area / Locality" value={areaName} />
-                <input type="hidden" name="area" value={areaName} />
-                <input type="hidden" name="city" value={modalCityName || resolvedCityName} />
-                <input name="landmark" type="text" defaultValue={editingVisit?.landmark || ""} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Nearby Landmark" />
-                <input name="nearbyLocation" type="text" defaultValue={editingVisit?.nearbyLocation || ""} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Nearby Location" />
-              </div>
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
 
-              <div className="grid grid-cols-3 gap-3 p-3 border border-gray-200 rounded">
-                {["Wi-Fi", "Drinking water", "Food", "Power backup", "Washing machine", "Parking", "CCTV"].map((a) => (
-                  <label key={a} className="inline-flex items-center text-xs">
-                    <input type="checkbox" name="amenities" value={a} className="mr-2" defaultChecked={editingVisit?.amenities?.some(x => x?.toLowerCase() === a?.toLowerCase())} /> {a}
-                  </label>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-4 gap-3">
-                <input name="monthlyRent" type="number" min="0" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Monthly Rent" defaultValue={editingVisit?.monthlyRent || ""} />
-                <input name="deposit" type="number" min="0" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Deposit" defaultValue={editingVisit?.deposit || ""} />
-                <input name="vacantRooms" type="number" min="0" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Vacant Rooms" defaultValue={editingVisit?.vacantRooms || ""} />
-                <input name="vacantBeds" type="number" min="0" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Beds in Vacant Rooms" defaultValue={editingVisit?.vacantBeds || ""} />
-                <input name="occupiedRooms" type="number" min="0" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Occupied Rooms" defaultValue={editingVisit?.occupiedRooms || ""} />
-                <input name="occupiedBeds" type="number" min="0" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Beds in Occupied Rooms" defaultValue={editingVisit?.occupiedBeds || ""} />
-              </div>
-              <div className="grid grid-cols-3 gap-3 mt-3">
-                <input name="electricityCharges" type="number" min="0" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Electricity Charges" defaultValue={editingVisit?.electricityCharges || ""} />
-                <input name="foodCharges" type="number" min="0" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Food Charges" defaultValue={editingVisit?.foodCharges || ""} />
-                <input name="maintenanceCharges" type="number" min="0" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Maintenance Charges" defaultValue={editingVisit?.maintenanceCharges || ""} />
-              </div>
-              <div className="grid grid-cols-1 gap-3 mt-3">
-                <input name="minStay" type="number" min="0" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Minimum Stay (months)" defaultValue={editingVisit?.minStay || ""} />
-              </div>
-
-              <div className="p-3 border border-gray-200 rounded">
-                <div className="font-semibold mb-2">House Rules</div>
-                <input name="entryExit" type="text" className="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-3" placeholder="Entry / Exit timing" defaultValue={editingVisit?.entryExit || ""} />
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { id: "visitorsAllowed", label: "Visitors Allowed", value: visitorsAllowed, setter: setVisitorsAllowed },
-                    { id: "cookingAllowed", label: "Cooking Allowed", value: cookingAllowed, setter: setCookingAllowed },
-                    { id: "smokingAllowed", label: "Smoking Allowed", value: smokingAllowed, setter: setSmokingAllowed },
-                    { id: "petsAllowed", label: "Pets Allowed", value: petsAllowed, setter: setPetsAllowed }
-                  ].map((item) => (
-                    <div key={item.id}>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">{item.label}</label>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setToggleValue(item.id, "Yes")}
-                          className={`flex-1 py-2 px-3 rounded text-sm font-medium border-2 ${item.value === "Yes" ? "border-green-500 bg-green-50 text-green-700" : "border-gray-300 text-gray-600"}`}
-                        >
-                          Yes
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setToggleValue(item.id, "No")}
-                          className={`flex-1 py-2 px-3 rounded text-sm font-medium border-2 ${item.value === "No" ? "border-red-500 bg-red-50 text-red-700" : "border-gray-300 text-gray-600"}`}
-                        >
-                          No
-                        </button>
+                {/* Step 1: Basic Details */}
+                {step === 1 && (
+                  <div className="bg-card border border-border rounded-2xl p-5 shadow-soft">
+                    <div className="flex items-center gap-3 mb-5 pb-4 border-b border-border">
+                      <div className="w-8 h-8 rounded-xl bg-violet-50 text-violet-600 border border-violet-100 flex items-center justify-center flex-shrink-0">
+                        <FileText className="w-4 h-4" />
                       </div>
-                      <input type="hidden" name={item.id} value={item.value} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="p-3 border border-gray-200 rounded">
-                <div className="font-semibold mb-3">Staff Assessment</div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-2">Cleanliness Rating</label>
-                    {renderStars(cleanlinessRating, "cleanlinessRating")}
-                    <input type="hidden" name="cleanlinessRating" value={cleanlinessRating} />
-                    <p className="text-xs text-gray-500 mt-1">{cleanlinessRating ? `Rating: ${cleanlinessRating}/5 ★` : "Click to rate"}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-2">Owner Behaviour</label>
-                    <div className="flex gap-2 flex-wrap">
-                      {["Good", "Average", "Poor"].map((val) => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setOwnerBehaviour(val)}
-                          className={`px-3 py-2 rounded text-xs font-medium border-2 ${
-                            ownerBehaviourPublic === val
-                              ? val === "Good"
-                                ? "border-green-500 bg-green-50 text-green-700"
-                                : val === "Average"
-                                  ? "border-yellow-500 bg-yellow-50 text-yellow-700"
-                                  : "border-red-500 bg-red-50 text-red-700"
-                              : "border-gray-300 text-gray-600"
-                          }`}
-                        >
-                          {val}
-                        </button>
-                      ))}
-                    </div>
-                    <input type="hidden" name="ownerBehaviourPublic" value={ownerBehaviourPublic} />
-                    <p className="text-xs text-gray-500 mt-1">{ownerBehaviourPublic ? `Selected: ${ownerBehaviourPublic}` : "Select behaviour"}</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-300">
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-2">Student Reviews Rating (★)</label>
-                    {renderStars(studentReviewsRating, "studentReviewsRating")}
-                    <input type="hidden" name="studentReviewsRating" value={studentReviewsRating} />
-                    <p className="text-xs text-gray-500 mt-1">{studentReviewsRating ? `Rating: ${studentReviewsRating}/5 ★` : "Click to rate"}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-2">Employee Rating (★)</label>
-                    {renderStars(employeeRating, "employeeRating")}
-                    <input type="hidden" name="employeeRating" value={employeeRating} />
-                    <p className="text-xs text-gray-500 mt-1">{employeeRating ? `Rating: ${employeeRating}/5 ★` : "Click to rate"}</p>
-                  </div>
-                </div>
-              </div>
-              <textarea name="studentReviews" rows="2" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Student reviews feedback" defaultValue={editingVisit?.studentReviews || ""}></textarea>
-              <textarea name="internalRemarks" rows="2" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Internal remarks (private)" defaultValue={editingVisit?.internalRemarks || ""}></textarea>
-              <textarea name="cleanlinessNote" rows="2" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Cleanliness note (private)" defaultValue={editingVisit?.cleanlinessNote || ""}></textarea>
-              <textarea name="ownerBehaviour" rows="2" className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Owner behaviour (private)" defaultValue={editingVisit?.ownerBehaviour || ""}></textarea>
-
-              {!editingVisit && (
-                <div className="p-3 border border-blue-200 rounded bg-blue-50/50 mb-4">
-                  <div className="font-semibold text-blue-900 mb-2">Property Owner Onboarding</div>
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input type="checkbox" name="createOwnerRequest" value="true" className="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
-                    <div>
-                      <span className="text-sm font-medium text-gray-900 block">Send Owner Onboarding Request to Superadmin</span>
-                      <span className="text-xs text-gray-500">Automatically creates a pending request for the property owner to complete their Digital KYC and receive login credentials once approved by Superadmin.</span>
-                    </div>
-                  </label>
-                </div>
-              )}
-
-              <div className="p-3 border-2 border-purple-300 rounded bg-purple-50">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="inline-flex items-center justify-center w-6 h-6 bg-purple-600 text-white rounded-full text-xs font-bold">1</span>
-                  <h3 className="font-bold text-purple-900">Live Capture (Required)</h3>
-                </div>
-                <p className="text-xs text-purple-700 mb-3">Capture property details using your device camera (up to 5 photos per area)</p>
-
-                {[
-                  { key: "photo_building", label: "Building Front (required)" },
-                  { key: "photo_room", label: "Room Interior (required)" },
-                  { key: "photo_bathroom", label: "Bathroom (required)" },
-                  { key: "photo_bed", label: "Bed / Interior (required)" }
-                ].map((item) => {
-                  const images = captureGroups[item.key] || [];
-                  const last = images[images.length - 1];
-                  return (
-                    <div key={item.key} className="block text-xs border border-gray-200 rounded p-2 bg-white mb-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium">{item.label}</span>
-                        <button type="button" onClick={() => openCamera(item.key)} className="text-xs px-2 py-1 bg-purple-50 text-purple-700 rounded">Capture</button>
+                      <div>
+                        <h4 className="text-[11px] font-bold text-foreground uppercase tracking-widest">Basic Details</h4>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Auto-generated visit info and property classification</p>
                       </div>
-                      <div className="w-full h-28 bg-gray-100 rounded border border-gray-200 flex items-center justify-center text-gray-400 mb-2 overflow-hidden">
-                        {last ? <img src={last} className="w-full h-full object-cover" /> : "No photo"}
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 mb-3">
+                      <div>
+                        <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Visit Date & Time</label>
+                        <input type="text" readOnly className="w-full border border-border bg-muted/50 text-muted-foreground rounded-xl px-3 py-2.5 text-[13px] cursor-not-allowed" value={visitDateDisplay} />
                       </div>
-                      <div className="flex gap-1 overflow-x-auto" style={{ maxHeight: 40 }}>
-                        {images.map((src, idx) => (
-                          <img key={`${item.key}-${idx}`} src={src} className="w-10 h-10 object-cover rounded border" />
+                      <div>
+                        <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Staff Name</label>
+                        <input type="text" name="staffName" readOnly className="w-full border border-border bg-muted/50 text-muted-foreground rounded-xl px-3 py-2.5 text-[13px] cursor-not-allowed" value={staffName} />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Staff ID</label>
+                        <input type="text" name="staffId" readOnly className="w-full border border-border bg-muted/50 text-muted-foreground rounded-xl px-3 py-2.5 text-[13px] cursor-not-allowed" value={staffId} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Property ID</label>
+                        <div className="relative">
+                          <input name="propertyId" type="text" readOnly className="w-full border border-border bg-muted/50 text-muted-foreground rounded-xl px-3 py-2.5 text-[13px] cursor-not-allowed pr-28" value={propertyId} />
+                          <button type="button" onClick={generatePropertyId} disabled={!!editingVisit} className="absolute right-2 top-1/2 -translate-y-1/2 bg-card border border-border text-foreground px-2.5 py-1 rounded-lg text-[10px] font-bold hover:bg-muted transition-all disabled:opacity-40">
+                            Regenerate
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Property Type</label>
+                        <select name="propertyType" className="w-full border border-input bg-card text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all" defaultValue={editingVisit?.propertyType || "PG"}>
+                          <option value="PG">PG</option>
+                          <option value="Hostel">Hostel</option>
+                          <option value="Room">Room</option>
+                          <option value="Flat">Flat</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 2: Property Details */}
+                {step === 2 && (
+                  <div className="space-y-4">
+                    {/* Property Info */}
+                    <div className="bg-card border border-border rounded-2xl p-5 shadow-soft">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1 h-4 bg-violet-500 rounded-full flex-shrink-0" />
+                        <span className="text-[10px] font-bold text-foreground uppercase tracking-widest">Property Information</span>
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Property Name *</label>
+                          <input name="name" type="text" required defaultValue={editingVisit?.propertyName || ""} className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground" placeholder="e.g. Sunrise PG for Boys" />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Full Address *</label>
+                          <textarea name="address" rows="2" required defaultValue={editingVisit?.address || ""} className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground resize-none" placeholder="Street, Area, City, Pin Code"></textarea>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Area / Locality</label>
+                            <input name="areaLocality" type="text" readOnly className="w-full border border-border bg-muted/50 text-muted-foreground rounded-xl px-3 py-2.5 text-[13px] cursor-not-allowed" value={areaName} />
+                          </div>
+                          <div>
+                            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Landmark</label>
+                            <input name="landmark" type="text" defaultValue={editingVisit?.landmark || ""} className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground" placeholder="Nearby landmark" />
+                          </div>
+                          <div>
+                            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Nearby Location</label>
+                            <input name="nearbyLocation" type="text" defaultValue={editingVisit?.nearbyLocation || ""} className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground" placeholder="Nearby location" />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Gender Preference</label>
+                          <select name="gender" className="w-full border border-input bg-card text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all" defaultValue={editingVisit?.gender || ""}>
+                            <option value="">Select Gender Preference</option>
+                            <option value="Male Only">Male Only</option>
+                            <option value="Female Only">Female Only</option>
+                            <option value="Co-Ed">Co-Ed</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Owner Info */}
+                    <div className="bg-card border border-border rounded-2xl p-5 shadow-soft">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1 h-4 bg-indigo-500 rounded-full flex-shrink-0" />
+                        <span className="text-[10px] font-bold text-foreground uppercase tracking-widest">Owner Information</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Owner Name *</label>
+                          <input name="ownerName" type="text" required defaultValue={editingVisit?.ownerName || ""} className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground" placeholder="Full name" />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Contact Number *</label>
+                          <input name="contactPhone" type="tel" required defaultValue={editingVisit?.contactPhone || editingVisit?.ownerPhone || ""} className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground" placeholder="+91 XXXXX XXXXX" />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Email Address *</label>
+                          <input name="ownerEmail" type="email" required defaultValue={editingVisit?.ownerEmail || ""} className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground" placeholder="owner@gmail.com" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Amenities */}
+                    <div className="bg-card border border-border rounded-2xl p-5 shadow-soft">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1 h-4 bg-emerald-500 rounded-full flex-shrink-0" />
+                        <span className="text-[10px] font-bold text-foreground uppercase tracking-widest">Amenities</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-y-3 gap-x-3">
+                        {["Wi-Fi", "Drinking water", "Food", "Power backup", "Washing machine", "Parking", "CCTV"].map((a) => (
+                          <label key={a} className="inline-flex items-center gap-2 text-[11px] text-foreground cursor-pointer group">
+                            <input type="checkbox" name="amenities" value={a} className="rounded border-input text-violet-600 focus:ring-violet-500 w-3.5 h-3.5" defaultChecked={editingVisit?.amenities?.some(x => x?.toLowerCase() === a?.toLowerCase())} />
+                            <span className="group-hover:text-violet-600 transition-colors">{a}</span>
+                          </label>
                         ))}
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">{images.length}/5 captures</p>
                     </div>
-                  );
-                })}
 
-                <div className="mt-3">
-                  <label className="block text-xs mb-1 font-medium text-gray-700">Additional Live Photos (optional, max 11)</label>
-                  <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => openCamera("photo_extra")} className="text-xs px-3 py-2 bg-gray-100 rounded hover:bg-gray-200">Capture Extra</button>
-                    <div className="flex gap-2 overflow-x-auto" style={{ maxHeight: 72 }}>
-                      {(captureGroups.photo_extra || []).map((src, idx) => (
-                        <img key={`extra-${idx}`} src={src} className="w-16 h-16 object-cover rounded border" />
-                      ))}
+                    {/* Pricing */}
+                    <div className="bg-card border border-border rounded-2xl p-5 shadow-soft">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1 h-4 bg-amber-500 rounded-full flex-shrink-0" />
+                        <span className="text-[10px] font-bold text-foreground uppercase tracking-widest">Pricing & Occupancy</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-3 mb-3">
+                        {[
+                          { name: "monthlyRent", label: "Monthly Rent", placeholder: "₹0", val: editingVisit?.monthlyRent },
+                          { name: "deposit", label: "Deposit", placeholder: "₹0", val: editingVisit?.deposit },
+                          { name: "vacantRooms", label: "Vacant Rooms", placeholder: "0", val: editingVisit?.vacantRooms },
+                          { name: "vacantBeds", label: "Beds (Vacant)", placeholder: "0", val: editingVisit?.vacantBeds }
+                        ].map(f => (
+                          <div key={f.name}>
+                            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">{f.label}</label>
+                            <input name={f.name} type="number" min="0" className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground" placeholder={f.placeholder} defaultValue={f.val || ""} />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-4 gap-3 mb-3">
+                        {[
+                          { name: "occupiedRooms", label: "Occupied Rooms", placeholder: "0", val: editingVisit?.occupiedRooms },
+                          { name: "occupiedBeds", label: "Beds (Occupied)", placeholder: "0", val: editingVisit?.occupiedBeds },
+                          { name: "electricityCharges", label: "Electricity/mo", placeholder: "₹0", val: editingVisit?.electricityCharges },
+                          { name: "foodCharges", label: "Food/mo", placeholder: "₹0", val: editingVisit?.foodCharges }
+                        ].map(f => (
+                          <div key={f.name}>
+                            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">{f.label}</label>
+                            <input name={f.name} type="number" min="0" className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground" placeholder={f.placeholder} defaultValue={f.val || ""} />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Maintenance/mo</label>
+                          <input name="maintenanceCharges" type="number" min="0" className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground" placeholder="₹0" defaultValue={editingVisit?.maintenanceCharges || ""} />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Min. Stay (months)</label>
+                          <input name="minStay" type="number" min="0" className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground" placeholder="0" defaultValue={editingVisit?.minStay || ""} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* House Rules */}
+                    <div className="bg-card border border-border rounded-2xl p-5 shadow-soft">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1 h-4 bg-rose-500 rounded-full flex-shrink-0" />
+                        <span className="text-[10px] font-bold text-foreground uppercase tracking-widest">House Rules</span>
+                      </div>
+                      <div className="mb-4">
+                        <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Entry / Exit Timing</label>
+                        <input name="entryExit" type="text" className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground" placeholder="e.g. 6 AM – 11 PM" defaultValue={editingVisit?.entryExit || ""} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { id: "visitorsAllowed", label: "Visitors Allowed", value: visitorsAllowed },
+                          { id: "cookingAllowed", label: "Cooking Allowed", value: cookingAllowed },
+                          { id: "smokingAllowed", label: "Smoking Allowed", value: smokingAllowed },
+                          { id: "petsAllowed", label: "Pets Allowed", value: petsAllowed }
+                        ].map((item) => (
+                          <div key={item.id} className="bg-muted/30 border border-border rounded-xl p-3">
+                            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-2.5">{item.label}</label>
+                            <div className="flex gap-2">
+                              <button type="button" onClick={() => setToggleValue(item.id, "Yes")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold border-2 transition-all ${item.value === "Yes" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-border text-muted-foreground hover:border-emerald-200"}`}>Yes</button>
+                              <button type="button" onClick={() => setToggleValue(item.id, "No")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold border-2 transition-all ${item.value === "No" ? "border-rose-500 bg-rose-50 text-rose-700" : "border-border text-muted-foreground hover:border-rose-200"}`}>No</button>
+                            </div>
+                            <input type="hidden" name={item.id} value={item.value} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Bank Details */}
+                    <div className="bg-card border border-border rounded-2xl p-5 shadow-soft">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1 h-4 bg-sky-500 rounded-full flex-shrink-0" />
+                        <span className="text-[10px] font-bold text-foreground uppercase tracking-widest">Bank Details</span>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Account Holder Name</label>
+                            <input name="bankAccountHolderName" type="text" className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground" placeholder="Full name on account" defaultValue={editingVisit?.bankAccountHolderName || ""} />
+                          </div>
+                          <div>
+                            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Account Number</label>
+                            <input name="bankAccountNumber" type="text" className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground" placeholder="Bank account number" defaultValue={editingVisit?.bankAccountNumber || ""} />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">IFSC Code</label>
+                            <input name="bankIfscCode" type="text" className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground" placeholder="e.g. SBIN0001234" defaultValue={editingVisit?.bankIfscCode || ""} />
+                          </div>
+                          <div>
+                            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Bank Name</label>
+                            <input name="bankName" type="text" className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground" placeholder="e.g. State Bank of India" defaultValue={editingVisit?.bankName || ""} />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Branch Name</label>
+                            <input name="bankBranchName" type="text" className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground" placeholder="Branch name" defaultValue={editingVisit?.bankBranchName || ""} />
+                          </div>
+                          <div>
+                            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">UPI ID <span className="font-normal text-muted-foreground/60">(optional)</span></label>
+                            <input name="bankUpiId" type="text" className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground" placeholder="e.g. name@upi" defaultValue={editingVisit?.bankUpiId || ""} />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-400 mt-2">{(captureGroups.photo_extra || []).length} selected</p>
-                </div>
-              </div>
+                )}
 
-              <div className="p-3 border-2 border-blue-300 rounded bg-blue-50">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-600 text-white rounded-full text-xs font-bold">2</span>
-                  <h3 className="font-bold text-blue-900">Professional Photos (From Gallery)</h3>
-                </div>
-                <p className="text-xs text-blue-700 mb-3">Upload high-quality professional photos from your device gallery (up to 10 photos)</p>
-                <button type="button" onClick={openProfModal} className="w-full py-2 px-3 bg-blue-600 text-white rounded font-medium text-sm hover:bg-blue-700 transition flex items-center justify-center gap-2">
-                  <i data-lucide="images" className="w-4 h-4"></i> Add Prof. Photos from Gallery
-                </button>
-                <div className="mt-3 p-2 bg-white border border-gray-200 rounded min-h-12 flex items-center justify-center">
-                  {profPhotos.length > 0 ? (
-                    <div className="flex gap-2 flex-wrap w-full">
-                      {profPhotos.map((p, i) => (
-                        <div key={`prof-${i}`} className="relative">
-                          <img src={p} className="w-16 h-16 object-cover rounded border border-blue-300" />
-                          <span className="absolute -top-2 -right-2 bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">{i + 1}</span>
+                {/* Step 3: Gallery */}
+                {step === 3 && (
+                  <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-soft">
+                    <div className="px-5 py-4 border-b border-border bg-gradient-to-r from-blue-50 to-indigo-50/50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <Images className="w-4 h-4 text-white" />
                         </div>
-                      ))}
+                        <div>
+                          <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-widest">Professional Gallery</h4>
+                          <p className="text-[10px] text-slate-500 mt-0.5">Upload high-quality photos from your device (up to 10)</p>
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    <p className="text-xs text-gray-400">No professional photos selected yet</p>
-                  )}
-                </div>
+                    <div className="p-5 space-y-4">
+                      <button type="button" onClick={openProfModal} className="w-full py-3 px-4 bg-blue-600 text-white rounded-xl font-bold text-[13px] hover:bg-blue-700 active:bg-blue-800 transition-all shadow-sm flex items-center justify-center gap-2">
+                        <Upload className="w-4 h-4" /> Select Photos from Gallery
+                      </button>
+                      <div className="border-2 border-dashed border-border rounded-xl p-4 min-h-24">
+                        {profPhotos.length > 0 ? (
+                          <div className="flex gap-2 flex-wrap">
+                            {profPhotos.map((p, i) => (
+                              <div key={`prof-${i}`} className="relative">
+                                <img src={p} className="w-16 h-16 object-cover rounded-xl border border-blue-100 shadow-sm" />
+                                <div className="absolute -top-1.5 -right-1.5 bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold shadow-sm">{i + 1}</div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-16 gap-1.5">
+                            <ImageOff className="w-6 h-6 text-muted-foreground/50" />
+                            <p className="text-[11px] text-muted-foreground">No professional photos selected yet</p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-muted-foreground">{profPhotos.length}/10 photos selected</span>
+                        {profPhotos.length > 0 && <span className="text-[10px] text-blue-600 font-bold">{profPhotos.length} photo{profPhotos.length > 1 ? 's' : ''} ready</span>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 4: Live Capture */}
+                {step === 4 && (() => {
+                  const images = captureGroups.photo_building || [];
+                  const last = images[images.length - 1];
+                  return (
+                    <div className="space-y-3">
+                      <div className="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-100 rounded-2xl px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                            <Camera className="w-4 h-4 text-white" />
+                          </div>
+                          <div>
+                            <h4 className="text-[11px] font-bold text-violet-900 uppercase tracking-widest">Live Camera Capture</h4>
+                            <p className="text-[10px] text-violet-600 mt-0.5">Capture live property photos using your device camera (up to 5)</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-card border border-border rounded-2xl p-4 shadow-soft">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center border border-violet-100 flex-shrink-0">
+                              <Camera className="w-3.5 h-3.5" />
+                            </div>
+                            <span className="text-[11px] font-bold text-foreground">Live Property Photos</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">{images.length}/5</span>
+                            <button type="button" onClick={() => openCamera("photo_building")} className="text-[11px] px-3 py-1.5 bg-violet-50 text-violet-700 rounded-lg border border-violet-100 font-bold hover:bg-violet-100 transition-all flex items-center gap-1.5">
+                              <Camera className="w-3 h-3" /> Capture
+                            </button>
+                          </div>
+                        </div>
+                        <div className="w-full h-40 bg-muted/50 rounded-xl border border-border flex items-center justify-center mb-3 overflow-hidden">
+                          {last ? <img src={last} className="w-full h-full object-cover rounded-xl" /> : (
+                            <div className="flex flex-col items-center gap-1.5">
+                              <CameraOff className="w-6 h-6 text-muted-foreground/40" />
+                              <span className="text-[10px] text-muted-foreground/60">No photo captured yet</span>
+                              <span className="text-[9px] text-muted-foreground/40">Click Capture to start</span>
+                            </div>
+                          )}
+                        </div>
+                        {images.length > 0 && (
+                          <div className="flex gap-1.5 overflow-x-auto pb-1 mb-2">
+                            {images.map((src, idx) => (
+                              <img key={`live-${idx}`} src={src} className="w-12 h-12 object-cover rounded-lg border border-violet-100 flex-shrink-0 shadow-sm" />
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-[10px] text-muted-foreground">{images.length}/5 photos captured</p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Step 5: Review & Submit */}
+                {step === 5 && (
+                  <div className="space-y-4">
+
+                    {/* Full form review summary */}
+                    <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-soft">
+                      <div className="px-5 py-3.5 bg-gradient-to-r from-violet-50 to-purple-50 border-b border-border flex items-center gap-2">
+                        <ClipboardList className="w-4 h-4 text-violet-600" />
+                        <h4 className="text-[11px] font-bold text-violet-900 uppercase tracking-widest">Review Your Submission</h4>
+                        <span className="ml-auto text-[10px] text-violet-500 font-medium">Check for any wrong inputs</span>
+                      </div>
+                      <div className="p-5 space-y-4 text-[11px]">
+
+                        {/* Basic Details */}
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <div className="w-1 h-3 bg-violet-500 rounded-full" />
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Basic Details</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-y-1.5 gap-x-4 bg-muted/30 rounded-xl p-3">
+                            <div><span className="text-muted-foreground">Visit Date: </span><span className="font-semibold">{visitDateDisplay || "—"}</span></div>
+                            <div><span className="text-muted-foreground">Staff: </span><span className="font-semibold">{staffName || "—"}</span></div>
+                            <div><span className="text-muted-foreground">Staff ID: </span><span className="font-semibold">{staffId || "—"}</span></div>
+                            <div><span className="text-muted-foreground">Property ID: </span><span className="font-semibold">{propertyId || "—"}</span></div>
+                            <div><span className="text-muted-foreground">Type: </span><span className="font-semibold">{formSnapshot.propertyType || "—"}</span></div>
+                          </div>
+                        </div>
+
+                        {/* Property Info */}
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <div className="w-1 h-3 bg-blue-500 rounded-full" />
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Property Info</span>
+                          </div>
+                          <div className="space-y-1.5 bg-muted/30 rounded-xl p-3">
+                            <div><span className="text-muted-foreground">Name: </span><span className="font-semibold">{formSnapshot.name || "—"}</span></div>
+                            <div><span className="text-muted-foreground">Address: </span><span className="font-semibold">{formSnapshot.address || "—"}</span></div>
+                            <div className="grid grid-cols-2 gap-x-4">
+                              <div><span className="text-muted-foreground">Landmark: </span><span className="font-semibold">{formSnapshot.landmark || "—"}</span></div>
+                              <div><span className="text-muted-foreground">Nearby: </span><span className="font-semibold">{formSnapshot.nearbyLocation || "—"}</span></div>
+                            </div>
+                            <div><span className="text-muted-foreground">Gender Preference: </span><span className="font-semibold">{formSnapshot.gender || "—"}</span></div>
+                          </div>
+                        </div>
+
+                        {/* Owner Info */}
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <div className="w-1 h-3 bg-emerald-500 rounded-full" />
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Owner Info</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-y-1.5 gap-x-4 bg-muted/30 rounded-xl p-3">
+                            <div className="col-span-2"><span className="text-muted-foreground">Name: </span><span className="font-semibold">{formSnapshot.ownerName || "—"}</span></div>
+                            <div><span className="text-muted-foreground">Phone: </span><span className="font-semibold">{formSnapshot.contactPhone || "—"}</span></div>
+                            <div><span className="text-muted-foreground">Email: </span><span className="font-semibold">{formSnapshot.ownerEmail || "—"}</span></div>
+                          </div>
+                        </div>
+
+                        {/* Pricing & Occupancy */}
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <div className="w-1 h-3 bg-amber-500 rounded-full" />
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Pricing & Occupancy</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-y-1.5 gap-x-3 bg-muted/30 rounded-xl p-3">
+                            <div><span className="text-muted-foreground">Rent: </span><span className="font-semibold">{formSnapshot.monthlyRent ? `₹${formSnapshot.monthlyRent}` : "—"}</span></div>
+                            <div><span className="text-muted-foreground">Deposit: </span><span className="font-semibold">{formSnapshot.deposit ? `₹${formSnapshot.deposit}` : "—"}</span></div>
+                            <div><span className="text-muted-foreground">Min Stay: </span><span className="font-semibold">{formSnapshot.minStay ? `${formSnapshot.minStay}m` : "—"}</span></div>
+                            <div><span className="text-muted-foreground">Vacant Rooms: </span><span className="font-semibold">{formSnapshot.vacantRooms || "—"}</span></div>
+                            <div><span className="text-muted-foreground">Vacant Beds: </span><span className="font-semibold">{formSnapshot.vacantBeds || "—"}</span></div>
+                            <div><span className="text-muted-foreground">Electricity: </span><span className="font-semibold">{formSnapshot.electricityCharges ? `₹${formSnapshot.electricityCharges}` : "—"}</span></div>
+                          </div>
+                        </div>
+
+                        {/* House Rules */}
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <div className="w-1 h-3 bg-rose-500 rounded-full" />
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">House Rules</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-y-1.5 gap-x-4 bg-muted/30 rounded-xl p-3">
+                            <div><span className="text-muted-foreground">Visitors: </span><span className={`font-semibold ${visitorsAllowed === "Yes" ? "text-emerald-600" : "text-rose-600"}`}>{visitorsAllowed}</span></div>
+                            <div><span className="text-muted-foreground">Cooking: </span><span className={`font-semibold ${cookingAllowed === "Yes" ? "text-emerald-600" : "text-rose-600"}`}>{cookingAllowed}</span></div>
+                            <div><span className="text-muted-foreground">Smoking: </span><span className={`font-semibold ${smokingAllowed === "Yes" ? "text-rose-600" : "text-emerald-600"}`}>{smokingAllowed}</span></div>
+                            <div><span className="text-muted-foreground">Pets: </span><span className={`font-semibold ${petsAllowed === "Yes" ? "text-emerald-600" : "text-rose-600"}`}>{petsAllowed}</span></div>
+                            {formSnapshot.entryExit && <div className="col-span-2"><span className="text-muted-foreground">Entry/Exit: </span><span className="font-semibold">{formSnapshot.entryExit}</span></div>}
+                          </div>
+                        </div>
+
+                        {/* Amenities */}
+                        {(formSnapshot.amenities || []).length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-1.5 mb-2">
+                              <div className="w-1 h-3 bg-teal-500 rounded-full" />
+                              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Amenities ({formSnapshot.amenities.length})</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5 bg-muted/30 rounded-xl p-3">
+                              {formSnapshot.amenities.map((a, i) => (
+                                <span key={i} className="text-[10px] px-2 py-0.5 bg-teal-50 text-teal-700 border border-teal-100 rounded-lg font-medium">{a}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Bank Details */}
+                        {formSnapshot.bankAccountNumber && (
+                          <div>
+                            <div className="flex items-center gap-1.5 mb-2">
+                              <div className="w-1 h-3 bg-sky-500 rounded-full" />
+                              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Bank Details</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-y-1.5 gap-x-4 bg-muted/30 rounded-xl p-3">
+                              <div className="col-span-2"><span className="text-muted-foreground">Account Holder: </span><span className="font-semibold">{formSnapshot.bankAccountHolderName || "—"}</span></div>
+                              <div><span className="text-muted-foreground">Account No: </span><span className="font-semibold">{"****" + formSnapshot.bankAccountNumber.slice(-4)}</span></div>
+                              <div><span className="text-muted-foreground">IFSC: </span><span className="font-semibold">{formSnapshot.bankIfscCode || "—"}</span></div>
+                              <div><span className="text-muted-foreground">Bank: </span><span className="font-semibold">{formSnapshot.bankName || "—"}</span></div>
+                              {formSnapshot.bankUpiId && <div><span className="text-muted-foreground">UPI: </span><span className="font-semibold">{formSnapshot.bankUpiId}</span></div>}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Photos */}
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <div className="w-1 h-3 bg-indigo-500 rounded-full" />
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Photos</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-100">
+                              <span className="text-xl font-bold text-blue-700">{profPhotos.length}</span>
+                              <p className="text-[9px] text-blue-600 font-bold uppercase tracking-widest mt-0.5">Gallery Photos</p>
+                            </div>
+                            <div className="bg-violet-50 rounded-xl p-3 text-center border border-violet-100">
+                              <span className="text-xl font-bold text-violet-700">{(captureGroups.photo_building || []).length}</span>
+                              <p className="text-[9px] text-violet-600 font-bold uppercase tracking-widest mt-0.5">Live Captures</p>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+
+                    {/* Staff Assessment (simplified) */}
+                    <div className="bg-card border border-border rounded-2xl p-5 shadow-soft">
+                      <div className="flex items-center gap-3 mb-5 pb-4 border-b border-border">
+                        <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center flex-shrink-0">
+                          <Star className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-[11px] font-bold text-foreground uppercase tracking-widest">Staff Assessment</h4>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Rate the property for internal reporting</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-5">
+                        <div>
+                          <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-2">Cleanliness Rating</label>
+                          {renderStars(cleanlinessRating, "cleanlinessRating")}
+                          <input type="hidden" name="cleanlinessRating" value={cleanlinessRating} />
+                          <p className="text-[10px] text-muted-foreground mt-1.5">{cleanlinessRating ? `${cleanlinessRating}/5 stars` : "Click stars to rate"}</p>
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-2">Owner Behaviour</label>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {["Good", "Average", "Poor"].map((val) => (
+                              <button key={val} type="button" onClick={() => setOwnerBehaviour(val)} className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border-2 transition-all ${ownerBehaviourPublic === val ? val === "Good" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : val === "Average" ? "border-amber-500 bg-amber-50 text-amber-700" : "border-rose-500 bg-rose-50 text-rose-700" : "border-border text-muted-foreground hover:bg-muted"}`}>{val}</button>
+                            ))}
+                          </div>
+                          <input type="hidden" name="ownerBehaviourPublic" value={ownerBehaviourPublic} />
+                          <p className="text-[10px] text-muted-foreground mt-1.5">{ownerBehaviourPublic ? `Selected: ${ownerBehaviourPublic}` : "Select behaviour"}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Internal Notes */}
+                    <div className="bg-card border border-border rounded-2xl p-5 shadow-soft">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1 h-4 bg-slate-400 rounded-full flex-shrink-0" />
+                        <span className="text-[10px] font-bold text-foreground uppercase tracking-widest">Internal Notes</span>
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Student Reviews Feedback</label>
+                          <textarea name="studentReviews" rows="2" className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground resize-none" placeholder="Summarize student feedback..." defaultValue={editingVisit?.studentReviews || ""}></textarea>
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Internal Remarks (Private)</label>
+                          <textarea name="internalRemarks" rows="2" className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground resize-none" placeholder="Internal notes for the team..." defaultValue={editingVisit?.internalRemarks || ""}></textarea>
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Cleanliness Note (Private)</label>
+                          <textarea name="cleanlinessNote" rows="2" className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground resize-none" placeholder="Cleanliness observations..." defaultValue={editingVisit?.cleanlinessNote || ""}></textarea>
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Owner Behaviour Note (Private)</label>
+                          <textarea name="ownerBehaviour" rows="2" className="w-full border border-input bg-background text-foreground rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all placeholder:text-muted-foreground resize-none" placeholder="Behaviour observations..." defaultValue={editingVisit?.ownerBehaviour || ""}></textarea>
+                        </div>
+                      </div>
+                    </div>
+
+                    {!editingVisit && (
+                      <div className="bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl p-5">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-8 h-8 rounded-xl bg-violet-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                            <UserPlus className="w-4 h-4" />
+                          </div>
+                          <h4 className="text-[11px] font-bold text-violet-900 uppercase tracking-widest">Owner Onboarding</h4>
+                        </div>
+                        <label className="flex items-start gap-3 cursor-pointer p-3 bg-white/60 rounded-xl border border-violet-100 hover:bg-white/80 transition-all">
+                          <input type="checkbox" name="createOwnerRequest" value="true" className="mt-0.5 w-4 h-4 text-violet-600 rounded border-input focus:ring-violet-500 flex-shrink-0" />
+                          <div>
+                            <span className="text-[12px] font-semibold text-foreground block leading-snug">Send Owner Onboarding Request to Superadmin</span>
+                            <span className="text-[10px] text-muted-foreground mt-1 block leading-relaxed">Automatically creates a pending request for Digital KYC and login credentials once approved.</span>
+                          </div>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                )}
+
               </div>
 
-              <button type="submit" className="w-full bg-purple-600 text-white py-2 rounded text-sm font-medium hover:bg-purple-700">{editingVisit ? "Update Report" : "Submit Report"}</button>
+              {/* Navigation Footer */}
+              <div className="px-6 py-4 border-t border-border flex items-center justify-between gap-3 bg-muted/20 flex-shrink-0">
+                {step > 1 ? (
+                  <button type="button" onClick={() => setStep(s => s - 1)} className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl border-2 border-border text-[12px] font-bold text-foreground hover:bg-muted transition-all">
+                    <ArrowLeft className="w-3.5 h-3.5" /> Back
+                  </button>
+                ) : <div />}
+                {step < 5 ? (
+                  <button type="button" onClick={handleContinue} className="flex-1 inline-flex items-center justify-center gap-1.5 bg-violet-600 text-white py-2.5 rounded-xl text-[12px] font-bold hover:bg-violet-700 active:scale-[0.98] transition-all shadow-sm">
+                    Continue <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => submitVisit()} className="flex-1 inline-flex items-center justify-center gap-1.5 bg-violet-600 text-white py-2.5 rounded-xl text-[12px] font-bold hover:bg-violet-700 active:scale-[0.98] transition-all shadow-sm">
+                    <Send className="w-3.5 h-3.5" /> {editingVisit ? "Update Report" : "Submit Report"}
+                  </button>
+                )}
+              </div>
             </form>
           </div>
         </div>
       )}
 
       {showProfModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[65]">
-          <div className="bg-white rounded-lg w-full max-w-lg p-4 shadow-xl">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="font-bold">Upload Professional Photos (up to 10)</h3>
-              <button onClick={closeProfModal} className="text-gray-600 px-2 py-1">Close</button>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[65] p-4">
+          <div className="bg-card rounded-2xl w-full max-w-lg shadow-pop border border-border overflow-hidden">
+            <div className="h-[3px] bg-gradient-to-r from-blue-500 to-indigo-500" />
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center flex-shrink-0">
+                  <Images className="w-4 h-4 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Professional Photos</h3>
+                  <p className="text-[10px] text-muted-foreground">{profPreview.length}/10 selected</p>
+                </div>
+              </div>
+              <button onClick={closeProfModal} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-muted text-muted-foreground transition-all">
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <div className="space-y-3">
-              <div className="w-full min-h-[88px] bg-gray-50 rounded overflow-hidden border border-gray-200 p-2 grid grid-cols-4 gap-2 items-start">
+            <div className="p-5 space-y-4">
+              <div className="border-2 border-dashed border-border rounded-2xl p-3 min-h-24">
                 {profPreview.length === 0 ? (
-                  <div className="col-span-4 text-xs text-gray-400">No photos selected</div>
+                  <div className="flex flex-col items-center justify-center h-20 gap-2">
+                    <ImagePlus className="w-6 h-6 text-muted-foreground/50" />
+                    <p className="text-[11px] text-muted-foreground">No photos selected yet</p>
+                  </div>
                 ) : (
-                  profPreview.map((src, i) => (
-                    <div key={`preview-${i}`} className="relative w-full h-24 overflow-hidden rounded">
-                      <img src={src} className="w-full h-full object-cover rounded" />
-                      <button type="button" onClick={() => removeProfPhoto(i)} className="absolute top-1 right-1 bg-white/80 text-red-600 rounded-full p-1 text-xs">✕</button>
-                    </div>
-                  ))
+                  <div className="grid grid-cols-4 gap-2">
+                    {profPreview.map((src, i) => (
+                      <div key={`preview-${i}`} className="relative group rounded-xl overflow-hidden aspect-square">
+                        <img src={src} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-all rounded-xl" />
+                        <button type="button" onClick={() => removeProfPhoto(i)} className="absolute top-1 right-1 bg-white text-rose-600 rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold shadow-sm hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100">✕</button>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-              <div className="text-center">
-                <input type="file" accept="image/*" multiple onChange={(e) => handleProfInput(e.target.files)} className="mx-auto" />
-              </div>
+              <label className="flex items-center justify-center gap-2 w-full py-2.5 px-4 border-2 border-dashed border-blue-200 text-blue-600 rounded-xl font-bold text-[12px] hover:border-blue-400 hover:bg-blue-50 transition-all cursor-pointer">
+                <UploadCloud className="w-4 h-4" /> Choose Photos from Device
+                <input type="file" accept="image/*" multiple onChange={(e) => handleProfInput(e.target.files)} className="hidden" />
+              </label>
               <div className="flex gap-2 justify-end">
-                <button type="button" onClick={saveProfPhotos} className="px-3 py-2 bg-blue-600 text-white rounded">Save Photos</button>
-                <button type="button" onClick={closeProfModal} className="px-3 py-2 bg-gray-100 rounded">Cancel</button>
+                <button type="button" onClick={closeProfModal} className="px-4 py-2 rounded-xl border border-border text-[12px] font-bold text-foreground hover:bg-muted transition-all">Cancel</button>
+                <button type="button" onClick={saveProfPhotos} className="px-5 py-2 bg-blue-600 text-white rounded-xl text-[12px] font-bold hover:bg-blue-700 transition-all shadow-sm">Save Photos</button>
               </div>
             </div>
           </div>
@@ -1267,19 +1717,16 @@ export default function Visit() {
       )}
 
       {submitSuccessMsg && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[90] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
-            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
-              <i data-lucide="check-circle-2" className="w-8 h-8 text-green-600"></i>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[90] p-4">
+          <div className="bg-card rounded-2xl shadow-pop border border-border max-w-sm w-full p-8 text-center overflow-hidden relative">
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-emerald-400 to-emerald-600" />
+            <div className="w-16 h-16 mx-auto mb-5 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg">
+              <Check className="w-8 h-8 text-white" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Report Submitted</h3>
-            <p className="text-sm text-gray-600 mb-5">{submitSuccessMsg}</p>
-            <button
-              type="button"
-              onClick={() => setSubmitSuccessMsg("")}
-              className="w-full py-2.5 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-700"
-            >
-              OK
+            <h3 className="text-lg font-bold text-foreground mb-2">Report Submitted!</h3>
+            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">{submitSuccessMsg}</p>
+            <button type="button" onClick={() => setSubmitSuccessMsg("")} className="w-full py-2.5 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-700 transition-all shadow-sm">
+              Back to Dashboard
             </button>
           </div>
         </div>
@@ -1287,59 +1734,103 @@ export default function Visit() {
 
       {showCamera && (
         <div className="fixed inset-0 bg-black z-[80]">
-          <div className="w-full h-full bg-black text-white flex flex-col">
-            <div className={cameraView === "capture" ? "h-full flex flex-col p-4 sm:p-6" : "hidden"}>
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="font-bold text-lg">Capture Photo</h3>
+          <div className="w-full h-full flex flex-col">
+
+            {/* Capture View */}
+            <div className={cameraView === "capture" ? "h-full flex flex-col relative" : "hidden"}>
+              {/* Top HUD */}
+              <div className="absolute top-0 left-0 right-0 z-10 flex justify-between items-center px-5 pt-5 pb-3 bg-gradient-to-b from-black/70 to-transparent">
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={toggleCamera} className="text-xs px-3 py-2 bg-white/20 rounded">Switch Camera</button>
-                  <button type="button" onClick={closeCamera} className="text-xs px-3 py-2 bg-white/20 rounded">Close</button>
+                  <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></div>
+                  <span className="text-white text-[11px] font-bold uppercase tracking-widest">Live Capture</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={toggleCamera} className="w-8 h-8 flex items-center justify-center bg-white/15 backdrop-blur-sm text-white rounded-xl border border-white/20 hover:bg-white/25 transition-all">
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </button>
+                  <button type="button" onClick={closeCamera} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/15 backdrop-blur-sm text-white rounded-xl border border-white/20 hover:bg-white/25 transition-all text-[11px] font-bold">
+                    <X className="w-3.5 h-3.5" /> Close
+                  </button>
                 </div>
               </div>
-              <div className="flex-1 bg-black flex items-center justify-center overflow-hidden rounded mb-3 relative min-h-[300px]">
+
+              {/* Video */}
+              <div className="flex-1 relative overflow-hidden bg-black">
                 <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}></video>
                 <canvas ref={canvasRef} style={{ display: "none" }}></canvas>
                 {cameraLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-sm">
-                    <div className="text-center">
-                      <p className="mb-2">Initializing camera...</p>
-                      <div className="inline-block w-8 h-8 border-4 border-gray-300 border-t-white rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+                    <div className="text-center text-white">
+                      <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-3"></div>
+                      <p className="text-[12px] font-semibold tracking-wide">Initializing Camera...</p>
                     </div>
                   </div>
                 )}
-              </div>
-              {cameraError ? <div className="text-sm text-red-300 mb-2">{cameraError}</div> : null}
-              {cameraLocation ? (
-                <div className="text-xs text-gray-200 mb-3">
-                  <strong>Location:</strong> <span>{cameraLocation}</span>
+                {/* Frame guides */}
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  <div className="w-52 h-52 relative">
+                    <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-white/70 rounded-tl-lg"></div>
+                    <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-white/70 rounded-tr-lg"></div>
+                    <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-white/70 rounded-bl-lg"></div>
+                    <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-white/70 rounded-br-lg"></div>
+                  </div>
                 </div>
-              ) : null}
-              <div className="flex items-center justify-end">
-                <button type="button" onClick={capturePhoto} className="px-5 py-3 bg-purple-600 text-white rounded">Capture</button>
+              </div>
+
+              {cameraError && <div className="px-4 py-2 bg-rose-900/80 text-rose-200 text-[11px] font-medium text-center">{cameraError}</div>}
+              {cameraLocation && !cameraError && (
+                <div className="px-5 py-2 bg-black/70 text-slate-300 text-[10px] flex items-center gap-1.5">
+                  <MapPin className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                  <span className="truncate">{cameraLocation}</span>
+                </div>
+              )}
+
+              {/* Capture Button */}
+              <div className="pb-10 px-6 pt-5 bg-gradient-to-t from-black/80 to-transparent flex items-center justify-center">
+                <button type="button" onClick={capturePhoto} className="w-18 h-18 rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all" style={{ width: 72, height: 72 }}>
+                  <div className="w-full h-full rounded-full bg-white/20 border-4 border-white flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-full bg-white shadow-lg"></div>
+                  </div>
+                </button>
               </div>
             </div>
 
-            <div className={cameraView === "preview" ? "h-full flex flex-col p-4 sm:p-6" : "hidden"}>
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="font-bold text-lg">Photo Preview</h3>
-                <button type="button" onClick={closeCamera} className="text-xs px-3 py-2 bg-white/20 rounded">Close</button>
+            {/* Preview View */}
+            <div className={cameraView === "preview" ? "h-full flex flex-col relative" : "hidden"}>
+              {/* Top HUD */}
+              <div className="absolute top-0 left-0 right-0 z-10 flex justify-between items-center px-5 pt-5 pb-3 bg-gradient-to-b from-black/70 to-transparent">
+                <span className="text-white text-[11px] font-bold uppercase tracking-widest">Photo Preview</span>
+                <button type="button" onClick={closeCamera} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/15 backdrop-blur-sm text-white rounded-xl border border-white/20 hover:bg-white/25 transition-all text-[11px] font-bold">
+                  <X className="w-3.5 h-3.5" /> Close
+                </button>
               </div>
-              <div className="flex-1 bg-black flex items-center justify-center overflow-hidden rounded mb-3 min-h-[300px]">
-                {capturedPreview ? (
-                  <img src={capturedPreview} alt="Captured Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : null}
+
+              {/* Preview Image */}
+              <div className="flex-1 bg-black overflow-hidden">
+                {capturedPreview && <img src={capturedPreview} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
               </div>
-              {previewLocation ? (
-                <div className="text-xs text-gray-200 mb-3">
-                  <strong>Location:</strong> <span>{previewLocation}</span>
+
+              {previewLocation && (
+                <div className="px-5 py-2 bg-black/70 text-slate-300 text-[10px] flex items-center gap-1.5">
+                  <MapPin className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                  <span className="truncate">{previewLocation}</span>
                 </div>
-              ) : null}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-                <button type="button" onClick={deleteCapture} className="px-4 py-3 bg-red-600 text-white rounded">Delete</button>
-                <button type="button" onClick={recapturePhoto} className="px-4 py-3 bg-gray-600 text-white rounded">Recapture</button>
-                <button type="button" onClick={confirmCapture} className="px-4 py-3 bg-green-600 text-white rounded">Keep Photo</button>
+              )}
+
+              {/* Action Buttons */}
+              <div className="pb-10 px-5 pt-5 bg-gradient-to-t from-black/80 to-transparent grid grid-cols-3 gap-3">
+                <button type="button" onClick={deleteCapture} className="flex items-center justify-center gap-1.5 py-3 bg-rose-600 text-white rounded-xl font-bold text-[12px] hover:bg-rose-700 active:scale-[0.97] transition-all shadow-lg">
+                  <Trash2 className="w-3.5 h-3.5" /> Discard
+                </button>
+                <button type="button" onClick={recapturePhoto} className="flex items-center justify-center gap-1.5 py-3 bg-slate-600 text-white rounded-xl font-bold text-[12px] hover:bg-slate-700 active:scale-[0.97] transition-all shadow-lg">
+                  <RotateCw className="w-3.5 h-3.5" /> Retake
+                </button>
+                <button type="button" onClick={confirmCapture} className="flex items-center justify-center gap-1.5 py-3 bg-emerald-600 text-white rounded-xl font-bold text-[12px] hover:bg-emerald-700 active:scale-[0.97] transition-all shadow-lg">
+                  <Check className="w-3.5 h-3.5" /> Keep
+                </button>
               </div>
             </div>
+
           </div>
         </div>
       )}

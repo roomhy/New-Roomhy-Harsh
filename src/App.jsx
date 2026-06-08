@@ -126,6 +126,56 @@ const ManagerRouteGuard = () => {
   return null;
 };
 
+const RouteRoleGuard = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const path = location.pathname || '';
+
+    // Only guard admin/employee routes
+    const isAdminRoute = path.startsWith('/superadmin/') && path !== '/superadmin/index';
+    const isEmployeeRoute = path.startsWith('/employee/');
+    if (!isAdminRoute && !isEmployeeRoute) return;
+
+    // If an owner session exists → they must not access these panels
+    const owner = getOwnerSession();
+    if (owner?.loginId) {
+      window.location.replace('/propertyowner/admin');
+      return;
+    }
+
+    // No owner session — check staff role
+    const getRole = () => {
+      const keys = ['user', 'staff_user', 'manager_user'];
+      for (const key of keys) {
+        try {
+          const val = sessionStorage.getItem(key) || localStorage.getItem(key);
+          if (val) {
+            const parsed = JSON.parse(val);
+            if (parsed?.role) return String(parsed.role).toLowerCase();
+          }
+        } catch (_) {}
+      }
+      return '';
+    };
+
+    const role = getRole();
+
+    if (isAdminRoute && role !== 'superadmin' && role !== 'admin') {
+      window.location.replace('/superadmin/index');
+      return;
+    }
+
+    if (isEmployeeRoute && role !== 'areamanager' && role !== 'employee') {
+      window.location.replace('/superadmin/index');
+    }
+  }, [location.pathname]);
+
+  return null;
+};
+
 const RouteChromeCleanup = () => {
   const location = useLocation();
 
@@ -183,6 +233,7 @@ export default function App() {
             <Toaster position="top-right" reverseOrder={false} />
             <InstallPWA />
             <ManagerRouteGuard />
+            <RouteRoleGuard />
             <RouteChromeCleanup />
             <Suspense fallback={<PageLoader />}>
               <Routes>

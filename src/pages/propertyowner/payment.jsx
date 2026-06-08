@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
-import { Send, Plus, Search, Wallet, CheckCircle2, Clock, AlertTriangle, Phone, MessageCircle, RefreshCw } from "lucide-react";
+import { Send, Plus, Search, Wallet, CheckCircle2, Clock, AlertTriangle, Phone, MessageCircle, RefreshCw, X, Receipt, Smartphone, CreditCard, Banknote } from "lucide-react";
 import {
   clearOwnerRuntimeSession,
   fetchOwnerTenants,
@@ -9,6 +9,7 @@ import {
 import {
   fetchRentDashboard,
   fetchInvoices,
+  fetchInvoiceById,
   sendReminder,
   recordPayment,
   generateInvoices,
@@ -115,6 +116,12 @@ export default function Payment() {
   const [payingId, setPayingId] = useState(null);
   const [generatingInvoices, setGeneratingInvoices] = useState(false);
   const [genConfirmOpen, setGenConfirmOpen] = useState(false);
+  const [historyModal, setHistoryModal] = useState(null); // { tenantName, billingMonth, payments[] }
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [payModal, setPayModal] = useState(null); // { row }
+  const [payModalMethod, setPayModalMethod] = useState("cash");
+  const [payModalAmt, setPayModalAmt] = useState(0);
+  const [payModalLoading, setPayModalLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
   const showToast = (msg, type = "success") => {
@@ -250,18 +257,54 @@ export default function Payment() {
     showToast(`Reminders queued for ${sent} tenant(s)`);
   };
 
-  const handleMarkPaid = async (row) => {
+  const openPayModal = (row) => {
     if (!row.invoice?._id) { showToast("No invoice found for this tenant. Generate invoices first.", "error"); return; }
-    setPayingId(row._id || row.id);
+    setPayModal({ row });
+    setPayModalMethod("cash");
+    setPayModalAmt(row.outstandingAmount || row.agreedRent || row.rent || 0);
+  };
+
+  const handleMarkPaid = async () => {
+    if (!payModal?.row) return;
+    const { row } = payModal;
+    setPayModalLoading(true);
     try {
-      await recordPayment(row.invoice._id, row.outstandingAmount || row.agreedRent || row.rent || 0, "cash");
+      await recordPayment(row.invoice._id, payModalAmt, payModalMethod);
       showToast(`Payment recorded for ${row.name}`);
+      setPayModal(null);
       const session = getOwnerRuntimeSession();
       if (session) loadData(session);
+      handleViewHistory(row);
     } catch (err) {
       showToast(err.message || "Failed to record payment", "error");
     } finally {
-      setPayingId(null);
+      setPayModalLoading(false);
+    }
+  };
+
+  const handleViewHistory = async (row) => {
+    if (!row.invoice?._id) return;
+    setHistoryLoading(true);
+    setHistoryModal({ tenantName: row.name, billingMonth: row.invoice.billingMonth, payments: [] });
+    try {
+      const data = await fetchInvoiceById(row.invoice._id);
+      const [yr, mo] = (data.invoice?.billingMonth || "").split("-");
+      const label = yr && mo
+        ? new Date(parseInt(yr), parseInt(mo) - 1).toLocaleString("en", { month: "long" }) + " " + yr
+        : data.invoice?.billingMonth || "";
+      setHistoryModal({
+        tenantName:   row.name,
+        billingMonth: label,
+        rentAmount:   data.invoice?.rentAmount || 0,
+        totalPaid:    data.invoice?.paidAmount || 0,
+        status:       data.invoice?.status,
+        payments:     data.payments || [],
+      });
+    } catch {
+      showToast("Could not load payment history", "error");
+      setHistoryModal(null);
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -510,15 +553,19 @@ export default function Payment() {
                               <Phone className="size-3.5" />
                             </button>
                             <button
-                              onClick={() => handleMarkPaid(t)}
-                              disabled={payingId === (t._id || t.id)}
-                              className="h-8 px-3 rounded-md bg-foreground text-background text-[11.5px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                              onClick={() => openPayModal(t)}
+                              className="h-8 px-3 rounded-md bg-foreground text-background text-[11.5px] font-medium hover:opacity-90 transition-opacity"
                             >
-                              {payingId === (t._id || t.id) ? "..." : "Mark paid"}
+                              Mark paid
                             </button>
                           </>
                         ) : (
-                          <span className="text-[11.5px] text-muted-foreground">Paid</span>
+                          <button
+                            onClick={() => handleViewHistory(t)}
+                            className="inline-flex items-center gap-1 text-[11.5px] text-emerald-600 font-medium hover:underline"
+                          >
+                            <Receipt className="size-3" /> View receipt
+                          </button>
                         )}
                       </div>
                     </td>
@@ -569,6 +616,154 @@ export default function Payment() {
                 className="flex-1 h-10 rounded-xl bg-foreground text-background text-[13px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
               >
                 {generatingInvoices ? "Generating..." : `Generate ${toGenerateCount}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Record Payment Modal */}
+      {payModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setPayModal(null)}>
+          <div className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-border">
+              <div>
+                <h2 className="font-semibold text-foreground text-[15px]">Record Payment</h2>
+                <p className="text-[12px] text-muted-foreground mt-0.5">{payModal.row.name} · {payModal.row.invoice?.billingMonth || "this month"}</p>
+              </div>
+              <button onClick={() => setPayModal(null)} className="size-8 rounded-lg hover:bg-muted grid place-items-center text-muted-foreground">
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              {/* Amount */}
+              <div>
+                <label className="text-[11.5px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Amount (₹)</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={payModalAmt}
+                  onChange={e => setPayModalAmt(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-border bg-white text-[14px] font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+
+              {/* Payment method */}
+              <div>
+                <label className="text-[11.5px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Payment Method</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { key: "upi",          label: "UPI Received",  Icon: Smartphone },
+                    { key: "bank_transfer", label: "Bank Transfer", Icon: CreditCard },
+                    { key: "cash",         label: "Cash Given",    Icon: Banknote },
+                  ].map(({ key, label, Icon }) => (
+                    <button
+                      key={key}
+                      onClick={() => setPayModalMethod(key)}
+                      className={[
+                        "flex flex-col items-center gap-1.5 py-3 rounded-xl border text-[11.5px] font-medium transition-colors",
+                        payModalMethod === key
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border bg-card text-muted-foreground hover:border-primary/40"
+                      ].join(" ")}
+                    >
+                      <Icon className="size-4" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="px-5 pb-5 flex gap-2">
+              <button
+                onClick={() => setPayModal(null)}
+                className="flex-1 h-10 rounded-xl border border-border text-[13px] font-medium hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMarkPaid}
+                disabled={payModalLoading || !payModalAmt}
+                className="flex-1 h-10 rounded-xl bg-foreground text-background text-[13px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+              >
+                {payModalLoading ? "Recording..." : "Confirm Payment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment History Modal */}
+      {historyModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setHistoryModal(null)}>
+          <div className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-border">
+              <div>
+                <h2 className="font-semibold text-foreground text-[15px]">{historyModal.tenantName}</h2>
+                <p className="text-[12px] text-muted-foreground mt-0.5">Payment history · {historyModal.billingMonth}</p>
+              </div>
+              <button onClick={() => setHistoryModal(null)} className="size-8 rounded-lg hover:bg-muted grid place-items-center text-muted-foreground">
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {/* Summary row */}
+            <div className="flex gap-3 px-5 py-3 border-b border-border bg-muted/40">
+              <div className="flex-1 text-center">
+                <div className="text-[11px] text-muted-foreground mb-0.5">Rent</div>
+                <div className="font-semibold text-[13px]">{fmt(historyModal.rentAmount)}</div>
+              </div>
+              <div className="flex-1 text-center">
+                <div className="text-[11px] text-muted-foreground mb-0.5">Total Paid</div>
+                <div className="font-semibold text-[13px] text-emerald-600">{fmt(historyModal.totalPaid)}</div>
+              </div>
+              <div className="flex-1 text-center">
+                <div className="text-[11px] text-muted-foreground mb-0.5">Status</div>
+                <div className={`font-semibold text-[12px] ${historyModal.status === "PAID" ? "text-emerald-600" : historyModal.status === "PARTIAL" ? "text-amber-500" : "text-muted-foreground"}`}>
+                  {historyModal.status || "—"}
+                </div>
+              </div>
+            </div>
+
+            {/* Payments list */}
+            <div className="px-5 py-4 max-h-72 overflow-y-auto">
+              {historyLoading ? (
+                <div className="text-center text-[13px] text-muted-foreground py-6">Loading...</div>
+              ) : historyModal.payments.length === 0 ? (
+                <div className="text-center text-[13px] text-muted-foreground py-6">No payments recorded yet</div>
+              ) : (
+                <div className="space-y-2.5">
+                  {historyModal.payments.map((p, i) => (
+                    <div key={p._id || i} className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-3.5 py-2.5">
+                      <div>
+                        <div className="text-[13px] font-medium text-foreground">{fmt(p.amount)}</div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                          {new Date(p.paymentDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                          {p.notes ? ` · ${p.notes}` : ""}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="inline-block bg-emerald-50 text-emerald-700 text-[11px] font-medium px-2 py-0.5 rounded-full capitalize">
+                          {(p.paymentMethod || "cash").replace("_", " ")}
+                        </span>
+                        {p.isPartial && (
+                          <div className="text-[10.5px] text-amber-500 mt-0.5">Partial · {fmt(p.remainingAfter)} left</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 pb-4">
+              <button
+                onClick={() => setHistoryModal(null)}
+                className="w-full h-10 rounded-xl border border-border text-[13px] font-medium hover:bg-muted transition-colors"
+              >
+                Close
               </button>
             </div>
           </div>
