@@ -1,53 +1,53 @@
-import { useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { setWebsiteSession } from "../utils/websiteSession";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
+const getApiUrl = () =>
+  import.meta.env?.VITE_API_URL ||
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+    ? "http://localhost:5001"
+    : "https://roohmy-backend-xwa9.vercel.app");
 
 export function useWebsiteLogin() {
+  const apiUrl = useMemo(() => getApiUrl(), []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const toastTimer = useRef(null);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
-    setLoading(true);
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+    if (!trimmedEmail || !trimmedPassword) {
+      setError("Please fill in all fields.");
+      return;
+    }
     setError("");
-    
+    setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
+      const response = await fetch(`${apiUrl}/api/auth/login`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ identifier: email, password })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: trimmedEmail, password: trimmedPassword })
       });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || "Login failed");
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.token && data.user) {
+        setWebsiteSession(data.user, data.token);
+        window.location.href = "/website/index";
+        return;
       }
-      
-      // Store token and user data (use 'userData' key to match AuthContext)
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("userData", JSON.stringify(data.user));
-      localStorage.setItem("userId", data.user.id);
-      localStorage.setItem("userEmail", data.user.email);
-      
-      // Redirect to home page
-      window.location.href = "/website/index";
-      
-    } catch (err) {
-      console.error("Login error:", err);
-      setError(err.message || "Login failed. Please try again.");
+      setError(data.message || "Invalid email or password.");
+    } catch {
+      setError("Network error. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiUrl, email, password]);
 
-  const handleForgot = () => {
+  const handleForgot = useCallback(() => {
     window.location.href = "/website/forgot-password";
-  };
+  }, []);
 
   return {
     email,

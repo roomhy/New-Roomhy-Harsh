@@ -11,7 +11,7 @@ import MobileBottomNav from './components/website/MobileBottomNav';
 import MobileHamburgerMenu from './components/website/MobileHamburgerMenu';
 import MobilePropertiesSection from './components/website/MobilePropertiesSection';
 import MobileVideoSection from './components/website/MobileVideoSection';
-import { fetchCities, fetchPropertyTypes, fetchProperties, trackPropertyClick } from './utils/api';
+import { fetchCities, fetchProperties, trackPropertyClick } from './utils/api';
 
 const cityAreas = {
   'Indore': ['Vijay Nagar', 'Bhawar Kuan', 'Rajwada', 'Palasia'],
@@ -333,14 +333,7 @@ export default function HomePage() {
           setCities(staticCities);
         }
 
-        // Fetch property types/offerings
-        const propertyTypesData = await fetchPropertyTypes();
-        // FORCE STATIC DATA for now as requested
-        // if (propertyTypesData && propertyTypesData.length > 0) {
-        //   setOfferings(propertyTypesData);
-        // } else {
-          setOfferings(staticOfferings);
-        // }
+        setOfferings(staticOfferings);
 
         // Fetch trending properties
         const allProperties = await fetchProperties();
@@ -369,8 +362,8 @@ export default function HomePage() {
     loadData();
   }, []);
 
-  // Search handler - search by city, area, property name, type
-  const handleSearch = async (query) => {
+  // Search handler - uses already-loaded state, no API calls
+  const handleSearch = (query) => {
     if (!query.trim()) {
       setSearchResults([]);
       setShowSearchDropdown(false);
@@ -379,16 +372,12 @@ export default function HomePage() {
 
     setIsSearching(true);
     const lowerQuery = query.toLowerCase();
-    
+
     try {
-      // Fetch all properties for search
-      const allProperties = await fetchProperties();
-      
-      // Filter and categorize results
       const results = [];
-      
+
       // 1. Search by City
-      const cityMatches = cities.filter(city => 
+      const cityMatches = cities.filter(city =>
         city.name?.toLowerCase().includes(lowerQuery)
       ).map(city => ({
         type: 'city',
@@ -398,9 +387,9 @@ export default function HomePage() {
         icon: 'MapPin'
       }));
       results.push(...cityMatches);
-      
-      // 2. Search by Property Name
-      const propertyMatches = allProperties.filter(prop => {
+
+      // 2. Search by Property Name using already-loaded trendingProperties
+      const propertyMatches = trendingProperties.filter(prop => {
         const propName = prop.propertyName || prop.property_name || prop.name || '';
         return propName.toLowerCase().includes(lowerQuery);
       }).slice(0, 5).map(prop => ({
@@ -411,9 +400,9 @@ export default function HomePage() {
         icon: 'Building2'
       }));
       results.push(...propertyMatches);
-      
+
       // 3. Search by Property Type
-      const typeMatches = offerings.filter(offering => 
+      const typeMatches = offerings.filter(offering =>
         offering.title?.toLowerCase().includes(lowerQuery) ||
         offering.category?.toLowerCase().includes(lowerQuery)
       ).map(offering => ({
@@ -424,11 +413,9 @@ export default function HomePage() {
         icon: 'Home'
       }));
       results.push(...typeMatches);
-      
+
       setSearchResults(results.slice(0, 8));
       setShowSearchDropdown(true);
-    } catch (error) {
-      console.error('Search error:', error);
     } finally {
       setIsSearching(false);
     }
@@ -815,6 +802,9 @@ export default function HomePage() {
                         src={allImages[selectedIdx]}
                         alt={offering.title}
                         className="w-full h-full object-cover transition-all duration-300"
+                        loading="lazy"
+                        width="200"
+                        height="160"
                       />
 
                       {/* Title always visible at TOP */}
@@ -878,6 +868,9 @@ export default function HomePage() {
                           src={offering.images[0]}
                           alt={offering.title}
                           className="w-full h-full object-cover"
+                          loading="lazy"
+                          width="128"
+                          height="96"
                         />
 
                         {/* Title always visible at TOP */}
@@ -979,10 +972,13 @@ export default function HomePage() {
                   className="group block cursor-pointer"
                 >
                   <div className="relative h-36 rounded-md overflow-hidden mb-2">
-                    <img 
-                      src={property.image} 
-                      alt={property.name} 
+                    <img
+                      src={property.image}
+                      alt={property.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      loading="lazy"
+                      width="300"
+                      height="144"
                       onError={(e) => {
                         e.target.src = `https://picsum.photos/600/400?random=${Math.floor(Math.random() * 100)}`;
                       }}
@@ -1046,10 +1042,13 @@ export default function HomePage() {
         >
           {/* Standalone image with rating badge */}
           <div className="relative h-24 rounded-2xl overflow-hidden shadow-md mb-2">
-            <img 
-              src={property.image} 
-              alt={property.name} 
+            <img
+              src={property.image}
+              alt={property.name}
               className="w-full h-full object-cover"
+              loading="lazy"
+              width="144"
+              height="96"
               onError={(e) => {
                 e.target.src = `https://picsum.photos/600/400?random=${Math.floor(Math.random() * 100)}`;
               }}
@@ -1125,10 +1124,13 @@ export default function HomePage() {
                       className="group block cursor-pointer"
                     >
                       <div className="relative h-36 rounded-md overflow-hidden mb-2">
-                        <img 
-                          src={item.image} 
-                          alt={item.name} 
+                        <img
+                          src={item.image}
+                          alt={item.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          loading="lazy"
+                          width="300"
+                          height="144"
                           onError={(e) => {
                             e.target.src = `https://picsum.photos/600/400?random=${Math.floor(Math.random() * 100)}`;
                           }}
@@ -1172,7 +1174,7 @@ export default function HomePage() {
                     >
                       {/* Standalone image with rating badge */}
                       <div className="relative h-24 rounded-2xl overflow-hidden shadow-md mb-2">
-                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" loading="lazy" width="144" height="96" />
                         {/* Rating badge - bottom left on image */}
                         <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur rounded-md px-1.5 py-0.5 flex items-center gap-1 shadow-sm">
                           <Star className="w-2.5 h-2.5 fill-yellow-400 text-yellow-400" />
@@ -1262,10 +1264,13 @@ export default function HomePage() {
                 <div key={`${setIdx}-${idx}`} className="flex-shrink-0 w-[280px] mx-2">
                   <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100 h-full">
                     <div className="flex items-center gap-2 mb-3">
-                      <img 
-                        src={review.avatar} 
+                      <img
+                        src={review.avatar}
                         alt={review.name}
                         className="w-10 h-10 rounded-full object-cover border-2 border-teal-100"
+                        loading="lazy"
+                        width="40"
+                        height="40"
                       />
                       <div>
                         <h4 className="font-semibold text-gray-900 text-sm">{review.name}</h4>

@@ -99,7 +99,7 @@ export default defineConfig({
     // Asset optimization
     assetsInlineLimit: 4096, // 4KB
     cssCodeSplit: true,
-    sourcemap: true,
+    sourcemap: false,
     
     // Chunk size warnings
     chunkSizeWarningLimit: 500,

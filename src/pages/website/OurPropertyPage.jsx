@@ -5,7 +5,7 @@ import * as LucideIcons from "lucide-react";
 const { Filter, MapPin, Wallet, Home, Users, TrendingUp, Send, RefreshCw, ChevronLeft, ChevronRight, Building2, BookOpen, Star, Check, Phone, Wifi, Utensils, Car, Dumbbell, Tv, Wind, Droplets, Zap, X, Menu, Heart, ChevronDown, Clock, Shirt, Cctv, Video, Waves, Fan } = LucideIcons;
 import { useState, useEffect } from "react";
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
-import { fetchProperties, searchPropertiesByLocation, getNearbyAreas, getInstitutions, getPriceRangeByType, fetchAllCollegesFromBackend, trackPropertyClick } from "../../utils/api";
+import { fetchProperties, searchPropertiesByLocation, getNearbyAreas, getInstitutions, getPriceRangeByType, trackPropertyClick } from "../../utils/api";
 import FastBiddingModal from "../../components/website/FastBiddingModal";
 import { useAuth } from "../../contexts/AuthContext";
 import axios from "axios";
@@ -20,7 +20,6 @@ export default function OurPropertyPage() {
   const [nearbyAreas, setNearbyAreas] = useState([]);
   const [allColleges, setAllColleges] = useState([]);
   const [selectedColleges, setSelectedColleges] = useState([]);
-  const [loadingColleges, setLoadingColleges] = useState(false);
   const [priceRange, setPriceRange] = useState({ min: 0, max: 0, average: 0, count: 0 });
   const [propertyNearbyColleges, setPropertyNearbyColleges] = useState({});
   
@@ -77,42 +76,28 @@ export default function OurPropertyPage() {
           allProperties = await fetchProperties();
         }
         
-        // Format properties - nearbyColleges already included from backend
-        const formattedProperties = allProperties.map(p => {
-          // Debug: Log what we're getting from API
-          console.log('🔄 OurPropertyPage Transformation:', p.property_name || p.name);
-          console.log('  Location Debug - p.city:', p.city);
-          console.log('  Location Debug - p.propertyInfo?.city:', p.propertyInfo?.city);
-          console.log('  Location Debug - p.location:', p.location);
-          console.log('  p.images:', p.images);
-          console.log('  p.professionalPhotos:', p.professionalPhotos);
-          console.log('  p.image:', p.image);
-          
-          const images = p.images || p.professionalPhotos || p.fieldPhotos || [p.image] || ['https://images.pexels.com/photos/1571468/pexels-photo-1571468.jpeg?auto=compress&cs=tinysrgb&w=600'];
-          
-          console.log('  Final images for PropertyCard:', images);
-          
-          return {
-            id: p._id || p.visitId || p.propertyName,
-            name: p.propertyName || p.property_name || p.name || 'Unnamed Property',
-            location: p.city || p.propertyInfo?.city || p.location || 'Unknown Location',
-            area: p.area || p.propertyInfo?.area || p.propertyInfo?.locality || '',
-            price: p.monthlyRent || p.rent || p.price || 5000,
-            rating: p.rating || 4.5,
-            type: p.propertyType || p.property_type || p.propertyInfo?.propertyType || p.type || 'PG',
-            gender: p.gender || p.genderSuitability || p.propertyInfo?.genderSuitability || 'Co-ed',
-            image: p.image || p.images?.[0] || p.professionalPhotos?.[0] || p.propertyInfo?.image || 'https://images.pexels.com/photos/1571468/pexels-photo-1571468.jpeg?auto=compress&cs=tinysrgb&w=600',
-            images: images, // Use the correctly prioritized images array
-            verified: p.isVerified || p.verified || p.status === 'approved' || true,
-            owner: p.owner_name || p.ownerName || p.generatedCredentials?.ownerName || 'Verified Owner',
-            beds: p.propertyInfo?.totalSeats || p.beds || 1,
-            phone: p.owner_phone || p.contactPhone || p.ownerPhone || 'N/A',
-            amenities: p.amenities || p.propertyInfo?.amenities || [],
-            nearbyColleges: p.nearbyColleges || [], // Already populated by backend
-            latitude: p.latitude || p.propertyInfo?.latitude || p.propertyInfo?.location?.coordinates?.[1] || null,
-            longitude: p.longitude || p.propertyInfo?.longitude || p.propertyInfo?.location?.coordinates?.[0] || null,
-          };
-        });
+        // Format properties — _formatProperty (in api.js) already normalized all fields.
+        // This pass only extracts the shape the listing UI needs; no re-normalization.
+        const formattedProperties = allProperties.map(p => ({
+          id: p._id,
+          name: p.name,
+          location: p.location,
+          area: p.locality || p.propertyInfo?.area || '',
+          price: p.monthlyRent,
+          rating: p.rating || 4.5,
+          type: p.propertyType,
+          gender: p.gender,
+          image: p.image,
+          images: p.images,
+          verified: p.isVerified || true,
+          owner: p.owner_name,
+          beds: p.beds,
+          phone: p.owner_phone,
+          amenities: p.amenities || [],
+          nearbyColleges: p.nearbyColleges || [],
+          latitude: p.latitude,
+          longitude: p.longitude,
+        }));
 
         // Apply filters quickly
         let filtered = formattedProperties;
@@ -224,7 +209,7 @@ export default function OurPropertyPage() {
               const insts = await getInstitutions(city);
               setInstitutions(insts);
             } catch (err) {
-              console.log('Background data fetch failed:', err);
+              console.error('Background data fetch failed:', err);
             }
           }, 200);
         }
@@ -236,7 +221,7 @@ export default function OurPropertyPage() {
               const range = await getPriceRangeByType(typeFromUrl);
               setPriceRange(range);
             } catch (err) {
-              console.log('Price range fetch failed:', err);
+              console.error('Price range fetch failed:', err);
             }
           }, 300);
         }
@@ -250,33 +235,8 @@ export default function OurPropertyPage() {
     };
     
     loadData();
-  }, [typeFromUrl, cityFromUrl, searchFromUrl, latitudeFromUrl, longitudeFromUrl, currentPage, searchParams, selectedCity, selectedType, selectedGender, minPrice, maxPrice, selectedRatings, selectedColleges]);
+  }, [typeFromUrl, cityFromUrl, searchFromUrl, latitudeFromUrl, longitudeFromUrl, currentPage, selectedCity, selectedType, selectedGender, minPrice, maxPrice, selectedRatings, selectedColleges]);
 
-  // Separate effect to fetch colleges after properties are loaded
-  useEffect(() => {
-    const loadColleges = async () => {
-      if (totalProperties.length === 0) return;
-      
-      setLoadingColleges(true);
-      try {
-        console.log('🎓 Fetching colleges separately...');
-        const data = await fetchAllCollegesFromBackend();
-        
-        if (data.allColleges && data.allColleges.length > 0) {
-          setAllColleges(data.allColleges);
-          console.log(`✅ Loaded ${data.allColleges.length} colleges for filter`);
-        }
-      } catch (error) {
-        console.error('Error loading colleges:', error);
-      } finally {
-        setLoadingColleges(false);
-      }
-    };
-    
-    // Wait 2 seconds after properties load before fetching colleges
-    const timer = setTimeout(loadColleges, 2000);
-    return () => clearTimeout(timer);
-  }, [totalProperties.length]);
 
   // Pagination handlers
   const paginate = (pageNumber) => {
@@ -498,26 +458,21 @@ export default function OurPropertyPage() {
                   {/* Colleges Section - OYO STYLE */}
                   <div className="py-6">
                     <label className="block text-sm font-bold text-gray-900 mb-4">Nearby Colleges</label>
-                    {loadingColleges ? (
-                      <div className="flex items-center gap-2 text-gray-500 text-xs">
-                        <RefreshCw className="w-3 h-3 animate-spin" /> Loading...
-                      </div>
-                    ) : (
                       <div className="space-y-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                         {allColleges.slice(0, 10).map((college, idx) => (
                           <label key={idx} className="flex items-center gap-3 cursor-pointer group">
                             <div className="relative flex items-center justify-center">
-                              <input 
-                                type="checkbox" 
-                                checked={selectedColleges.includes(college)} 
+                              <input
+                                type="checkbox"
+                                checked={selectedColleges.includes(college)}
                                 onChange={() => {
                                   if (selectedColleges.includes(college)) {
                                     setSelectedColleges(selectedColleges.filter(c => c !== college));
                                   } else {
                                     setSelectedColleges([...selectedColleges, college]);
                                   }
-                                }} 
-                                className="peer appearance-none w-5 h-5 border-2 border-gray-200 rounded checked:bg-white checked:border-[#EE2A24] transition-all" 
+                                }}
+                                className="peer appearance-none w-5 h-5 border-2 border-gray-200 rounded checked:bg-white checked:border-[#EE2A24] transition-all"
                               />
                               <div className="absolute w-2.5 h-2.5 bg-[#EE2A24] rounded-sm opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none"></div>
                             </div>
@@ -525,7 +480,6 @@ export default function OurPropertyPage() {
                           </label>
                         ))}
                       </div>
-                    )}
                   </div>
 
                   {/* Price Range Info */}
@@ -765,6 +719,13 @@ export default function OurPropertyPage() {
   );
 }
 
+// Inject Cloudinary transforms. Non-Cloudinary URLs pass through unchanged.
+function getOptimizedImageUrl(url, width = 800) {
+  if (!url || typeof url !== 'string') return url;
+  if (!url.includes('res.cloudinary.com')) return url;
+  return url.replace('/upload/', `/upload/f_auto,q_auto,w_${width}/`);
+}
+
 // Property Card Component - OYO Style
 function PropertyCard({ property, onBidNow }) {
   const navigate = useNavigate();
@@ -789,10 +750,13 @@ function PropertyCard({ property, onBidNow }) {
         {/* Desktop OYO-style Image Section */}
         <div className="hidden lg:flex w-[280px] h-full flex-shrink-0 relative border-r border-gray-100">
           <div className="flex-1 overflow-hidden relative group">
-            <img 
-              src={displayImages[currentImageIndex]} 
-              alt={property.name} 
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+            <img
+              src={getOptimizedImageUrl(displayImages[currentImageIndex], 280)}
+              alt={property.name}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              loading="lazy"
+              width="280"
+              height="185"
             />
             <div className="absolute top-2 left-2 bg-black/60 text-white text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
               Verified
@@ -807,7 +771,7 @@ function PropertyCard({ property, onBidNow }) {
                 className={`flex-1 overflow-hidden cursor-pointer rounded-sm transition-all border ${currentImageIndex === idx + 1 ? 'border-[#EE2A24]' : 'border-transparent'}`}
                 onMouseEnter={() => setCurrentImageIndex(idx + 1)}
               >
-                <img src={img} alt="thumb" className="w-full h-full object-cover" />
+                <img src={getOptimizedImageUrl(img, 65)} alt="thumb" className="w-full h-full object-cover" loading="lazy" width="65" height="60" />
               </div>
             ))}
           </div>
@@ -818,7 +782,14 @@ function PropertyCard({ property, onBidNow }) {
           <div className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar h-[145px] gap-2 p-2">
             {displayImages.map((img, idx) => (
               <div key={idx} className="flex-shrink-0 w-[48%] h-full snap-start rounded-md overflow-hidden">
-                <img src={img} alt={`${property.name} ${idx + 1}`} className="w-full h-full object-cover" />
+                <img
+                  src={getOptimizedImageUrl(img, 400)}
+                  alt={`${property.name} ${idx + 1}`}
+                  className="w-full h-full object-cover"
+                  loading={idx === 0 ? 'eager' : 'lazy'}
+                  width="200"
+                  height="145"
+                />
               </div>
             ))}
           </div>
@@ -833,7 +804,6 @@ function PropertyCard({ property, onBidNow }) {
           to={`/website/property-details/${property.id}`} 
           className="lg:hidden px-3 pb-3"
           onClick={() => {
-            console.log(`🖱️ UI: Card clicked (Mobile) for ID: ${property.id}`);
             trackPropertyClick(property.id);
           }}
         >
@@ -860,7 +830,6 @@ function PropertyCard({ property, onBidNow }) {
             to={`/website/property-details/${property.id}`} 
             className="flex-1 p-3.5 flex flex-col justify-between"
             onClick={() => {
-              console.log(`🖱️ UI: Info section clicked (Desktop) for ID: ${property.id}`);
               trackPropertyClick(property.id);
             }}
           >
@@ -963,9 +932,8 @@ function PropertyCard({ property, onBidNow }) {
             <div className="flex gap-2 w-full mt-2">
               <button 
                 onClick={(e) => { 
-                  e.preventDefault(); 
-                  e.stopPropagation(); 
-                  console.log(`🖱️ UI: View details button clicked for ID: ${property.id}`);
+                  e.preventDefault();
+                  e.stopPropagation();
                   trackPropertyClick(property.id);
                   navigate(`/website/property-details/${property.id}`); 
                 }}

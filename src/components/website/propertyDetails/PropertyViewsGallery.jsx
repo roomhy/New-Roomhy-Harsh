@@ -2,6 +2,14 @@ import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Maximize2, X, ArrowLeft, Share2, Heart, Image as ImageIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+// Inject Cloudinary auto-format/quality transforms into property image URLs.
+// Non-Cloudinary URLs (pexels, picsum, etc.) pass through unchanged.
+function getOptimizedImageUrl(url, width = 800) {
+  if (!url || typeof url !== 'string') return url;
+  if (!url.includes('res.cloudinary.com')) return url;
+  return url.replace('/upload/', `/upload/f_auto,q_auto,w_${width}/`);
+}
+
 const PropertyViewsGallery = ({ propertyViews = [], images = [] }) => {
   const [selectedView, setSelectedView] = useState(0);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -147,11 +155,14 @@ const PropertyViewsGallery = ({ propertyViews = [], images = [] }) => {
             }}
           >
             <img
-              src={currentImages[selectedImageIndex]}
+              src={getOptimizedImageUrl(currentImages[selectedImageIndex], 800)}
               alt={`${viewLabels[selectedView]} - Image ${selectedImageIndex + 1}`}
               className="w-full h-full object-cover"
+              loading="eager"
+              fetchPriority="high"
+              width="800"
+              height="600"
               onError={(e) => {
-                console.log('🖼️ Image failed to load:', currentImages[selectedImageIndex]);
                 e.target.src = 'https://picsum.photos/800/600?random=' + Math.random();
               }}
             />
@@ -214,7 +225,7 @@ const PropertyViewsGallery = ({ propertyViews = [], images = [] }) => {
                         : 'border-white/30 hover:border-white/60'
                     }`}
                   >
-                    <img src={view.images?.[0] || images[0]} className="w-full h-full object-cover" alt={view.label} />
+                    <img src={getOptimizedImageUrl(view.images?.[0] || images[0], 96)} className="w-full h-full object-cover" alt={view.label} loading="lazy" width="96" height="64" />
                     <div className="absolute inset-0 bg-black/20" />
                     <span className="absolute bottom-1 left-0 right-0 text-[10px] md:text-xs text-white font-bold text-center drop-shadow-md">
                       {view.label}
@@ -250,9 +261,12 @@ const PropertyViewsGallery = ({ propertyViews = [], images = [] }) => {
               }`}
             >
               <img
-                src={image}
+                src={getOptimizedImageUrl(image, 96)}
                 alt={`Thumbnail ${index + 1}`}
                 className="w-full h-full object-cover"
+                loading="lazy"
+                width="96"
+                height="64"
               />
             </button>
           ))}

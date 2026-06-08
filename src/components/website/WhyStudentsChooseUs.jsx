@@ -105,7 +105,7 @@ export default function WhyStudentsChooseUs() {
           {chooseUsPoints.map((point, index) => (
             <div key={index} className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 p-5 border border-gray-100">
               <div className="relative mb-4">
-                <img src={point.image} alt={point.title} className="rounded-lg h-40 w-full object-cover" />
+                <img src={point.image} alt={point.title} className="rounded-lg h-40 w-full object-cover" loading="lazy" width="400" height="160" />
                 <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-green-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold border-4 border-white">{index + 1}</div>
               </div>
               <h3 className="font-bold text-lg text-gray-900 text-center">{point.title}</h3>
@@ -130,7 +130,7 @@ export default function WhyStudentsChooseUs() {
                 <div className="flex flex-col md:flex-row items-start gap-6">
                   <div className="flex-shrink-0">
                     {reviews[currentReviewIndex].avatar ? (
-                      <img src={reviews[currentReviewIndex].avatar} alt={reviews[currentReviewIndex].name} className="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover border-4 border-teal-100" />
+                      <img src={reviews[currentReviewIndex].avatar} alt={reviews[currentReviewIndex].name} className="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover border-4 border-teal-100" loading="lazy" width="80" height="80" />
                     ) : (
                       <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-r from-teal-400 to-blue-500 flex items-center justify-center text-white text-2xl font-bold border-4 border-teal-100">
                         {reviews[currentReviewIndex].name?.charAt(0)?.toUpperCase() || 'U'}

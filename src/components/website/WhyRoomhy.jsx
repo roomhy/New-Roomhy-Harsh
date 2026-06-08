@@ -85,6 +85,9 @@ export default function WhyRoomhy() {
                   src={point.image}
                   alt={point.title}
                   className="rounded-lg h-20 sm:h-40 w-full object-cover"
+                  loading="lazy"
+                  width="400"
+                  height="160"
                 />
                 <div className="absolute -bottom-3 sm:-bottom-4 left-1/2 -translate-x-1/2 bg-teal-500 text-white w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold border-2 sm:border-4 border-white text-[10px] sm:text-sm">
                   {index + 1}
@@ -122,7 +125,7 @@ export default function WhyRoomhy() {
               className="w-full max-w-sm rounded-2xl bg-white overflow-hidden shadow-2xl"
               onClick={(event) => event.stopPropagation()}
             >
-              <img src={previewCard.image} alt={previewCard.title} className="h-56 w-full object-cover" />
+              <img src={previewCard.image} alt={previewCard.title} className="h-56 w-full object-cover" loading="lazy" width="400" height="224" />
               <div className="p-4">
                 <h3 className="text-lg font-bold text-gray-900">{previewCard.title}</h3>
                 <p className="mt-2 text-sm text-gray-600 leading-relaxed">{previewCard.description}</p>

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { X, MapPin, Zap, Send, Loader, Info, Shield, Search, Locate } from 'lucide-react';
-import { fetchCities, fetchAreas, fetchProperties, submitBid } from '../../utils/api';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { X, MapPin, Zap, Send, Loader, Info, Shield, Locate } from 'lucide-react';
+import { fetchCities, fetchAreas, fetchJson } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 import LocationMapPicker from './LocationMapPicker';
 
@@ -8,53 +8,84 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
   const { user, isAuthenticated } = useAuth();
   const [cities, setCities] = useState([]);
   const [areas, setAreas] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
-  const [matchingProperties, setMatchingProperties] = useState([]);
-  
+  // Cache all properties after first fetch — never refetch
+  const [allProperties, setAllProperties] = useState([]);
+  const propertiesFetched = useRef(false);
+
+  const apiUrl = useMemo(() => (
+    import.meta.env?.VITE_API_URL ||
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://localhost:5001'
+      : 'https://roohmy-backend-xwa9.vercel.app')
+  ), []);
+
   const [form, setForm] = useState({
     fullName: '',
     email: '',
     phone: '',
     city: '',
     area: '',
-    priceRange: '', // e.g., "7000-10000" or "less than 8000"
+    priceRange: '',
     locationName: '',
     latitude: null,
     longitude: null,
     gender: 'Any'
   });
 
-  const [matchCount, setMatchCount] = useState(0);
-
-  // Update match count whenever filters change
+  // Fetch properties ONCE when modal first opens
   useEffect(() => {
-    const updateCount = async () => {
-      try {
-        const allProperties = await fetchProperties();
-        const filtered = allProperties.filter(prop => {
-          if (form.city && prop.city !== form.city) return false;
-          if (form.area && !prop.area?.includes(form.area) && !prop.propertyInfo?.area?.includes(form.area)) return false;
-          if (form.latitude && form.longitude && prop.latitude && prop.longitude) {
-            const dist = calculateDistance(form.latitude, form.longitude, prop.latitude, prop.longitude);
-            if (dist > 10) return false;
-          }
-          if (form.priceRange) {
-            const range = parsePriceRange(form.priceRange);
-            const rent = prop.monthlyRent || prop.rent || 0;
-            if (range.max && rent > (range.max + 3000)) return false;
-            if (range.min && rent < (range.min - 3000)) return false;
-          }
-          return true;
-        });
-        setMatchCount(filtered.length);
-      } catch (err) {
-        console.error('Error counting matches:', err);
+    if (!isOpen || propertiesFetched.current) return;
+    propertiesFetched.current = true;
+    fetchJson(`${apiUrl}/api/approved-properties/public/approved`)
+      .then(data => {
+        let all = Array.isArray(data) ? data : data?.properties || [];
+        all = all.filter(p => p.isLiveOnWebsite === true || p.status === 'live' || p.status === 'approved');
+        setAllProperties(all);
+      })
+      .catch(() => setAllProperties([]));
+  }, [isOpen, apiUrl]);
+
+  // Reset cache when modal closes so next open gets fresh data
+  useEffect(() => {
+    if (!isOpen) {
+      propertiesFetched.current = false;
+    }
+  }, [isOpen]);
+
+  // Filter locally — no API call
+  const filteredProperties = useMemo(() => {
+    return allProperties.filter(prop => {
+      const propInfo = prop.propertyInfo || {};
+      const propArea = (prop.locality || propInfo.area || '').toLowerCase().trim();
+
+      if (form.area && propArea) {
+        const areaLower = form.area.toLowerCase();
+        if (!propArea.includes(areaLower) && !areaLower.includes(propArea)) return false;
       }
-    };
-    if (isOpen) updateCount();
-  }, [form.city, form.area, form.priceRange, form.latitude, form.longitude, isOpen]);
+
+      if (form.latitude && form.longitude && prop.latitude && prop.longitude) {
+        if (calculateDistance(form.latitude, form.longitude, prop.latitude, prop.longitude) > 10) return false;
+      }
+
+      if (form.priceRange) {
+        const range = parsePriceRange(form.priceRange);
+        const rent = parseInt(prop.monthlyRent || prop.rent || propInfo.rent || 0, 10);
+        if (Number.isFinite(rent) && rent > 0) {
+          if (range.max && rent > range.max + 3000) return false;
+          if (range.min && rent < range.min - 3000) return false;
+        }
+      }
+
+      if (form.gender && form.gender !== 'Any') {
+        const propGender = (prop.gender || propInfo.gender || prop.genderSuitability || '').toLowerCase();
+        if (propGender && !propGender.includes('co-ed') && !propGender.includes(form.gender.toLowerCase())) return false;
+      }
+
+      return true;
+    });
+  }, [allProperties, form.area, form.priceRange, form.gender, form.latitude, form.longitude]);
 
   // Auto-fill from user context or initialData
   useEffect(() => {
@@ -67,7 +98,6 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
           phone: user.phone || prev.phone
         }));
       }
-      
       if (initialData.city) setForm(prev => ({ ...prev, city: initialData.city }));
       if (initialData.area) setForm(prev => ({ ...prev, area: initialData.area }));
       if (initialData.priceRange) setForm(prev => ({ ...prev, priceRange: initialData.priceRange }));
@@ -75,29 +105,25 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
     }
   }, [isOpen, isAuthenticated, user, initialData]);
 
-  // Load cities
+  // Load cities once
   useEffect(() => {
-    const loadCities = async () => {
-      const data = await fetchCities();
-      setCities(data);
-    };
-    loadCities();
+    fetchCities().then(setCities).catch(() => {});
   }, []);
 
   // Load areas when city changes
   useEffect(() => {
-    const loadAreas = async () => {
-      if (form.city) {
-        const allAreas = await fetchAreas();
-        const filtered = allAreas.filter(a => 
-          (typeof a === 'object' ? a.city?.name === form.city || a.city === form.city : a.startsWith(form.city))
-        );
-        setAreas(filtered.map(a => typeof a === 'string' ? a : a.name));
-      } else {
-        setAreas([]);
-      }
-    };
-    loadAreas();
+    if (!form.city) { setAreas([]); return; }
+    fetchAreas()
+      .then(allAreas => {
+        const cityLower = form.city.toLowerCase();
+        const filtered = allAreas.filter(a => {
+          if (typeof a === 'string') return a.toLowerCase().startsWith(cityLower);
+          const cityName = (a.city?.name || a.cityName || '').toLowerCase();
+          return cityName === cityLower || cityName.includes(cityLower);
+        });
+        setAreas(filtered.map(a => typeof a === 'string' ? a : (a.name || a.areaName || '')));
+      })
+      .catch(() => setAreas([]));
   }, [form.city]);
 
   const handleInputChange = (e) => {
@@ -121,108 +147,66 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
       alert('Please login to place a bid');
       return;
     }
+    if (filteredProperties.length === 0) {
+      alert('No properties found matching your criteria. We will notify you when something matches!');
+      return;
+    }
 
-    setSubmitting(true);
-    try {
-      // Find matching properties based on filters
-      const allProperties = await fetchProperties();
-      
-      // Filter logic
-      const filtered = allProperties.filter(prop => {
-        // City match
-        if (form.city && prop.city !== form.city) return false;
-        
-        // Area match
-        if (form.area && !prop.area?.includes(form.area) && !prop.propertyInfo?.area?.includes(form.area)) return false;
-        
-        // Distance match if location provided (10km radius)
-        if (form.latitude && form.longitude && prop.latitude && prop.longitude) {
-          const dist = calculateDistance(form.latitude, form.longitude, prop.latitude, prop.longitude);
-          if (dist > 10) return false;
-        }
+    // Show success immediately, send all bids in parallel in background
+    alert(`Sending bids to ${filteredProperties.length} matching properties!`);
+    onClose();
 
-        // Price range match (with 3000 margin for negotiation)
-        const rent = prop.monthlyRent || prop.rent || 0;
-        if (form.priceRange) {
-          const range = parsePriceRange(form.priceRange);
-          // If user says max 10000, allow properties up to 13000 (owner might negotiate)
-          if (range.max && rent > (range.max + 3000)) return false;
-          // If user says min 7000, allow properties down to 4000 (owner might be okay)
-          if (range.min && rent < (range.min - 3000)) return false;
-        }
+    const userId = user.loginId || user._id || user.id || '';
+    const range = parsePriceRange(form.priceRange);
 
-        return true;
-      });
+    const bidRequests = filteredProperties
+      .map((prop, index) => {
+        const propInfo = prop.propertyInfo || {};
+        const propertyId = prop._id || prop.propertyNumber || `property-${index}`;
+        const ownerId =
+          (prop.generatedCredentials && prop.generatedCredentials.loginId) ||
+          prop.ownerLoginId ||
+          prop.createdBy ||
+          prop.owner ||
+          prop.propertyOwnerId ||
+          prop.owner_id;
 
-      if (filtered.length === 0) {
-        alert('No properties found matching your criteria. We will notify you when something matches!');
-      }
-
-      // Submit bids to all matching owners
-      const results = await Promise.all(filtered.map(prop => {
-        const ownerId = prop.owner_id || prop.generatedCredentials?.loginId || prop.ownerLoginId;
         if (!ownerId) return null;
 
-        const rent = prop.monthlyRent || prop.rent || 0;
+        return fetch(`${apiUrl}/api/booking/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            property_id: propertyId,
+            property_name: prop.property_name || propInfo.name || 'Property',
+            area: prop.locality || propInfo.area || '',
+            property_type: prop.propertyType || propInfo.propertyType || 'PG',
+            rent_amount: parseInt(prop.monthlyRent || prop.rent || propInfo.rent || 0, 10),
+            user_id: userId,
+            owner_id: ownerId,
+            name: form.fullName,
+            email: form.email,
+            phone: form.phone,
+            request_type: 'bid',
+            bid_min: range.min || null,
+            bid_max: range.max || null,
+            message: `Flexible Bid: ${form.priceRange}. Preferred Location: ${form.locationName || 'Nearby'}. Gender: ${form.gender}`,
+            latitude: form.latitude,
+            longitude: form.longitude,
+            filter_criteria: {
+              priceRange: form.priceRange,
+              location: form.locationName,
+              city: form.city,
+              area: form.area,
+              gender: form.gender
+            }
+          })
+        }).catch(() => null);
+      })
+      .filter(Boolean);
 
-        return submitBid({
-          property_id: prop._id,
-          property_name: prop.property_name || prop.name,
-          area: prop.area || prop.propertyInfo?.area || '',
-          property_type: prop.propertyType || 'PG',
-          rent_amount: rent,
-          user_id: user.loginId || user._id,
-          owner_id: ownerId,
-          name: form.fullName,
-          email: form.email,
-          phone: form.phone,
-          request_type: 'bid',
-          message: `Flexible Bid: ${form.priceRange}. Preferred Location: ${form.locationName || 'Nearby'}`,
-          latitude: form.latitude,
-          longitude: form.longitude,
-          filter_criteria: {
-            priceRange: form.priceRange,
-            location: form.locationName,
-            gender: form.gender
-          }
-        });
-      }));
-
-      alert(`Successfully sent bids to ${results.filter(Boolean).length} owners!`);
-      onClose();
-    } catch (error) {
-      console.error('Error submitting bids:', error);
-      alert('Failed to submit bids. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371; // km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-  const parsePriceRange = (str) => {
-    const numbers = str.match(/\d+/g)?.map(Number);
-    if (!numbers) return { min: null, max: null };
-    
-    if (str.toLowerCase().includes('less') || str.includes('<')) {
-      return { min: null, max: numbers[0] };
-    }
-    if (str.toLowerCase().includes('more') || str.includes('>')) {
-      return { min: numbers[0], max: null };
-    }
-    if (numbers.length >= 2) {
-      return { min: Math.min(...numbers), max: Math.max(...numbers) };
-    }
-    return { min: null, max: numbers[0] };
+    // Fire all bids simultaneously
+    Promise.allSettled(bidRequests);
   };
 
   if (!isOpen) return null;
@@ -244,12 +228,12 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 overflow-y-auto max-h-[80vh]">
-          {/* User Details (Auto-filled) */}
+          {/* User Details */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             <div className="space-y-1">
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Full Name</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 name="fullName"
                 value={form.fullName}
                 onChange={handleInputChange}
@@ -260,8 +244,8 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
             </div>
             <div className="space-y-1">
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Email</label>
-              <input 
-                type="email" 
+              <input
+                type="email"
                 name="email"
                 value={form.email}
                 onChange={handleInputChange}
@@ -272,8 +256,8 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
             </div>
             <div className="space-y-1">
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Phone</label>
-              <input 
-                type="tel" 
+              <input
+                type="tel"
                 name="phone"
                 value={form.phone}
                 onChange={handleInputChange}
@@ -290,7 +274,7 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
               <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Preferred City</label>
                 <div className="relative">
-                  <select 
+                  <select
                     name="city"
                     value={form.city}
                     onChange={handleInputChange}
@@ -310,7 +294,7 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
               <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Area / Locality</label>
                 <div className="relative">
-                  <select 
+                  <select
                     name="area"
                     value={form.area}
                     onChange={handleInputChange}
@@ -333,8 +317,8 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
               <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Price Range (Your Choice)</label>
                 <div className="relative">
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     name="priceRange"
                     value={form.priceRange}
                     onChange={handleInputChange}
@@ -355,8 +339,8 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
                       type="button"
                       onClick={() => setForm(prev => ({ ...prev, gender: g }))}
                       className={`flex-1 py-3 rounded-xl font-bold transition-all border-2 ${
-                        form.gender === g 
-                          ? 'bg-[#EE4266] border-[#EE4266] text-white shadow-lg shadow-[#EE4266]/30' 
+                        form.gender === g
+                          ? 'bg-[#EE4266] border-[#EE4266] text-white shadow-lg shadow-[#EE4266]/30'
                           : 'bg-white border-gray-100 text-gray-500 hover:border-gray-200'
                       }`}
                     >
@@ -368,13 +352,13 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
             </div>
           </div>
 
-          {/* Location Search API Mock-ish */}
+          {/* Location */}
           <div className="mb-8">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Specific Location (e.g. near Resonance, Kota)</label>
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={form.locationName}
                   readOnly
                   placeholder="Search location on map..."
@@ -382,7 +366,7 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
                 />
                 <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               </div>
-              <button 
+              <button
                 type="button"
                 onClick={() => setShowMapPicker(true)}
                 className="bg-black text-white px-6 py-3 rounded-xl font-bold hover:bg-gray-800 transition-all flex items-center gap-2"
@@ -399,7 +383,7 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
 
           {/* Actions */}
           <div className="flex flex-col gap-4">
-            <button 
+            <button
               type="submit"
               disabled={submitting}
               className="w-full bg-[#EE4266] hover:bg-[#d63a5b] text-white py-4 rounded-xl font-black text-lg shadow-xl shadow-[#EE4266]/30 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3"
@@ -410,11 +394,11 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
                 </>
               ) : (
                 <>
-                  <Send className="w-6 h-6" /> Send Bids to {matchCount > 0 ? matchCount : ''} Matching Owners
+                  <Send className="w-6 h-6" /> Send Bids to {filteredProperties.length > 0 ? filteredProperties.length : ''} Matching Owners
                 </>
               )}
             </button>
-            
+
             <div className="flex items-center justify-center gap-6 text-gray-400">
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest">
                 <Shield className="w-3.5 h-3.5 text-green-500" /> Direct from Owner
@@ -431,7 +415,7 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
       </div>
 
       {showMapPicker && (
-        <LocationMapPicker 
+        <LocationMapPicker
           onLocationSelect={handleLocationSelect}
           onClose={() => setShowMapPicker(false)}
         />
@@ -440,7 +424,25 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
   );
 }
 
-// Icons for the form
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const parsePriceRange = (str) => {
+  const numbers = str.match(/\d+/g)?.map(Number);
+  if (!numbers) return { min: null, max: null };
+  if (str.toLowerCase().includes('less') || str.includes('<')) return { min: null, max: numbers[0] };
+  if (str.toLowerCase().includes('more') || str.includes('>')) return { min: numbers[0], max: null };
+  if (numbers.length >= 2) return { min: Math.min(...numbers), max: Math.max(...numbers) };
+  return { min: null, max: numbers[0] };
+};
+
 const ChevronDown = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />

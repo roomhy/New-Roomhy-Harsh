@@ -188,7 +188,7 @@ export default function MobilePropertiesSection() {
             >
               {/* Property Image - Smaller */}
               <div className="relative h-20">
-                <img src={property.image} alt={property.name} className="w-full h-full object-cover" />
+                <img src={property.image} alt={property.name} className="w-full h-full object-cover" loading="lazy" width="128" height="80" />
                 {property.verified && (
                   <div className="absolute top-1 right-1 bg-white rounded-full px-1 py-0.5 flex items-center">
                     <BadgeCheck className="w-2 h-2 text-teal-600 mr-0.5" />

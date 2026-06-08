@@ -15,18 +15,23 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in on mount
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('userData');
-    
-    if (token && userData) {
+    const token =
+      localStorage.getItem('website_token') ||
+      localStorage.getItem('token');
+    const rawUser =
+      localStorage.getItem('website_user') ||
+      localStorage.getItem('user') ||
+      localStorage.getItem('userData');
+
+    if (token && rawUser) {
       try {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
-      } catch (error) {
-        console.error('Error parsing user data:', error);
+        setUser(JSON.parse(rawUser));
+      } catch {
+        localStorage.removeItem('website_token');
+        localStorage.removeItem('website_user');
         localStorage.removeItem('token');
         localStorage.removeItem('userData');
+        localStorage.removeItem('user');
       }
     }
     setLoading(false);
@@ -40,8 +45,10 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('userData');
+    ['token', 'userData', 'user', 'website_token', 'website_user'].forEach(k => {
+      localStorage.removeItem(k);
+      sessionStorage.removeItem(k);
+    });
   };
 
   const value = {

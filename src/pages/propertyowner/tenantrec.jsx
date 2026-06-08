@@ -11,7 +11,7 @@ import {
 import { getApiBase, fetchJson, getAuthHeader } from "../../utils/api";
 import { toast } from "react-hot-toast";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
-import { getOwnerRuntimeSession, clearOwnerRuntimeSession, fetchOwnerProperties } from "../../utils/propertyowner";
+import { getOwnerRuntimeSession, clearOwnerRuntimeSession, fetchOwnerProperties, clearOwnerFetchCache } from "../../utils/propertyowner";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -618,6 +618,8 @@ export default function TenantRec() {
         setNewTenant(json.tenant);
         setShowSuccess(true);
         toast.success("Tenant Onboarded Successfully!");
+        // Invalidate rooms/tenants cache so Rooms page shows updated occupancy immediately
+        clearOwnerFetchCache(owner.loginId);
       } else {
         toast.error(json.message || "Failed to onboard tenant");
       }
@@ -872,8 +874,8 @@ export default function TenantRec() {
                     onChange={e => setRoomAssignment({ ...roomAssignment, bed: e.target.value })}
                     options={
                       bedOptions.length > 0
-                        ? bedOptions.map(b => ({ label: b, value: b }))
-                        : ["Bed 1", "Bed 2", "Bed 3", "Bed 4"]
+                        ? bedOptions.map((b, i) => ({ label: b, value: String(i + 1) }))
+                        : [{ label: "Bed 1", value: "1" }, { label: "Bed 2", value: "2" }, { label: "Bed 3", value: "3" }, { label: "Bed 4", value: "4" }]
                     }
                     placeholder={roomAssignment.roomUnit ? "Select bed" : "Select room first"}
                   />

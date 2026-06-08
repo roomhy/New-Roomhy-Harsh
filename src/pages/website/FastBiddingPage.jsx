@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Zap, ArrowLeft, Send, Loader, Heart, CheckCircle, X, Shield, Info } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Zap, ArrowLeft, Send, Loader, CheckCircle, Shield, Info } from 'lucide-react';
 import WebsiteNavbar from "../../components/website/WebsiteNavbar";
 import WebsiteFooter from "../../components/website/WebsiteFooter";
 import MobileBottomNav from "../../components/website/MobileBottomNav";
-import { fetchCities, fetchAreas, fetchProperties, submitBid } from '../../utils/api';
+import { fetchCities, fetchAreas, fetchProperties } from '../../utils/api';
 import { getWebsiteUser, getWebsiteUserId, getWebsiteUserName, getWebsiteUserEmail, isWebsiteLoggedIn } from '../../utils/websiteSession';
 
 const defaultCities = [
@@ -17,10 +17,13 @@ const defaultCities = [
 export default function FastBiddingPage() {
   const [cities, setCities] = useState([]);
   const [areas, setAreas] = useState([]);
+  const [allProperties, setAllProperties] = useState([]);
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [selectedIds, setSelectedIds] = useState([]);
+  const propertiesFetched = useRef(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showSignupModal, setShowSignupModal] = useState(false);
+  const [signupEmail, setSignupEmail] = useState('');
   const [successCount, setSuccessCount] = useState(0);
 
   const [form, setForm] = useState({
@@ -39,7 +42,6 @@ export default function FastBiddingPage() {
       : 'https://roohmy-backend-xwa9.vercel.app');
   }, []);
 
-  // Load user data if logged in
   useEffect(() => {
     const user = getWebsiteUser();
     if (user) {
@@ -51,7 +53,6 @@ export default function FastBiddingPage() {
     }
   }, []);
 
-  // Load cities
   useEffect(() => {
     const loadCities = async () => {
       try {
@@ -64,7 +65,6 @@ export default function FastBiddingPage() {
     loadCities();
   }, []);
 
-  // Load areas when city changes
   useEffect(() => {
     const loadAreas = async () => {
       if (!form.city) {
@@ -74,7 +74,7 @@ export default function FastBiddingPage() {
       try {
         const allAreas = await fetchAreas();
         const filtered = allAreas.filter(a => a.city?._id === form.city || a.city === form.city);
-        setAreas(filtered.length > 0 ? filtered : []);
+        setAreas(filtered);
       } catch {
         setAreas([]);
       }
@@ -82,92 +82,71 @@ export default function FastBiddingPage() {
     loadAreas();
   }, [form.city]);
 
-  // Load and filter properties
+  // Fetch ALL properties once on mount — shared cache via fetchProperties()
   useEffect(() => {
-    const loadProperties = async () => {
-      if (!form.area) {
-        setProperties([]);
-        return;
-      }
-      setLoading(true);
+    if (propertiesFetched.current) return;
+    propertiesFetched.current = true;
+    const load = async () => {
       try {
-        const allProperties = await fetchProperties();
-        const selectedArea = areas.find(a => (a._id || a.id) === form.area);
-        const areaName = selectedArea?.name?.toLowerCase()?.trim() || '';
-        const gender = form.gender.toLowerCase();
-        const minPrice = parseInt(form.minPrice || 0);
-        const maxPrice = parseInt(form.maxPrice || 0);
-
-        console.log('Filtering properties:', {
-          totalProperties: allProperties.length,
-          areaName,
-          gender,
-          minPrice,
-          maxPrice
-        });
-
-        let rejectionReasons = { area: 0, gender: 0, rent: 0 };
-        
-        const filtered = allProperties.filter((prop, index) => {
-          const propName = prop.propertyName || prop.property_name || `Property ${index}`;
-          const propArea = (prop.locality || prop.propertyInfo?.area || '').toString().toLowerCase().trim();
-          const areaMatch = areaName ? (propArea.includes(areaName) || areaName.includes(propArea)) : true;
-          
-          if (!areaMatch) {
-            if (index < 3) console.log(`❌ ${propName}: Area mismatch - propArea: "${propArea}", looking for: "${areaName}"`);
-            rejectionReasons.area++;
-            return false;
-          }
-
-          if (gender) {
-            const propGender = (prop.gender || prop.propertyInfo?.gender || '').toString().toLowerCase();
-            const genderMatch = propGender.includes('co-ed') || propGender.includes(gender) || gender.includes(propGender);
-            if (propGender && !genderMatch) {
-              if (index < 3) console.log(`❌ ${propName}: Gender mismatch - propGender: "${propGender}", looking for: "${gender}"`);
-              rejectionReasons.gender++;
-              return false;
-            }
-          }
-
-          if (minPrice || maxPrice) {
-            const rawRent = prop.monthlyRent || prop.rent || prop.propertyInfo?.rent || 0;
-            const rent = parseInt(rawRent);
-            const rentInRange = (!minPrice || rent >= minPrice) && (!maxPrice || maxPrice === 50000 || rent <= maxPrice);
-            
-            console.log(`${rentInRange ? '✅' : '❌'} ${propName}: Rent ${rent} (raw: ${rawRent}) - Range: ${minPrice}-${maxPrice}`);
-            
-            if (!rentInRange) {
-              rejectionReasons.rent++;
-              return false;
-            }
-          }
-          return true;
-        });
-        
-        console.log('Rejection summary:', rejectionReasons);
-
-        console.log('Filtered properties:', filtered.length);
-
-        setProperties(filtered);
-      } catch (error) {
-        setProperties([]);
-      } finally {
-        setLoading(false);
+        const data = await fetchProperties();
+        const live = data.filter(p =>
+          p.isLiveOnWebsite === true || p.status === 'live' || p.status === 'approved'
+        );
+        setAllProperties(live);
+      } catch {
+        setAllProperties([]);
       }
     };
-    loadProperties();
-  }, [form.area, form.gender, form.minPrice, form.maxPrice, areas]);
+    load();
+  }, []);
+
+  // Filter in memory whenever form filters or allProperties change — no API call
+  useEffect(() => {
+    if (!form.area) {
+      setProperties([]);
+      return;
+    }
+    setLoading(true);
+
+    const selectedArea = areas.find(a => (a._id || a.id) === form.area);
+    const areaName = selectedArea?.name?.toLowerCase()?.trim() || '';
+    const gender = form.gender.toLowerCase();
+    const minPrice = parseInt(form.minPrice || 0, 10);
+    const maxPrice = parseInt(form.maxPrice || 0, 10);
+
+    const filtered = allProperties.filter(prop => {
+      const propInfo = prop.propertyInfo || {};
+      const propArea = (prop.locality || propInfo.area || '').toString().toLowerCase().trim();
+
+      if (areaName) {
+        const areaMatch = propArea.includes(areaName) || areaName.includes(propArea);
+        if (!propArea || !areaMatch) return false;
+      }
+
+      if (gender) {
+        const propGender = (prop.gender || propInfo.gender || prop.genderSuitability || '').toString().toLowerCase();
+        const genderMatch = propGender.includes('co-ed') || propGender.includes(gender) || gender.includes(propGender);
+        if (propGender && !genderMatch) return false;
+      }
+
+      if (minPrice || maxPrice) {
+        const rent = parseInt(prop.monthlyRent || prop.rent || propInfo.rent || propInfo.monthlyRent, 10);
+        if (Number.isFinite(rent)) {
+          if (minPrice && rent < minPrice) return false;
+          if (maxPrice && maxPrice !== 50000 && rent > maxPrice) return false;
+        }
+      }
+
+      return true;
+    });
+
+    setProperties(filtered);
+    setLoading(false);
+  }, [form.area, form.gender, form.minPrice, form.maxPrice, areas, allProperties]);
 
   const handleFormChange = (e) => {
     const { id, value } = e.target;
     setForm(prev => ({ ...prev, [id]: value }));
-  };
-
-  const toggleProperty = (propertyId) => {
-    setSelectedIds(prev => {
-      if (prev.includes(propertyId)) return prev.filter(id => id !== propertyId);
-      return [...prev, propertyId];
-    });
   };
 
   const validateForm = () => {
@@ -176,78 +155,87 @@ export default function FastBiddingPage() {
     if (!form.gender) return false;
     if (!form.city || !form.area) return false;
     if (!form.minPrice || !form.maxPrice) return false;
-    if (parseInt(form.minPrice) > parseInt(form.maxPrice)) return false;
+    if (parseInt(form.minPrice, 10) > parseInt(form.maxPrice, 10)) return false;
     return true;
   };
 
   const submitBids = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       alert('Please fill in all required fields correctly');
       return;
     }
 
     if (!isWebsiteLoggedIn()) {
-      alert('Please login to submit bids');
-      window.location.href = '/login';
+      setSignupEmail(form.gmail);
+      setShowSignupModal(true);
       return;
     }
 
-    if (selectedIds.length === 0) {
-      alert('Please select at least one property to bid on');
+    if (properties.length === 0) {
+      alert('No matching properties found in this area');
       return;
     }
 
-    const userId = getWebsiteUserId();
+    // Show success modal immediately, send bids in background
+    setSuccessCount(properties.length);
+    setShowSuccessModal(true);
+
+    const userId = getWebsiteUserId() || getWebsiteUser()?.loginId || '';
     const selectedCity = cities.find(c => (c._id || c.id) === form.city);
     const selectedArea = areas.find(a => (a._id || a.id) === form.area);
-    const bidMin = parseInt(form.minPrice || 0);
-    const bidMax = parseInt(form.maxPrice || 0);
+    const bidMin = parseInt(form.minPrice || 0, 10);
+    const bidMax = parseInt(form.maxPrice || 0, 10);
 
-    let successCount = 0;
-    for (const propertyId of selectedIds) {
+    for (const [index, property] of properties.entries()) {
       try {
-        const property = properties.find(p => p._id === propertyId);
-        if (!property) continue;
+        const propertyId = property._id || property.propertyNumber || property.propertyId || `${property.property_name || property.propertyInfo?.name || 'property'}-${index}`;
+        const ownerId =
+          (property.generatedCredentials && property.generatedCredentials.loginId) ||
+          property.ownerLoginId ||
+          property.createdBy ||
+          property.owner ||
+          property.propertyOwnerId;
 
-        const ownerId = property.generatedCredentials?.loginId || property.ownerLoginId || property.createdBy;
         if (!ownerId) continue;
 
-        await submitBid({
+        const bidData = {
           property_id: propertyId,
           property_name: property.property_name || property.propertyInfo?.name || 'Property',
           area: property.locality || property.propertyInfo?.area || '',
           property_type: property.propertyType || property.propertyInfo?.propertyType || 'Property',
-          rent_amount: parseInt(property.monthlyRent || property.rent || 0),
+          rent_amount: parseInt(property.monthlyRent || property.rent || property.propertyInfo?.rent || 0, 10),
           user_id: userId,
           owner_id: ownerId,
           name: form.fullName,
           email: form.gmail,
           phone: '',
           request_type: 'bid',
-          bid_min: bidMin > 0 ? bidMin : null,
-          bid_max: bidMax > 0 ? bidMax : null,
+          bid_min: Number.isFinite(bidMin) && bidMin > 0 ? bidMin : null,
+          bid_max: Number.isFinite(bidMax) && bidMax > 0 ? bidMax : null,
           filter_criteria: {
             gender: form.gender,
             city_id: form.city,
-            city: selectedCity?.name || '',
+            city: selectedCity?.name || selectedCity?.cityName || '',
             area_id: form.area,
-            area: selectedArea?.name || '',
-            min_price: bidMin > 0 ? bidMin : null,
-            max_price: bidMax > 0 ? bidMax : null
+            area: selectedArea?.name || selectedArea?.area_name || '',
+            min_price: Number.isFinite(bidMin) && bidMin > 0 ? bidMin : null,
+            max_price: Number.isFinite(bidMax) && bidMax > 0 ? bidMax : null,
+            property_type: property.propertyType || property.propertyInfo?.propertyType || 'Property'
           },
           message: `Looking for property with rent Rs ${form.minPrice}-${form.maxPrice}, Gender: ${form.gender}`
+        };
+
+        await fetch(`${apiUrl}/api/booking/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bidData)
         });
-        successCount++;
-      } catch (err) {
-        console.error('Failed to submit bid for property:', propertyId);
+      } catch {
+        // ignore individual failures
       }
     }
-
-    setSuccessCount(successCount);
-    setShowSuccessModal(true);
-    setSelectedIds([]);
   };
 
   return (
@@ -266,9 +254,17 @@ export default function FastBiddingPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 pb-32">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Quick Bidding Form</h1>
-          <p className="text-gray-600">Fill in your details to find matching properties and send bids to multiple owners</p>
+        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Quick Bidding Form</h1>
+            <p className="text-gray-600">Fill in your details to find matching properties and send bids to multiple owners</p>
+          </div>
+          <div className="flex gap-3">
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-center">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Matches</p>
+              <p className="text-lg font-semibold text-gray-900">{properties.length}</p>
+            </div>
+          </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-md p-6 sm:p-8 mb-8">
@@ -385,9 +381,17 @@ export default function FastBiddingPage() {
               </div>
             </div>
 
-            {/* Properties List */}
+            {/* Properties List — auto-included, no manual selection */}
             <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Properties Found in Your Area</h3>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">Properties Found in Your Area</h3>
+                  <p className="text-sm text-gray-500 mt-1">All matching properties are auto-selected and will receive your bid.</p>
+                </div>
+                <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-600">
+                  All {properties.length} selected
+                </span>
+              </div>
               {loading && (
                 <div className="flex items-center justify-center py-8">
                   <Loader className="w-6 h-6 text-blue-600 animate-spin" />
@@ -395,43 +399,36 @@ export default function FastBiddingPage() {
                 </div>
               )}
               {!loading && properties.length === 0 && (
-                <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
+                <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-200">
                   <p>No properties found. Try adjusting your filters.</p>
                 </div>
               )}
               <div className="space-y-3">
-                {properties.map(prop => {
-                  const propertyId = prop._id;
-                  const propertyName = prop.property_name || prop.propertyInfo?.name || `Property ${propertyId}`;
-                  const rent = prop.monthlyRent || prop.rent || prop.propertyInfo?.rent || 0;
-                  const gender = prop.gender || prop.propertyInfo?.gender || 'Not specified';
-                  const propertyType = prop.propertyType || prop.propertyInfo?.propertyType || 'Property';
-                  const isSelected = selectedIds.includes(propertyId);
+                {properties.map((prop, index) => {
+                  const propInfo = prop.propertyInfo || {};
+                  const propertyId = prop._id || prop.propertyNumber || prop.propertyId || index;
+                  const propertyName = propInfo.name || prop.property_name || `Property ${propertyId}`;
+                  const rent = prop.monthlyRent || prop.rent || propInfo.rent || propInfo.monthlyRent || 0;
+                  const gender = prop.gender || propInfo.gender || prop.genderSuitability || 'Not specified';
+                  const propertyType = prop.propertyType || propInfo.propertyType || 'Property';
 
                   return (
-                    <div
-                      key={propertyId}
-                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                        isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'
-                      }`}
-                      onClick={() => toggleProperty(propertyId)}
-                    >
+                    <div key={propertyId} className="p-4 border-2 border-blue-200 bg-blue-50 rounded-lg">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <h4 className="font-semibold text-gray-900">{propertyName}</h4>
-                          <p className="text-sm text-gray-600 mt-1">#{propertyId}</p>
-                          <div className="flex gap-4 mt-2 text-sm">
-                            <span className="text-gray-600"><strong>₹{rent.toLocaleString()}</strong>/month</span>
-                            <span className="text-gray-600">{gender}</span>
-                            <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs">{propertyType}</span>
+                          <p className="text-sm text-gray-500 mt-1">#{propertyId}</p>
+                          <div className="flex flex-wrap gap-2 mt-2 text-xs">
+                            <span className="rounded-full bg-white border border-gray-200 px-3 py-1 text-gray-700">
+                              <strong>₹{Number(rent).toLocaleString()}</strong>/month
+                            </span>
+                            <span className="rounded-full bg-white border border-gray-200 px-3 py-1 text-gray-700">{gender}</span>
+                            <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-700">{propertyType}</span>
                           </div>
                         </div>
-                        <input
-                          type="checkbox"
-                          className="w-5 h-5 text-blue-600 rounded"
-                          checked={isSelected}
-                          onChange={() => toggleProperty(propertyId)}
-                        />
+                        <div className="ml-4 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700">
+                          Auto included
+                        </div>
                       </div>
                     </div>
                   );
@@ -442,10 +439,7 @@ export default function FastBiddingPage() {
             <div className="border-t border-gray-200 pt-6 flex gap-3">
               <button
                 type="button"
-                onClick={() => {
-                  setForm({ fullName: '', gmail: '', gender: '', city: '', area: '', minPrice: '', maxPrice: '' });
-                  setSelectedIds([]);
-                }}
+                onClick={() => setForm({ fullName: '', gmail: '', gender: '', city: '', area: '', minPrice: '', maxPrice: '' })}
                 className="flex-1 bg-gray-100 text-gray-700 font-semibold py-3 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 Clear Form
@@ -455,7 +449,7 @@ export default function FastBiddingPage() {
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
               >
                 <Send className="w-5 h-5" />
-                Send Bids ({selectedIds.length})
+                Send Bids to Matching Properties
               </button>
             </div>
           </form>
@@ -488,7 +482,6 @@ export default function FastBiddingPage() {
         <WebsiteFooter />
       </div>
 
-      {/* Mobile Bottom Navigation */}
       <MobileBottomNav />
 
       {/* Success Modal */}
@@ -500,7 +493,7 @@ export default function FastBiddingPage() {
                 <CheckCircle className="w-8 h-8 text-green-600" />
               </div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Bid Sent Successfully!</h2>
-              <p className="text-gray-600 text-sm">Your bid has been sent to property owners.</p>
+              <p className="text-gray-600 text-sm">Your bid has been sent to all matching property owners.</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4 mb-6">
               <p className="text-sm text-gray-600"><strong>Bids sent to:</strong> {successCount} properties</p>
@@ -512,6 +505,58 @@ export default function FastBiddingPage() {
             >
               Done
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Signup Modal — shown when user is not logged in */}
+      {showSignupModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full overflow-hidden">
+            <div className="border-b border-gray-200 px-6 py-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">Account Verification</h2>
+                  <p className="mt-1 text-sm text-gray-600">Create an account to continue bidding.</p>
+                </div>
+                <button
+                  onClick={() => setShowSignupModal(false)}
+                  className="rounded-full border border-gray-200 p-2 text-gray-600 hover:border-gray-900 hover:text-gray-900 transition"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="px-6 py-8">
+              <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <p className="text-sm text-gray-500">Email</p>
+                <p className="mt-1 text-base font-semibold text-gray-900">{signupEmail}</p>
+              </div>
+              <p className="text-center text-gray-600 mb-6">
+                <span className="font-semibold text-gray-900">No account found</span> for this email. Please create an account to verify your identity and continue bidding.
+              </p>
+              <ul className="space-y-2 text-sm text-gray-600 mb-6 bg-white border border-gray-200 rounded-xl p-4">
+                <li className="flex items-center"><span className="mr-2 font-bold text-gray-900">✓</span> Verified account</li>
+                <li className="flex items-center"><span className="mr-2 font-bold text-gray-900">✓</span> Send multiple bids</li>
+                <li className="flex items-center"><span className="mr-2 font-bold text-gray-900">✓</span> Track your properties</li>
+              </ul>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowSignupModal(false)}
+                  className="flex-1 rounded-xl border border-gray-300 px-4 py-3 font-semibold text-gray-700 hover:border-gray-900 hover:text-gray-900 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { window.location.href = '/signup'; }}
+                  className="flex-1 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 transition"
+                >
+                  Sign Up Now
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

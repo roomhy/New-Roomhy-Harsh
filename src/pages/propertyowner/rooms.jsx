@@ -133,7 +133,10 @@ export default function Rooms() {
   useEffect(() => {
     const s = getOwnerRuntimeSession();
     if (!s?.loginId) { window.location.href = "/propertyowner/ownerlogin"; return; }
-    setOwner(s); load(s);
+    setOwner(s);
+    // Always bypass cache on mount so occupancy reflects the latest DB state
+    clearOwnerFetchCache(s.loginId);
+    load(s);
   }, []);
 
   const openAssignModal = (room, bedIdx) => {

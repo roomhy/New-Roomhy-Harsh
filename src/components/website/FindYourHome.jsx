@@ -57,6 +57,9 @@ export default function FindYourHome() {
                   src={point.image}
                   alt={point.title}
                   className="rounded-lg h-40 w-full object-cover"
+                  loading="lazy"
+                  width="800"
+                  height="160"
                 />
                 <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold border-4 border-white">
                   {index + 1}

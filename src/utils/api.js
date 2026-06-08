@@ -1,5 +1,31 @@
 import { fetchPropertiesLocal } from './mockApi';
 
+// ---------------------------------------------------------------------------
+// Module-level request cache
+// Deduplicates concurrent calls and avoids redundant network fetches.
+// Two components calling fetchCities() at the same time share one in-flight
+// Promise and one cached response for the TTL window.
+// ---------------------------------------------------------------------------
+const _cache = new Map();
+const _CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+// Second-level cache for the already-formatted properties array.
+// Prevents re-running _formatProperty on every fetchProperties() call
+// when the underlying HTTP response is already cached.
+let _formattedPropertiesCache = null;
+let _formattedPropertiesCacheTs = 0;
+
+const _fetchCached = (url, ttlMs = _CACHE_TTL_MS) => {
+  const entry = _cache.get(url);
+  if (entry && Date.now() - entry.ts < ttlMs) return entry.promise;
+  const promise = fetchJson(url).catch(err => {
+    _cache.delete(url); // never cache a failed request
+    throw err;
+  });
+  _cache.set(url, { promise, ts: Date.now() });
+  return promise;
+};
+
 export const getApiBase = () => {
   // Use Vite env variable if available
   if (import.meta.env?.VITE_API_URL) {
@@ -40,8 +66,10 @@ export const getAuthHeader = () => {
 export const fetchJson = async (path, options = {}) => {
   const base = getApiBase();
   const url = path.startsWith("http") ? path : `${base}${path}`;
+  const method = (options.method || 'GET').toUpperCase();
+  const hasBody = method !== 'GET' && method !== 'HEAD';
   const headers = {
-    "Content-Type": "application/json",
+    ...(hasBody ? { "Content-Type": "application/json" } : {}),
     ...(options.headers || {}),
     ...getAuthHeader()
   };
@@ -67,10 +95,10 @@ export const fetchJson = async (path, options = {}) => {
   return res.json();
 };
 
-// Fetch cities from backend
+// Fetch cities from backend — cached 10 minutes (cities rarely change)
 export const fetchCities = async () => {
   try {
-    const data = await fetchJson('/api/locations/cities');
+    const data = await _fetchCached('/api/locations/cities', 10 * 60 * 1000);
     return data.data || data || [];
   } catch (error) {
     console.error('Error fetching cities:', error);
@@ -78,10 +106,10 @@ export const fetchCities = async () => {
   }
 };
 
-// Fetch areas from backend
+// Fetch areas from backend — cached 10 minutes
 export const fetchAreas = async () => {
   try {
-    const data = await fetchJson('/api/locations/areas');
+    const data = await _fetchCached('/api/locations/areas', 10 * 60 * 1000);
     return data.data || data || [];
   } catch (error) {
     console.error('Error fetching areas:', error);
@@ -429,116 +457,75 @@ const staticPropertiesList = [
   }
 ];
 
-// Fetch properties from backend
+// Shared property formatter — used by fetchProperties and fetchPropertyByVisitId
+const _formatProperty = (p) => {
+  const imagesArray = p.images || p.photos || p.propertyInfo?.photos || [];
+  const firstImage = imagesArray[0] || `https://picsum.photos/800/600?random=${Math.floor(Math.random() * 100)}`;
+  return {
+    ...p,
+    _id: String(p._id || p.visitId || ''),
+    visitId: p.visitId || p._id,
+    property_name: p.property_name || p.propertyName || p.propertyInfo?.name || 'Property',
+    name: p.property_name || p.propertyName || p.propertyInfo?.name || 'Property',
+    city: p.city || p.propertyInfo?.city || 'Unknown',
+    location: p.propertyInfo?.area ? `${p.propertyInfo.area}, ${p.city || p.propertyInfo?.city}` : (p.city || p.propertyInfo?.city || 'Unknown'),
+    owner_name: p.owner_name || p.ownerName || p.generatedCredentials?.ownerName || p.approvedBy || 'Verified Owner',
+    owner_phone: p.owner_phone || p.contactPhone || p.ownerPhone || p.propertyInfo?.phone || '9000000000',
+    propertyName: p.propertyName || p.property_name || p.propertyInfo?.name || 'Property',
+    propertyType: p.propertyType || p.property_type || p.propertyInfo?.propertyType || 'PG',
+    monthlyRent: p.monthlyRent || p.rent || p.propertyInfo?.rent || 5000,
+    image: firstImage,
+    images: imagesArray,
+    latitude: p.latitude || p.propertyInfo?.latitude || p.propertyInfo?.location?.coordinates?.[1] || null,
+    longitude: p.longitude || p.propertyInfo?.longitude || p.propertyInfo?.location?.coordinates?.[0] || null,
+    beds: (() => {
+      const fromRoomTypes = (p.roomTypes || p.propertyInfo?.roomTypes || [])
+        .reduce((acc, rt) => acc + parseInt(rt.totalRooms || rt.total_rooms || 0), 0);
+      return fromRoomTypes || p.propertyInfo?.totalSeats || p.totalRooms || p.beds || 1;
+    })(),
+    owner_id: p.owner_id || p.ownerLoginId || p.generatedCredentials?.loginId || p.ownerLoginId,
+    isPremium: p.isPremium || p.is_premium || p.propertyInfo?.isPremium || false,
+    gender: p.gender || p.genderSuitability || p.propertyInfo?.genderSuitability || 'Co-ed'
+  };
+};
+
+// Fetch properties from backend — cached 5 minutes
 export const fetchProperties = async () => {
+  // Return already-formatted result if still fresh — skips _formatProperty re-run
+  const now = Date.now();
+  if (_formattedPropertiesCache && (now - _formattedPropertiesCacheTs) < _CACHE_TTL_MS) {
+    return _formattedPropertiesCache;
+  }
   try {
-    // Add cache-busting timestamp to ensure fresh data
-    const timestamp = Date.now();
-    const data = await fetchJson(`/api/approved-properties/public/approved?t=${timestamp}`);
+    const data = await _fetchCached('/api/approved-properties/public/approved');
     const properties = Array.isArray(data) ? data : data?.properties || data?.data || [];
-    
-    // Get total count from API (new field) or fallback to properties length
     const totalCount = data?.total || properties.length;
-    
-    console.log('📊 API returned', properties.length, 'properties (Total:', totalCount + ')');
-    
-    // Debug: Check first property to see what images data we have
-    if (properties.length > 0) {
-      console.log('🔍 API Debug - First Property:');
-      console.log('  p.images:', properties[0].images);
-      console.log('  p.photos:', properties[0].photos);
-      console.log('  p.propertyInfo?.photos:', properties[0].propertyInfo?.photos);
-      console.log('  p.property_name:', properties[0].property_name);
-      console.log('  p.propertyName:', properties[0].propertyName);
-    }
-    
-    // Ensure all required fields are present with fallback values
-    const formattedProperties = properties
-      .map(p => {
-        // Debug each property
-        console.log(`🔍 Processing Property: ${p.property_name || p.propertyName || 'Unknown'}`);
-        console.log(`  Images: ${p.images?.length || 0}, Photos: ${p.photos?.length || 0}, PropertyInfo Photos: ${p.propertyInfo?.photos?.length || 0}`);
-        
-        const imagesArray = p.images || p.photos || p.propertyInfo?.photos || [];
-        const firstImage = imagesArray[0] || `https://picsum.photos/800/600?random=${Math.floor(Math.random() * 100)}`;
-        
-        console.log(`  Final images array length: ${imagesArray.length}`);
-        console.log(`  First image: ${firstImage}`);
-        
-        return {
-          ...p,
-          _id: String(p._id || p.visitId || ''),
-          visitId: p.visitId || p._id,
-          property_name: p.property_name || p.propertyName || p.propertyInfo?.name || 'Property',
-          name: p.property_name || p.propertyName || p.propertyInfo?.name || 'Property',
-          city: p.city || p.propertyInfo?.city || 'Unknown',
-          location: p.propertyInfo?.area ? `${p.propertyInfo.area}, ${p.city || p.propertyInfo?.city}` : (p.city || p.propertyInfo?.city || 'Unknown'),
-          owner_name: p.owner_name || p.ownerName || p.generatedCredentials?.ownerName || p.approvedBy || 'Verified Owner',
-          owner_phone: p.owner_phone || p.contactPhone || p.ownerPhone || p.propertyInfo?.phone || '9000000000',
-          propertyName: p.propertyName || p.property_name || p.propertyInfo?.name || 'Property',
-          propertyType: p.propertyType || p.property_type || p.propertyInfo?.propertyType || 'PG',
-          monthlyRent: p.monthlyRent || p.rent || p.propertyInfo?.rent || 5000,
-          
-          // Add image field with first image from images array
-          image: firstImage,
-          
-          // Ensure images array exists for PropertyCard
-          images: imagesArray,
-
-          // Location coordinates
-          latitude: p.latitude || p.propertyInfo?.latitude || p.propertyInfo?.location?.coordinates?.[1] || null,
-          longitude: p.longitude || p.propertyInfo?.longitude || p.propertyInfo?.location?.coordinates?.[0] || null,
-          
-          // Beds/Rooms calculation
-          beds: (() => {
-            const fromRoomTypes = (p.roomTypes || p.propertyInfo?.roomTypes || [])
-              .reduce((acc, rt) => acc + parseInt(rt.totalRooms || rt.total_rooms || 0), 0);
-            return fromRoomTypes || p.propertyInfo?.totalSeats || p.totalRooms || p.beds || 1;
-          })(),
-
-          // Owner info
-          owner_id: p.owner_id || p.ownerLoginId || p.generatedCredentials?.loginId || p.ownerLoginId,
-          isPremium: p.isPremium || p.is_premium || p.propertyInfo?.isPremium || false,
-          gender: p.gender || p.genderSuitability || p.propertyInfo?.genderSuitability || 'Co-ed'
-        };
-      });
-    
-    // Attach total count to the array for access by components
+    const formattedProperties = properties.map(_formatProperty);
     formattedProperties.total = totalCount;
-    
-    console.log('✅ API SUCCESS - Returning formatted properties:');
-    console.log('  Total properties:', formattedProperties.length);
-    console.log('  First property images:', formattedProperties[0]?.images);
-    console.log('  First property image:', formattedProperties[0]?.image);
-    
+    _formattedPropertiesCache = formattedProperties;
+    _formattedPropertiesCacheTs = now;
     return formattedProperties;
   } catch (error) {
-    console.error('❌ API ERROR - Falling back to static data:', error);
-    console.log('🔄 Using static data fallback - this explains why PropertyCard gets wrong data!');
-    // Return static properties as fallback with correct structure
+    console.error('fetchProperties failed, using static fallback:', error.message);
     const staticFormatted = staticPropertiesList.map(p => ({
       ...p,
-      property_name: p.property_name,
-      city: p.city,
-      location: p.city || 'Unknown',
-      owner_name: p.owner_name,
-      owner_phone: p.owner_phone,
-      propertyName: p.propertyName,
-      propertyType: p.propertyType,
-      monthlyRent: p.monthlyRent,
-      
-      // Add image field with first image from images array
       image: p.images?.[0] || p.featuredImage || `https://picsum.photos/800/600?random=${Math.floor(Math.random() * 100)}`,
-      
-      // Ensure images array exists for PropertyCard
       images: p.images || [],
-      
-      // Owner link for bidding
       owner_id: p.owner_id
     }));
     staticFormatted.total = staticPropertiesList.length;
     return staticFormatted;
   }
+};
+
+// Fetch a single property by visitId or MongoDB _id.
+// Always uses the targeted single-property endpoint which returns all fields
+// (including propertyViews, roomTypes, facilities, pricing, policies that are
+// excluded from the listing endpoint to reduce payload size).
+export const fetchPropertyByVisitId = async (visitId) => {
+  const data = await fetchJson(`/api/approved-properties/${visitId}`);
+  const prop = data.property || data;
+  return _formatProperty(prop);
 };
 
 // Fetch stats for homepage
@@ -609,9 +596,7 @@ export const trackFeaturedClick = async (id) => {
 // Track view on property
 export const trackPropertyView = async (id) => {
   try {
-    console.log(`🌐 API: Tracking View for ID: ${id}`);
-    const res = await fetchJson(`/api/properties/${id}/view`, { method: 'POST' });
-    console.log(`✅ API: View tracked successfully for ${id}`, res);
+    await fetchJson(`/api/properties/${id}/view`, { method: 'POST' });
   } catch (error) {
     console.error('❌ API: Error tracking property view:', error);
   }
@@ -620,9 +605,7 @@ export const trackPropertyView = async (id) => {
 // Track click on property
 export const trackPropertyClick = async (id) => {
   try {
-    console.log(`🌐 API: Tracking Click for ID: ${id}`);
-    const res = await fetchJson(`/api/properties/${id}/click`, { method: 'POST' });
-    console.log(`✅ API: Click tracked successfully for ${id}`, res);
+    await fetchJson(`/api/properties/${id}/click`, { method: 'POST' });
   } catch (error) {
     console.error('❌ API: Error tracking property click:', error);
   }
@@ -690,29 +673,15 @@ export const fetchPropertyTypes = async () => {
   try {
     const response = await fetchJson('/api/property-types');
     if (response && response.success && response.data && response.data.length > 0) {
-      console.log('✅ Fetched property types from API:', response.data.length);
       return response.data;
     }
-    console.log('⚠️ Property types API returned empty or failed, using fallback');
   } catch (error) {
-    console.log('❌ Property types endpoint not available, using fallback');
+    // API not available, fall through to static types
   }
   // ============================================
 
-  // Fallback: use static data for now
-  console.log('Using static fallback data for property types');
-  
-  // Fallback: get unique property types from approved properties
-  try {
-    const properties = await fetchProperties();
-    const types = new Set();
-    properties.forEach(p => {
-      const type = p.propertyType || p.propertyInfo?.propertyType || p.type;
-      if (type) types.add(type);
-    });
-    
-    // Map to standard format with images array
-    const typeMap = {
+  // Static fallback — no external API dependency
+  const typeMap = {
       'pg': { 
         title: 'PG', 
         category: 'PG', 
@@ -773,34 +742,8 @@ export const fetchPropertyTypes = async () => {
         link: '/website/list'
       }
     };
-    
-    const result = [];
-    types.forEach(type => {
-      const key = type.toLowerCase();
-      if (typeMap[key]) {
-        result.push(typeMap[key]);
-      }
-    });
-    
-    // Always return all default types, merging with any found types
-    const defaultTypes = Object.values(typeMap);
-    if (result.length === 0) {
-      return defaultTypes;
-    }
-    
-    // Ensure all default types are present (merge found with defaults)
-    const foundCategories = new Set(result.map(r => r.category.toLowerCase()));
-    defaultTypes.forEach(defaultType => {
-      if (!foundCategories.has(defaultType.category.toLowerCase())) {
-        result.push(defaultType);
-      }
-    });
-    
-    return result;
-  } catch (error) {
-    console.error('Error fetching property types:', error);
-    return [];
-  }
+
+  return Object.values(typeMap);
 };
 
 // Search properties by location and property type
@@ -867,8 +810,6 @@ export const searchPropertiesByLocation = async (latitude, longitude, propertyTy
 
     // Preserve total count on the filtered array
     filtered.total = totalCount;
-    
-    console.log('📍 Location search:', filtered.length, 'nearby of', totalCount, 'total');
     
     return filtered;
   } catch (error) {
@@ -1000,81 +941,25 @@ export const fetchNearbyColleges = async (latitude, longitude, city = '', radius
 };
 
 // Enrich properties with nearby colleges from map API
-export const enrichPropertiesWithColleges = async (properties) => {
-  try {
-    // Default colleges for each city - instant display (no waiting)
-    const defaultCollegesByCity = {
-      'Kota': ['Allen', 'FIITJEE', 'Bansal Classes', 'Resonance'],
-      'Indore': ['IIT Indore', 'MITS', 'Devi Ahilya University', 'MAWL Institute'],
-      'Jaipur': ['MNIT Jaipur', 'RTU Jaipur', 'Manipal University', 'BITS Pilani'],
-      'Delhi': ['Delhi University', 'IIT Delhi', 'NSIT Delhi', 'DTU Delhi'],
-      'Bhopal': ['IISER Bhopal', 'Barkatullah University', 'MATS University', 'ITM Universe'],
-      'Nagpur': ['VNIT Nagpur', 'RCOEM', 'Rashtrasant Tukdoji Maharaj', 'Nagpur University'],
-      'Mumbai': ['IIT Bombay', 'NMIMS', 'AISSMS', 'Mumbai University'],
-      'Bangalore': ['IIT Bangalore', 'VTU', 'RV University', 'Christ University'],
-      'Chandigarh': ['Punjab University', 'PEC University', 'Chitkara University', 'DAV College'],
-      'Pune': ['Pune University', 'COEP', 'Symbiosis', 'MIT Pune']
-    };
+const _defaultCollegesByCity = {
+  'Kota': ['Allen', 'FIITJEE', 'Bansal Classes', 'Resonance'],
+  'Indore': ['IIT Indore', 'MITS', 'Devi Ahilya University', 'MAWL Institute'],
+  'Jaipur': ['MNIT Jaipur', 'RTU Jaipur', 'Manipal University', 'BITS Pilani'],
+  'Delhi': ['Delhi University', 'IIT Delhi', 'NSIT Delhi', 'DTU Delhi'],
+  'Bhopal': ['IISER Bhopal', 'Barkatullah University', 'MATS University', 'ITM Universe'],
+  'Nagpur': ['VNIT Nagpur', 'RCOEM', 'Rashtrasant Tukdoji Maharaj', 'Nagpur University'],
+  'Mumbai': ['IIT Bombay', 'NMIMS', 'AISSMS', 'Mumbai University'],
+  'Bangalore': ['IIT Bangalore', 'VTU', 'RV University', 'Christ University'],
+  'Chandigarh': ['Punjab University', 'PEC University', 'Chitkara University', 'DAV College'],
+  'Pune': ['Pune University', 'COEP', 'Symbiosis', 'MIT Pune']
+};
 
-    // Map properties with fallback colleges immediately
-    const enrichedProperties = properties.map((property) => {
-      try {
-        const city = property.city || property.propertyInfo?.city || 'Kota';
-        
-        // If already has nearby colleges from mock data, keep them
-        if (property.nearbyColleges && property.nearbyColleges.length > 0) {
-          return property;
-        }
-        
-        // Use default colleges for the city
-        const colleges = defaultCollegesByCity[city] || defaultCollegesByCity['Kota'];
-        
-        return {
-          ...property,
-          nearbyColleges: colleges
-        };
-      } catch (err) {
-        console.warn('Error processing property:', err);
-        return property;
-      }
-    });
-
-    // Try to fetch real data from OSM in background (don't block UI)
-    setTimeout(async () => {
-      const cityCoordinates = {
-        'Kota': { lat: 25.2048, lon: 75.8615 },
-        'Indore': { lat: 22.7196, lon: 75.8577 },
-        'Jaipur': { lat: 26.9124, lon: 75.7873 },
-        'Delhi': { lat: 28.6139, lon: 77.2090 },
-        'Bhopal': { lat: 23.1815, lon: 79.9864 },
-        'Nagpur': { lat: 21.1458, lon: 79.0882 },
-        'Mumbai': { lat: 19.0760, lon: 72.8777 },
-        'Bangalore': { lat: 12.9716, lon: 77.5946 },
-        'Chandigarh': { lat: 30.7595, lon: 76.7620 },
-        'Pune': { lat: 18.5204, lon: 73.8567 }
-      };
-
-      for (const property of enrichedProperties) {
-        try {
-          const city = property.city || property.propertyInfo?.city || 'Kota';
-          const coords = cityCoordinates[city];
-          if (coords) {
-            const colleges = await fetchNearbyColleges(coords.lat, coords.lon, city);
-            if (colleges && colleges.length > 0) {
-              property.nearbyColleges = colleges;
-            }
-          }
-        } catch (err) {
-          console.warn('Background OSM enrichment failed:', err);
-        }
-      }
-    }, 500);
-
-    return enrichedProperties;
-  } catch (error) {
-    console.error('Error enriching properties:', error);
-    return properties;
-  }
+export const enrichPropertiesWithColleges = (properties) => {
+  return properties.map((property) => {
+    if (property.nearbyColleges && property.nearbyColleges.length > 0) return property;
+    const city = property.city || property.propertyInfo?.city || 'Kota';
+    return { ...property, nearbyColleges: _defaultCollegesByCity[city] || _defaultCollegesByCity['Kota'] };
+  });
 };
 
 // ============================================================
@@ -1084,13 +969,8 @@ export const enrichPropertiesWithColleges = async (properties) => {
 // Fetch colleges for a single city from backend (calls Overpass API)
 export const fetchCollegesForCity = async (city) => {
   try {
-    console.log(`🎓 Fetching colleges for city: ${city}`);
     const data = await fetchJson(`/api/colleges/fetch-nearby?city=${encodeURIComponent(city)}`);
-    
-    if (data.success) {
-      console.log(`✅ Found ${data.count} colleges for ${city}`);
-      return data.colleges || [];
-    }
+    if (data.success) return data.colleges || [];
     return [];
   } catch (error) {
     console.error('Error fetching colleges for city:', error);
@@ -1098,25 +978,12 @@ export const fetchCollegesForCity = async (city) => {
   }
 };
 
-// Fetch colleges for ALL cities from backend (with delays, takes 20-30 seconds)
+// DO NOT call this function — the backend endpoint hits Overpass API sequentially
+// for 8 cities, each returning HTTP 406, causing 40-80s of backend processing.
+// College data comes from property.nearbyColleges populated by the backend on
+// GET /api/approved-properties/public/approved. Use that instead.
 export const fetchAllCollegesFromBackend = async () => {
-  try {
-    console.log('🎓 Fetching all colleges from backend (this may take 20-30 seconds)...');
-    const data = await fetchJson('/api/colleges/fetch-all-cities');
-    
-    if (data.success) {
-      console.log(`✅ Found ${data.totalColleges} colleges across ${data.cityCount} cities`);
-      return {
-        allColleges: data.allColleges || [],
-        cities: data.cities || {},
-        totalColleges: data.totalColleges || 0
-      };
-    }
-    return { allColleges: [], cities: {}, totalColleges: 0 };
-  } catch (error) {
-    console.error('Error fetching all colleges:', error);
-    return { allColleges: [], cities: {}, totalColleges: 0 };
-  }
+  return { allColleges: [], cities: {}, totalColleges: 0 };
 };
 
 // ==================== USER API FUNCTIONS ====================

@@ -3,7 +3,7 @@ import WebsiteFooter from "../../components/website/WebsiteFooter";
 import MobileBottomNav from "../../components/website/MobileBottomNav";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { fetchProperties, getPropertyReviews, getPropertyReviewStats, checkUserReview, submitReview, trackPropertyView, trackPropertyClick } from "../../utils/api";
+import { fetchPropertyByVisitId, getPropertyReviews, getPropertyReviewStats, checkUserReview, submitReview, trackPropertyView, trackPropertyClick } from "../../utils/api";
 
 // Extract city from property name (e.g., "HOSTEL - Vastrapur, Ahmedabad" -> "Ahmedabad")
 const extractCityFromName = (name) => {
@@ -364,7 +364,6 @@ export default function PropertyDetailsPage() {
   const handleQuickBookingSubmit = async (bookingData) => {
     try {
       // Here you would normally send the booking data to your backend
-      console.log('Booking Data:', bookingData);
       
       // For now, show success message and navigate
       alert('Booking request submitted successfully! We will contact you soon.');
@@ -460,7 +459,6 @@ export default function PropertyDetailsPage() {
           })
           .sort((a, b) => a.distance - b.distance);
 
-        console.log(`✅ Fetched ${institutes.length} institutes from ${server}`);
         apiSuccess = true;
         break;
       } catch (error) {
@@ -484,7 +482,6 @@ export default function PropertyDetailsPage() {
           distance: 0,
           source: "database"
         }));
-        console.log(`📋 Using ${institutes.length} colleges from database as fallback`);
       }
     }
 
@@ -497,7 +494,6 @@ export default function PropertyDetailsPage() {
           .slice(0, 10); // Save top 10 colleges
 
         if (collegeNames.length > 0) {
-          console.log(`💾 Saving ${collegeNames.length} colleges to database for property ${propertyId}`);
           
           // Update property in database
           await fetch(`/api/property-colleges/properties/${propertyId}/colleges`, {
@@ -539,47 +535,24 @@ export default function PropertyDetailsPage() {
     const loadPropertyDetails = async () => {
       try {
         setLoading(true);
-        
-        // Try to fetch from API first
-        let allProperties = [];
+
+        let foundProperty = null;
         try {
-          allProperties = await fetchProperties();
+          foundProperty = await fetchPropertyByVisitId(propertyId);
         } catch (apiError) {
           console.warn('API failed, using static data:', apiError.message);
-          // Use static data as fallback - get specific property by ID
           const staticProperty = getStaticPropertyById(propertyId);
           setProperty(staticProperty);
           setRawPropertyId(staticProperty._id);
           setLoading(false);
           return;
         }
-        
-        console.log('🔍 Debug: Looking for propertyId:', propertyId);
-        console.log('🔍 Debug: allProperties count:', allProperties.length);
-        
-        const foundProperty = allProperties.find(
-          (p) => String(p._id) === String(propertyId) || 
-                 String(p.visitId) === String(propertyId) || 
-                 String(p.propertyName) === String(propertyId) ||
-                 String(p.property_name) === String(propertyId)
-        );
 
         if (foundProperty) {
-          console.log('✅ Debug: Found property:', foundProperty.name || foundProperty.property_name);
-          // Debug: Log the full property object to see what _id looks like
-          console.log('Full foundProperty:', foundProperty);
-          console.log('foundProperty._id:', foundProperty._id);
-          console.log('foundProperty._id type:', typeof foundProperty._id);
-          console.log('foundProperty._id length:', foundProperty._id?.length);
-          
-          // Store actual MongoDB ObjectId separately for API calls
           const actualId = foundProperty._id || foundProperty.id;
           setRawPropertyId(actualId);
-          console.log('Setting rawPropertyId to:', actualId);
-          
-          // Track view
+
           if (actualId) {
-            console.log(`👁️ UI: Tracking view for property details: ${actualId}`);
             trackPropertyView(actualId);
           }
           
@@ -632,12 +605,6 @@ export default function PropertyDetailsPage() {
                 return amenity;
               });
               
-              console.log('🏠 PropertyDetailsPage amenities debug:', {
-                foundPropertyAmenities: foundProperty.amenities,
-                propertyInfoAmenities: foundProperty.propertyInfo?.amenities,
-                rawAmenities: rawAmenities,
-                parsedAmenities: parsedAmenities
-              });
               return parsedAmenities;
             })(),
             exclusiveBenefits: foundProperty.exclusiveBenefits || foundProperty.benefits || [],
@@ -680,7 +647,6 @@ export default function PropertyDetailsPage() {
             originalPrice: foundProperty.originalPrice || null,
           };
 
-          console.log('✅ Debug: Formatted property roomTypes:', formatted.roomTypes);
           setProperty(formatted);
 
           // Fetch nearby institutes from OpenStreetMap if coordinates available
@@ -699,14 +665,12 @@ export default function PropertyDetailsPage() {
             setNearbyInstitutes(institutes);
           }
         } else {
-          console.log('Property not found, using static data');
           const staticProperty = getStaticPropertyById(propertyId);
           setProperty(staticProperty);
           setRawPropertyId(staticProperty._id);
         }
       } catch (error) {
         console.error("Error fetching property details:", error);
-        console.log('Using static data as fallback');
         const staticProperty = getStaticPropertyById(propertyId);
         setProperty(staticProperty);
         setRawPropertyId(staticProperty._id);
@@ -755,7 +719,6 @@ export default function PropertyDetailsPage() {
   const loadReviews = async () => {
     if (!rawPropertyId) return;
     try {
-      console.log('Loading reviews for property:', rawPropertyId);
       const [reviewsData, statsData, userReviewData] = await Promise.all([
         getPropertyReviews(rawPropertyId),
         getPropertyReviewStats(rawPropertyId),
@@ -776,8 +739,6 @@ export default function PropertyDetailsPage() {
     
     // Use property.id (can be string like DELHI-PG-002)
     const actualPropertyId = property?.id || rawPropertyId;
-    console.log('property.id:', property?.id);
-    console.log('Using ID:', actualPropertyId);
     
     if (!actualPropertyId) {
       alert('Error: Property ID not found');
