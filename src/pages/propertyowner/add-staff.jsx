@@ -1,250 +1,470 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
-import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
-import { 
-  UserPlus, ShieldCheck, Mail, Phone, 
-  Briefcase, IndianRupee, FileText, CheckCircle2, AlertCircle
+import { getOwnerRuntimeSession, clearOwnerRuntimeSession, fetchOwnerProperties } from "../../utils/propertyowner";
+import {
+  UserPlus, CheckCircle2, AlertCircle, Camera, Building2,
+  Clock, IndianRupee, Phone, Mail, Shield, Briefcase, Calendar, MapPin, User
 } from "lucide-react";
 import { apiFetch } from "../../services/api";
 
-export default function AddStaffPage() {
-  const owner = getOwnerRuntimeSession();
-  if (!owner?.loginId && typeof window !== "undefined") { 
-    window.location.href = "/propertyowner/ownerlogin"; 
-    return null; 
-  }
+const ROLES = ["Warden", "Reception", "Accountant", "Housekeeping", "Maintenance", "Property Manager", "Custom"];
+const SHIFTS = [
+  { label: "Morning Shift (06:00 AM – 02:00 PM)", start: "06:00 AM", end: "02:00 PM" },
+  { label: "Day Shift (09:00 AM – 06:00 PM)", start: "09:00 AM", end: "06:00 PM" },
+  { label: "Evening Shift (02:00 PM – 10:00 PM)", start: "02:00 PM", end: "10:00 PM" },
+  { label: "Night Shift (10:00 PM – 06:00 AM)", start: "10:00 PM", end: "06:00 AM" },
+  { label: "Flexible Hours", start: "09:00 AM", end: "06:00 PM" },
+];
+const DEFAULT_PERMISSIONS = ["Dashboard", "Rooms", "Tenants", "Complaints", "Attendance", "Tasks"];
 
+// ── Defined OUTSIDE component — never recreated on re-render ──
+const ALL_MODULES = ["Dashboard", "Properties", "Rooms", "Tenants", "Leads", "Bookings", "Rent Collection", "Payments", "Complaints", "Attendance", "Tasks", "Reports", "Documents"];
+
+const inputCls = "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-[13px] font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:text-slate-400";
+
+const Field = ({ label, children, required }) => (
+  <div>
+    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+      {label}{required && <span className="text-rose-500 ml-0.5">*</span>}
+    </label>
+    {children}
+  </div>
+);
+
+export default function AddStaffPage() {
+  // ── All hooks FIRST — no conditional returns before hooks ──
+  const [owner] = useState(() => getOwnerRuntimeSession());
+  const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
-    name: "",
-    role: "Warden",
-    phone: "",
-    email: "",
-    salary: "",
-    shift: "Day Shift (09:00 AM - 06:00 PM)",
-    aadhaar: ""
+    name: "", role: "Warden", customRole: "",
+    phone: "", email: "",
+    salary: "", shift: SHIFTS[1].label,
+    joiningDate: new Date().toISOString().split("T")[0],
+    address: "", emergencyContact: "",
+    assignedProperty: "", assignedPropertyName: "",
+    status: "Active",
+    photoDataUrl: "",
+    permissions: DEFAULT_PERMISSIONS,
   });
+  const [properties, setProperties] = useState([]);
   const [successData, setSuccessData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [nextStaffId, setNextStaffId] = useState("STAFF0001");
+  const photoRef = useRef(null);
+
+  // Session redirect — inside useEffect to avoid hooks violation
+  useEffect(() => {
+    if (!owner?.loginId) {
+      window.location.href = "/propertyowner/ownerlogin";
+    }
+  }, [owner]);
+
+  useEffect(() => {
+    if (!owner?.loginId) return;
+    fetchOwnerProperties(owner.loginId, true)
+      .then(list => setProperties(list || []))
+      .catch(() => {});
+    apiFetch(`/api/employees/generate-staff-id/${owner.loginId}`)
+      .then(data => { if (data?.staffId) setNextStaffId(data.staffId); })
+      .catch(() => {});
+  }, [owner?.loginId]);
+
+  // ── SINGLE stable handler — prevents re-render on every keystroke ──
+  const handleChange = useCallback((field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handlePropertyChange = useCallback((val) => {
+    setFormData(prev => {
+      const sel = properties.find(p => String(p._id || p.id) === val);
+      return { ...prev, assignedProperty: val, assignedPropertyName: sel?.title || sel?.name || "" };
+    });
+  }, [properties]);
+
+  const handlePhoto = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => handleChange("photoDataUrl", ev.target.result);
+    reader.readAsDataURL(file);
+  }, [handleChange]);
+
+  const togglePermission = useCallback((perm) => {
+    setFormData(prev => ({
+      ...prev,
+      permissions: prev.permissions.includes(perm)
+        ? prev.permissions.filter(p => p !== perm)
+        : [...prev.permissions, perm]
+    }));
+  }, []);
 
   const handleSubmit = async (e) => {
+
     e.preventDefault();
     setLoading(true);
     setError("");
     try {
-      // 1. Generate loginId
-      const loginId = `${formData.name.replace(/\s+/g, '').toLowerCase()}_${Date.now().toString().slice(-4)}`;
-      
-      // Generate a secure 8-character random password
-      const password = Math.random().toString(36).slice(-8).toUpperCase();
+      // Generate secure temp password
+      const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$";
+      const password = Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 
-      // 2. Create Employee
-      const empData = await apiFetch('/api/employees', {
-        method: 'POST',
+      // Fetch fresh staff ID to avoid race conditions
+      let staffId = nextStaffId;
+      try {
+        const idRes = await apiFetch(`/api/employees/generate-staff-id/${owner.loginId}`);
+        if (idRes?.staffId) staffId = idRes.staffId;
+      } catch (_) {}
+
+      const shiftObj = SHIFTS.find(s => s.label === formData.shift) || SHIFTS[1];
+      const roleFinal = formData.role === "Custom" ? (formData.customRole || "Custom") : formData.role;
+
+      // Create employee
+      const empData = await apiFetch("/api/employees", {
+        method: "POST",
         body: JSON.stringify({
           name: formData.name,
-          loginId: loginId,
+          loginId: staffId,
           phone: formData.phone,
           email: formData.email,
           password: password,
-          role: formData.role,
-          parentLoginId: owner.loginId
-        })
+          role: roleFinal,
+          parentLoginId: owner.loginId,
+          photoDataUrl: formData.photoDataUrl,
+          permissions: formData.permissions,
+          isActive: formData.status === "Active",
+          requirePasswordReset: true,
+          joiningDate: formData.joiningDate,
+          address: formData.address,
+          emergencyContact: formData.emergencyContact,
+          assignedProperty: formData.assignedProperty,
+          assignedPropertyName: formData.assignedPropertyName,
+        }),
       });
-      if (!empData || !empData.data) throw new Error(empData?.error || 'Failed to create staff');
-      
+      if (!empData?.data) throw new Error(empData?.error || "Failed to create staff");
+
       const employeeId = empData.data._id;
 
-      // 3. Setup Salary
-      await apiFetch('/api/hr/salaries', {
-        method: 'POST',
-        body: JSON.stringify({
-          employeeId,
-          ownerLoginId: owner.loginId,
-          month: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
-          baseSalary: Number(formData.salary) || 0,
-          status: 'Pending'
-        })
-      });
-
-      // 4. Setup Shift
-      let startTime = "09:00 AM";
-      let endTime = "06:00 PM";
-      if (formData.shift.includes("Night")) {
-        startTime = "08:00 PM";
-        endTime = "08:00 AM";
+      // Setup salary
+      if (formData.salary) {
+        await apiFetch("/api/hr/salaries", {
+          method: "POST",
+          body: JSON.stringify({
+            employeeId,
+            ownerLoginId: owner.loginId,
+            month: new Date().toLocaleString("default", { month: "long", year: "numeric" }),
+            baseSalary: Number(formData.salary) || 0,
+            status: "Pending",
+          }),
+        });
       }
-      await apiFetch('/api/hr/shifts', {
-        method: 'POST',
+
+      // Setup shift
+      await apiFetch("/api/hr/shifts", {
+        method: "POST",
         body: JSON.stringify({
           employeeId,
           ownerLoginId: owner.loginId,
-          shiftName: formData.shift.split(" ")[0] + " Shift",
-          startTime,
-          endTime,
-          days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-        })
+          shiftName: formData.shift.split("(")[0].trim(),
+          startTime: shiftObj.start,
+          endTime: shiftObj.end,
+          days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+        }),
       });
 
-      setSuccessData({ loginId, password });
-      setTimeout(() => {
-        setSuccessData(null);
-        setFormData({ name: "", role: "Warden", phone: "", email: "", salary: "", shift: "Day Shift (09:00 AM - 06:00 PM)", aadhaar: "" });
-      }, 10000);
+      setSuccessData({ staffId, password, name: formData.name, role: roleFinal, email: formData.email });
+      setStep(1);
+      setFormData({
+        name: "", role: "Warden", customRole: "", phone: "", email: "", salary: "",
+        shift: SHIFTS[1].label, joiningDate: new Date().toISOString().split("T")[0],
+        address: "", emergencyContact: "", assignedProperty: "", assignedPropertyName: "",
+        status: "Active", photoDataUrl: "", permissions: DEFAULT_PERMISSIONS,
+      });
+      // Refresh next ID
+      try {
+        const idRes = await apiFetch(`/api/employees/generate-staff-id/${owner.loginId}`);
+        if (idRes?.staffId) setNextStaffId(idRes.staffId);
+      } catch (_) {}
     } catch (err) {
-      console.error(err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
+
+
   return (
-    <PropertyOwnerLayout 
-      owner={owner} 
-      title="Add New Staff" 
+    <PropertyOwnerLayout
+      owner={owner}
+      title="Add Staff"
       onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
     >
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
-        <div>
-          <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Add New Staff</h1>
-          <p className="mt-1.5 text-[13.5px] text-muted-foreground">Register a new team member, assign job roles, shift timings, and monthly salary.</p>
+      <div className="max-w-4xl">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/20">
+              <UserPlus size={20} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">Add New Staff</h1>
+              <p className="text-xs text-slate-500 font-medium">Auto ID: <span className="font-black text-blue-600">{nextStaffId}</span></p>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="max-w-2xl rounded-2xl border border-border bg-card p-6 shadow-soft space-y-6">
-        <h3 className="font-serif text-[20px] text-foreground border-b border-border/60 pb-3">Staff Profile Information</h3>
-        
-        {successData && (
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-6 space-y-4 animate-in fade-in zoom-in duration-300">
-            <div className="flex items-center gap-2 text-emerald-800 text-sm font-bold">
-              <CheckCircle2 size={18} className="text-emerald-600 animate-bounce" /> Staff registered successfully & Credentials Email sent!
-            </div>
-            <div className="grid grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-emerald-100 text-xs">
-              <div>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Login ID</span>
-                <code className="text-sm font-black text-blue-600 tracking-wider">{successData.loginId}</code>
-              </div>
-              <div>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Access Password</span>
-                <code className="text-sm font-black text-slate-800 tracking-wider">{successData.password}</code>
-              </div>
-            </div>
-            <p className="text-[10px] text-slate-400 font-medium">Please note down these credentials. An email containing these details has also been dispatched to the employee's inbox.</p>
-          </div>
-        )}
-        {error && (
-          <div className="rounded-xl border border-rose-100 bg-rose-50 p-4 text-rose-700 text-xs font-bold flex items-center gap-2">
-            <AlertCircle size={16} /> {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">Full Name</label>
-              <input 
-                type="text" 
-                value={formData.name} 
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g. Ramesh Kumar"
-                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-[11.5px] font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-200 transition-all"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">Job Designation / Role</label>
-              <select 
-                value={formData.role} 
-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-[11.5px] font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-200 transition-all cursor-pointer"
-              >
-                <option value="Owner">Owner</option>
-                <option value="Warden">Warden</option>
-                <option value="Accountant">Accountant</option>
-                <option value="Reception">Reception</option>
-                <option value="Housekeeping">Housekeeping</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">Email Address</label>
-              <input 
-                type="email" 
-                value={formData.email} 
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="e.g. ramesh@roomhy.com"
-                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-[11.5px] font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-200 transition-all"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">Phone Number</label>
-              <input 
-                type="tel" 
-                value={formData.phone} 
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="e.g. +91 99887 76655"
-                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-[11.5px] font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-200 transition-all"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">Monthly Salary (₹)</label>
-              <input 
-                type="number" 
-                value={formData.salary} 
-                onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
-                placeholder="e.g. 15000"
-                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-[11.5px] font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-200 transition-all"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">Aadhaar Card Number</label>
-              <input 
-                type="text" 
-                value={formData.aadhaar} 
-                onChange={(e) => setFormData({ ...formData, aadhaar: e.target.value })}
-                placeholder="12-digit Aadhaar"
-                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-[11.5px] font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-200 transition-all"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">Duty Shift Schedule</label>
-              <select 
-                value={formData.shift} 
-                onChange={(e) => setFormData({ ...formData, shift: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-[11.5px] font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-200 transition-all cursor-pointer"
-              >
-                <option value="Day Shift (09:00 AM - 06:00 PM)">Day Shift (09:00 AM - 06:00 PM)</option>
-                <option value="Night Shift (08:00 PM - 08:00 AM)">Night Shift (08:00 PM - 08:00 AM)</option>
-                <option value="Flexible Shift">Flexible Hours</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-4 border-t border-border/60">
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="px-6 h-11 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-slate-900/10 disabled:opacity-50"
+        {/* Step Tabs */}
+        <div className="flex gap-1 mb-8 bg-slate-100 p-1 rounded-2xl w-fit">
+          {[{ n: 1, label: "Profile" }, { n: 2, label: "Work Details" }, { n: 3, label: "Permissions" }].map(s => (
+            <button
+              key={s.n}
+              onClick={() => setStep(s.n)}
+              className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${step === s.n ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
             >
-              {loading ? "Registering..." : "Add Staff Member"} <UserPlus className="w-3.5 h-3.5" />
+              {s.n}. {s.label}
             </button>
+          ))}
+        </div>
+
+        {/* Success Banner */}
+        {successData && (
+          <div className="mb-6 p-6 rounded-2xl bg-emerald-50 border border-emerald-200">
+            <div className="flex items-center gap-2 mb-4 text-emerald-800">
+              <CheckCircle2 size={20} className="text-emerald-600" />
+              <span className="font-black text-sm">Staff "{successData.name}" created successfully!</span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: "Staff ID", value: successData.staffId, mono: true, color: "text-blue-700" },
+                { label: "Temp Password", value: successData.password, mono: true, color: "text-slate-900" },
+                { label: "Role", value: successData.role, mono: false, color: "text-slate-700" },
+                { label: "Email Sent To", value: successData.email || "No email", mono: false, color: "text-slate-700" },
+              ].map(item => (
+                <div key={item.label} className="bg-white p-3 rounded-xl border border-emerald-100">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{item.label}</p>
+                  <p className={`text-sm font-black ${item.color} ${item.mono ? "font-mono tracking-wider" : ""} break-all`}>{item.value}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-400 mt-3 font-medium">⚠️ Share these credentials with the staff member. They will be prompted to change their password on first login.</p>
           </div>
+        )}
+
+        {error && (
+          <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 flex items-center gap-3 text-rose-700">
+            <AlertCircle size={18} />
+            <span className="text-sm font-bold">{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          {/* STEP 1 – Profile */}
+          {step === 1 && (
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-8 space-y-6">
+              <h2 className="text-base font-black text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-4 flex items-center gap-2">
+                <User size={16} className="text-blue-500" /> Profile Information
+              </h2>
+
+              {/* Photo Upload */}
+              <div className="flex items-center gap-5">
+                <div className="relative">
+                  <div
+                    onClick={() => photoRef.current?.click()}
+                    className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center cursor-pointer hover:scale-105 transition-transform overflow-hidden border-4 border-white shadow-xl shadow-blue-500/20"
+                  >
+                    {formData.photoDataUrl
+                      ? <img src={formData.photoDataUrl} alt="Staff" className="w-full h-full object-cover" />
+                      : <span className="text-3xl font-black text-white">{formData.name?.[0]?.toUpperCase() || "?"}</span>
+                    }
+                  </div>
+                  <div
+                    onClick={() => photoRef.current?.click()}
+                    className="absolute -bottom-1 -right-1 w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center cursor-pointer shadow-lg"
+                  >
+                    <Camera size={13} className="text-white" />
+                  </div>
+                  <input ref={photoRef} type="file" accept="image/*" onChange={handlePhoto} className="hidden" />
+                </div>
+                <div>
+                  <p className="text-sm font-black text-slate-800">Profile Photo</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Click to upload (optional)</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <Field label="Full Name" required>
+                  <input type="text" value={formData.name} onChange={e => handleChange("name", e.target.value)}
+                    placeholder="e.g. Ramesh Kumar" className={inputCls} required />
+                </Field>
+                <Field label="Job Role / Designation" required>
+                  <select value={formData.role} onChange={e => handleChange("role", e.target.value)} className={inputCls}>
+                    {ROLES.map(r => <option key={r}>{r}</option>)}
+                  </select>
+                </Field>
+                {formData.role === "Custom" && (
+                  <Field label="Custom Role Name" required>
+                    <input type="text" value={formData.customRole} onChange={e => handleChange("customRole", e.target.value)}
+                      placeholder="e.g. Security Guard" className={inputCls} required />
+                  </Field>
+                )}
+                <Field label="Email Address" required>
+                  <input type="email" value={formData.email} onChange={e => handleChange("email", e.target.value)}
+                    placeholder="staff@example.com" className={inputCls} required />
+                </Field>
+                <Field label="Mobile Number" required>
+                  <input type="tel" value={formData.phone} onChange={e => handleChange("phone", e.target.value)}
+                    placeholder="+91 98765 43210" className={inputCls} required />
+                </Field>
+                <Field label="Emergency Contact">
+                  <input type="tel" value={formData.emergencyContact} onChange={e => handleChange("emergencyContact", e.target.value)}
+                    placeholder="Emergency phone" className={inputCls} />
+                </Field>
+                <Field label="Address">
+                  <input type="text" value={formData.address} onChange={e => handleChange("address", e.target.value)}
+                    placeholder="Residential address" className={inputCls} />
+                </Field>
+                <Field label="Status">
+                  <select value={formData.status} onChange={e => handleChange("status", e.target.value)} className={inputCls}>
+                    <option>Active</option>
+                    <option>Inactive</option>
+                  </select>
+                </Field>
+              </div>
+
+              <div className="flex justify-end pt-4 border-t border-slate-50">
+                <button type="button" onClick={() => setStep(2)}
+                  className="px-8 h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-600/20">
+                  Next: Work Details →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2 – Work Details */}
+          {step === 2 && (
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-8 space-y-6">
+              <h2 className="text-base font-black text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-4 flex items-center gap-2">
+                <Briefcase size={16} className="text-blue-500" /> Work Details
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <Field label="Assigned Property">
+                  <select value={formData.assignedProperty} onChange={e => handlePropertyChange(e.target.value)} className={inputCls}>
+                    <option value="">— All Properties / Not Assigned —</option>
+                    {properties.map(p => (
+                      <option key={p._id || p.id} value={p._id || p.id}>{p.title || p.name}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Shift Timing" required>
+                  <select value={formData.shift} onChange={e => handleChange("shift", e.target.value)} className={inputCls}>
+                    {SHIFTS.map(s => <option key={s.label} value={s.label}>{s.label}</option>)}
+                  </select>
+                </Field>
+                <Field label="Monthly Salary (₹)">
+                  <div className="relative">
+                    <IndianRupee size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input type="number" value={formData.salary} onChange={e => handleChange("salary", e.target.value)}
+                      placeholder="e.g. 15000" className={`${inputCls} pl-8`} />
+                  </div>
+                </Field>
+                <Field label="Joining Date" required>
+                  <input type="date" value={formData.joiningDate} onChange={e => handleChange("joiningDate", e.target.value)}
+                    className={inputCls} required />
+                </Field>
+              </div>
+
+              {/* Auto-generated credentials preview */}
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100">
+                <h3 className="text-xs font-black text-blue-800 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <Shield size={14} /> Auto-Generated Login Credentials
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white p-3 rounded-xl border border-blue-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Staff ID</p>
+                    <p className="text-sm font-black text-blue-700 font-mono tracking-wider">{nextStaffId}</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-blue-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Temp Password</p>
+                    <p className="text-sm font-black text-slate-600 font-mono">Auto-generated</p>
+                  </div>
+                </div>
+                <p className="text-[10px] text-blue-700 mt-3 font-medium">
+                  📧 Credentials will be emailed to {formData.email || "staff email"} after account creation.
+                </p>
+              </div>
+
+              <div className="flex justify-between pt-4 border-t border-slate-50">
+                <button type="button" onClick={() => setStep(1)}
+                  className="px-6 h-11 border border-slate-200 text-slate-600 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-slate-50 transition-all">
+                  ← Back
+                </button>
+                <button type="button" onClick={() => setStep(3)}
+                  className="px-8 h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-600/20">
+                  Next: Permissions →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3 – Permissions */}
+          {step === 3 && (
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-8 space-y-6">
+              <h2 className="text-base font-black text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-4 flex items-center gap-2">
+                <Shield size={16} className="text-blue-500" /> Module Permissions
+              </h2>
+              <p className="text-xs text-slate-500 font-medium -mt-2">
+                Select which modules this staff member can access. These can be changed later.
+              </p>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {ALL_MODULES.map(mod => {
+                  const active = formData.permissions.includes(mod);
+                  return (
+                    <button
+                      key={mod}
+                      type="button"
+                      onClick={() => togglePermission(mod)}
+                      className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${active
+                        ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-600/20"
+                        : "border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600"}`}
+                    >
+                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all ${active ? "border-white" : "border-slate-300"}`}>
+                        {active && <CheckCircle2 size={10} className="text-white" />}
+                      </div>
+                      <span className="text-xs font-bold">{mod}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-2 mt-4">
+                <button type="button" onClick={() => setFormData(f => ({ ...f, permissions: ALL_MODULES }))}
+                  className="px-4 py-1.5 text-xs font-black text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-all">
+                  Select All
+                </button>
+                <button type="button" onClick={() => handleChange("permissions", ["Dashboard"])}
+                  className="px-4 py-1.5 text-xs font-black text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 transition-all">
+                  Reset to Default
+                </button>
+              </div>
+
+              <div className="flex justify-between pt-4 border-t border-slate-50">
+                <button type="button" onClick={() => setStep(2)}
+                  className="px-6 h-11 border border-slate-200 text-slate-600 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-slate-50 transition-all">
+                  ← Back
+                </button>
+                <button type="submit" disabled={loading}
+                  className="px-10 h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-600/20 disabled:opacity-60 flex items-center gap-2">
+                  {loading ? (
+                    <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Creating...</>
+                  ) : (
+                    <><UserPlus size={15} />Create Staff Member</>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </form>
       </div>
     </PropertyOwnerLayout>

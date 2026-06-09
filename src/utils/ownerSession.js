@@ -13,13 +13,10 @@ const normalizeOwnerSession = (value) => {
 export const getOwnerSession = () => {
   if (typeof window === "undefined") return null;
 
+  // ONLY read from owner-specific keys — NOT "user" (superadmin key)
   const keys = [
     () => sessionStorage.getItem("owner_session"),
     () => localStorage.getItem("owner_session"),
-    () => localStorage.getItem("owner_user"),
-    () => sessionStorage.getItem("owner_user"),
-    () => sessionStorage.getItem("user"),
-    () => localStorage.getItem("user")
   ];
 
   for (const read of keys) {

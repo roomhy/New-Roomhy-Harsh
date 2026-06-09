@@ -159,6 +159,7 @@ const routeEntries = [
   ["/propertyowner/tenants", "./pages/propertyowner/tenants.jsx"],
   
   // New Demo Panels
+  ["/staff/login", "./pages/staff-panel/login.jsx"],
   ["/staff", "./pages/staff-panel/dashboard.jsx"],
   ["/staff/tenants", "./pages/staff-panel/tenants.jsx"],
   ["/staff/rooms", "./pages/staff-panel/rooms.jsx"],
@@ -238,6 +239,7 @@ const routeEntries = [
   ["/propertyowner/add-staff", "./pages/propertyowner/add-staff.jsx"],
   ["/propertyowner/roles-permissions", "./pages/propertyowner/roles-permissions.jsx"],
   ["/propertyowner/staff-attendance", "./pages/propertyowner/staff-attendance.jsx"],
+  ["/propertyowner/staff-tasks", "./pages/propertyowner/staff-tasks.jsx"],
   ["/propertyowner/staff-salaries", "./pages/propertyowner/staff-salaries.jsx"],
   ["/propertyowner/shift-management", "./pages/propertyowner/shift-management.jsx"],
   ["/propertyowner/staff-performance", "./pages/propertyowner/staff-performance.jsx"],

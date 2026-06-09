@@ -1,174 +1,353 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
-import { 
-  Users, Search, Plus, Trash2, Edit3, 
-  CheckCircle2, AlertCircle, Phone, ArrowUpRight
+import {
+  Users, Search, Plus, CheckCircle2, AlertCircle, Phone, Mail,
+  Building2, Clock, Shield, MoreVertical, X, TrendingUp,
+  Briefcase, UserCheck, UserX, Filter, ChevronDown, Eye, Edit3, Power
 } from "lucide-react";
 import { apiFetch } from "../../services/api";
 
+const ROLE_COLORS = {
+  Warden: "bg-blue-100 text-blue-700",
+  Reception: "bg-emerald-100 text-emerald-700",
+  Accountant: "bg-purple-100 text-purple-700",
+  Housekeeping: "bg-amber-100 text-amber-700",
+  Maintenance: "bg-orange-100 text-orange-700",
+  "Property Manager": "bg-indigo-100 text-indigo-700",
+  Custom: "bg-slate-100 text-slate-700",
+};
+
+const ROLE_AVATAR_BG = {
+  Warden: "bg-blue-600",
+  Reception: "bg-emerald-600",
+  Accountant: "bg-purple-600",
+  Housekeeping: "bg-amber-500",
+  Maintenance: "bg-orange-500",
+  "Property Manager": "bg-indigo-600",
+  Custom: "bg-slate-600",
+};
+
 export default function AllStaffPage() {
   const owner = getOwnerRuntimeSession();
-  if (!owner?.loginId && typeof window !== "undefined") { 
-    window.location.href = "/propertyowner/ownerlogin"; 
-    return null; 
+  if (!owner?.loginId && typeof window !== "undefined") {
+    window.location.href = "/propertyowner/ownerlogin";
+    return null;
   }
 
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
   const [staff, setStaff] = useState([]);
+  const [stats, setStats] = useState({ total: 0, active: 0, inactive: 0, presentToday: 0 });
   const [loading, setLoading] = useState(true);
+  const [detailStaff, setDetailStaff] = useState(null);
+  const [actionLoading, setActionLoading] = useState(null);
 
-  React.useEffect(() => {
-    fetchStaff();
-  }, []);
-
-  const fetchStaff = async () => {
+  const fetchStaff = useCallback(async () => {
+    setLoading(true);
     try {
-      // Fetch employees where parentLoginId is owner.loginId (assuming our API returns all or we just filter client-side for now, wait, employeeRoutes returns all by default. We should pass filter, but it's not supported via query yet. We'll filter client side for safety.)
-      const data = await apiFetch('/api/employees');
-      let myStaff = (data.data || []).filter(e => e.parentLoginId === owner.loginId);
+      const [empData, statsData, shiftsData] = await Promise.allSettled([
+        apiFetch(`/api/employees?parentLoginId=${owner.loginId}`),
+        apiFetch(`/api/employees/stats/${owner.loginId}`),
+        apiFetch(`/api/hr/shifts/${owner.loginId}`),
+      ]);
 
-      // Fetch their shifts to show duty hours
-      const shiftsData = await apiFetch(`/api/hr/shifts/${owner.loginId}`);
+      const employees = (empData.status === "fulfilled" ? empData.value?.data : null) || [];
+      const statsRes = statsData.status === "fulfilled" ? statsData.value?.data : {};
+      const shifts = (shiftsData.status === "fulfilled" ? shiftsData.value?.data : null) || [];
+
       const shiftsMap = {};
-      if (shiftsData.success) {
-        shiftsData.data.forEach(sh => {
-          if (sh.employeeId && sh.employeeId._id) {
-             shiftsMap[sh.employeeId._id] = `${sh.startTime} - ${sh.endTime}`;
-          } else if (sh.employeeId) {
-             shiftsMap[sh.employeeId] = `${sh.startTime} - ${sh.endTime}`;
-          }
-        });
-      }
+      shifts.forEach(sh => {
+        const id = sh.employeeId?._id || sh.employeeId;
+        if (id) shiftsMap[id] = `${sh.startTime} – ${sh.endTime}`;
+      });
 
-      myStaff = myStaff.map(s => ({
-        id: s._id,
-        loginId: s.loginId,
-        name: s.name,
-        role: s.role,
-        phone: s.phone || 'N/A',
-        shift: shiftsMap[s._id] || 'Standard Hours',
-        status: s.isActive ? 'Active' : 'Terminated'
+      const mapped = employees.map(e => ({
+        id: e._id,
+        loginId: e.loginId,
+        name: e.name || "Unknown",
+        role: e.role || "Staff",
+        phone: e.phone || "",
+        email: e.email || "",
+        status: e.isActive ? "Active" : "Inactive",
+        photoDataUrl: e.photoDataUrl || "",
+        shift: shiftsMap[e._id] || "Standard Hours",
+        permissions: e.permissions || [],
+        assignedPropertyName: e.assignedPropertyName || "",
+        joiningDate: e.joiningDate || e.createdAt || "",
+        address: e.address || "",
       }));
 
-      setStaff(myStaff);
+      setStaff(mapped);
+      setStats({
+        total: statsRes.total || mapped.length,
+        active: statsRes.active || mapped.filter(s => s.status === "Active").length,
+        inactive: statsRes.inactive || mapped.filter(s => s.status === "Inactive").length,
+        presentToday: statsRes.presentToday || 0,
+      });
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [owner.loginId]);
 
-  const handleToggleActive = async (loginId, isCurrentlyActive) => {
-    const action = isCurrentlyActive ? "deactivate" : "reactivate";
-    if (!window.confirm(`Are you sure you want to ${action} this staff member?`)) return;
+  useEffect(() => { fetchStaff(); }, [fetchStaff]);
+
+  const handleToggle = async (s) => {
+    const action = s.status === "Active" ? "deactivate" : "reactivate";
+    if (!window.confirm(`${action === "deactivate" ? "Deactivate" : "Reactivate"} ${s.name}?`)) return;
+    setActionLoading(s.id);
     try {
-      await apiFetch(`/api/employees/${loginId}/${action}`, { method: 'POST' });
-      setStaff(prev => prev.map(s => s.loginId === loginId ? { ...s, status: isCurrentlyActive ? "Terminated" : "Active" } : s));
-    } catch (err) {
-      console.error(`Failed to ${action}`, err);
-    }
+      await apiFetch(`/api/employees/${s.loginId}/${action}`, { method: "POST" });
+      setStaff(prev => prev.map(e => e.id === s.id ? { ...e, status: action === "deactivate" ? "Inactive" : "Active" } : e));
+      setStats(prev => ({
+        ...prev,
+        active: prev.active + (action === "deactivate" ? -1 : 1),
+        inactive: prev.inactive + (action === "deactivate" ? 1 : -1),
+      }));
+    } catch (err) { alert("Action failed: " + err.message); }
+    finally { setActionLoading(null); }
   };
 
-  const filteredStaff = staff.filter(s => 
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.role.toLowerCase().includes(search.toLowerCase())
+  const roles = ["All", ...Array.from(new Set(staff.map(s => s.role)))];
+  const filtered = staff.filter(s => {
+    const q = search.toLowerCase();
+    const matchSearch = !q || s.name.toLowerCase().includes(q) || s.role.toLowerCase().includes(q) || s.loginId.toLowerCase().includes(q) || s.phone.includes(q);
+    const matchRole = roleFilter === "All" || s.role === roleFilter;
+    const matchStatus = statusFilter === "All" || s.status === statusFilter;
+    return matchSearch && matchRole && matchStatus;
+  });
+
+  const StatCard = ({ icon: Icon, label, value, color }) => (
+    <div className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center gap-4 shadow-sm hover:shadow-md transition-all">
+      <div className={`w-12 h-12 rounded-2xl ${color} flex items-center justify-center shrink-0`}>
+        <Icon size={22} className="text-white" />
+      </div>
+      <div>
+        <p className="text-2xl font-black text-slate-900 leading-none">{value}</p>
+        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-1">{label}</p>
+      </div>
+    </div>
   );
 
   return (
-    <PropertyOwnerLayout 
-      owner={owner} 
-      title="All Staff" 
+    <PropertyOwnerLayout
+      owner={owner}
+      title="Staff Management"
       onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
     >
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Staff Management</h1>
-          <p className="mt-1.5 text-[13.5px] text-muted-foreground">Manage property wardens, cleaners, security personnel, and active workloads.</p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Staff Management</h1>
+          <p className="text-xs text-slate-500 font-medium mt-0.5">Manage your hostel team — roles, shifts, and performance</p>
         </div>
+        <button
+          onClick={() => window.location.href = "/propertyowner/add-staff"}
+          className="flex items-center gap-2 px-5 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-600/20"
+        >
+          <Plus size={15} /> Add Staff
+        </button>
       </div>
 
-      {/* Toolbar */}
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <StatCard icon={Users} label="Total Staff" value={stats.total} color="bg-blue-600" />
+        <StatCard icon={UserCheck} label="Active" value={stats.active} color="bg-emerald-500" />
+        <StatCard icon={UserX} label="Inactive" value={stats.inactive} color="bg-rose-500" />
+        <StatCard icon={CheckCircle2} label="Present Today" value={stats.presentToday} color="bg-amber-500" />
+      </div>
+
+      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
-          <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search staff by name or job role..."
-            className="w-full h-10 pl-9 pr-3 rounded-xl bg-card border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground"
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name, role, ID, or phone..."
+            className="w-full h-10 pl-10 pr-4 rounded-xl bg-white border border-slate-200 text-sm font-medium focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 placeholder:text-slate-400"
           />
         </div>
+        <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}
+          className="h-10 px-4 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-700 outline-none focus:border-blue-400">
+          {roles.map(r => <option key={r}>{r}</option>)}
+        </select>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          className="h-10 px-4 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-700 outline-none focus:border-blue-400">
+          {["All", "Active", "Inactive"].map(s => <option key={s}>{s}</option>)}
+        </select>
       </div>
 
-      {/* Grid of Staff */}
+      {/* Staff Grid */}
       {loading ? (
-        <div className="py-12 text-center text-slate-500">Loading staff...</div>
-      ) : filteredStaff.length === 0 ? (
-        <div className="py-12 text-center text-slate-500">No staff members found.</div>
+        <div className="py-20 text-center">
+          <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-slate-400 font-medium">Loading staff...</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="py-20 text-center">
+          <Users size={40} className="text-slate-200 mx-auto mb-4" />
+          <p className="text-slate-400 font-bold">No staff members found.</p>
+          <p className="text-xs text-slate-300 mt-1">Try adjusting your filters or add new staff.</p>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredStaff.map((s) => (
-            <div key={s.id} className={`rounded-[20px] border ${s.status === 'Active' ? 'border-border bg-card' : 'border-rose-100 bg-rose-50/30'} p-6 shadow-[0_4px_16px_rgba(0,0,0,0.02)] hover:shadow-md transition-all flex flex-col justify-between`}>
-              <div className="space-y-4">
-                <div className="flex justify-between items-start">
-                  <div className={`size-10 rounded-xl flex items-center justify-center ${s.status === 'Active' ? 'bg-blue-500/10 text-blue-600' : 'bg-slate-500/10 text-slate-500'}`}>
-                    <Users size={20} />
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {filtered.map(s => {
+            const avatarBg = ROLE_AVATAR_BG[s.role] || "bg-slate-600";
+            const roleColor = ROLE_COLORS[s.role] || "bg-slate-100 text-slate-700";
+            const isActive = s.status === "Active";
+
+            return (
+              <div
+                key={s.id}
+                className={`group relative bg-white rounded-3xl border ${isActive ? "border-slate-100" : "border-rose-100 bg-rose-50/30"} p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300`}
+              >
+                {/* Top row */}
+                <div className="flex items-start justify-between mb-5">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-13 h-13 rounded-2xl ${avatarBg} flex items-center justify-center text-white font-black text-lg shadow-lg overflow-hidden`}
+                      style={{ width: 52, height: 52 }}>
+                      {s.photoDataUrl
+                        ? <img src={s.photoDataUrl} alt={s.name} className="w-full h-full object-cover" />
+                        : <span>{s.name[0]?.toUpperCase()}</span>}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-black text-slate-900 text-[15px] leading-tight truncate">{s.name}</h3>
+                      <span className={`inline-block text-[10px] font-black px-2 py-0.5 rounded-full mt-1 ${roleColor}`}>{s.role}</span>
+                    </div>
                   </div>
-                  <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full ${
-                    s.status === "Active" 
-                      ? "bg-emerald-50 text-emerald-600 border border-emerald-100" 
-                      : "bg-rose-50 text-rose-600 border border-rose-100"
-                  }`}>
+                  <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full border ${isActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-600 border-rose-200"}`}>
                     {s.status}
                   </span>
                 </div>
 
-                <div>
-                  <h3 className={`font-serif text-[21px] font-bold ${s.status === 'Active' ? 'text-foreground' : 'text-slate-600 line-through'}`}>{s.name}</h3>
-                  <p className="text-[12.5px] text-muted-foreground mt-0.5">{s.role}</p>
-                  <p className="text-[11.5px] text-muted-foreground mt-1 flex items-center gap-1"><Phone size={11} /> {s.phone}</p>
+                {/* Details */}
+                <div className="space-y-2 mb-5">
+                  <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest">ID: <span className="text-blue-600 font-mono">{s.loginId}</span></div>
+                  {s.phone && (
+                    <div className="flex items-center gap-2 text-[12px] text-slate-600 font-medium">
+                      <Phone size={11} className="text-slate-400 shrink-0" /> {s.phone}
+                    </div>
+                  )}
+                  {s.shift && (
+                    <div className="flex items-center gap-2 text-[12px] text-slate-600 font-medium">
+                      <Clock size={11} className="text-slate-400 shrink-0" /> {s.shift}
+                    </div>
+                  )}
+                  {s.assignedPropertyName && (
+                    <div className="flex items-center gap-2 text-[12px] text-slate-600 font-medium">
+                      <Building2 size={11} className="text-slate-400 shrink-0" /> {s.assignedPropertyName}
+                    </div>
+                  )}
                 </div>
 
-                <div className="border-t border-border/60 pt-4 space-y-2 text-xs">
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Duty Shift Hours:</span>
-                    <span className="font-medium text-foreground">{s.shift}</span>
+                {/* Permissions preview */}
+                {s.permissions?.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-5">
+                    {s.permissions.slice(0, 4).map(p => (
+                      <span key={p} className="text-[9px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-md uppercase tracking-wider">{p}</span>
+                    ))}
+                    {s.permissions.length > 4 && (
+                      <span className="text-[9px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md">+{s.permissions.length - 4} more</span>
+                    )}
                   </div>
+                )}
+
+                {/* Actions */}
+                <div className="border-t border-slate-100 pt-4 flex gap-2">
+                  <button
+                    onClick={() => setDetailStaff(s)}
+                    className="flex-1 h-9 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-blue-600 border border-slate-200 hover:border-blue-200 text-xs font-black transition-all flex items-center justify-center gap-1"
+                  >
+                    <Eye size={13} /> View
+                  </button>
+                  <button
+                    onClick={() => handleToggle(s)}
+                    disabled={actionLoading === s.id}
+                    className={`flex-1 h-9 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1 border ${isActive
+                      ? "bg-rose-50 hover:bg-rose-100 text-rose-600 border-rose-200"
+                      : "bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border-emerald-200"
+                    }`}
+                  >
+                    {actionLoading === s.id
+                      ? <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      : <Power size={13} />}
+                    {isActive ? "Deactivate" : "Activate"}
+                  </button>
                 </div>
               </div>
-
-              <div className="border-t border-border/60 mt-6 pt-4 flex gap-2">
-                {s.status === "Active" ? (
-                  <button 
-                    onClick={() => handleToggleActive(s.loginId, true)}
-                    className="flex-1 h-10 border border-rose-200 hover:bg-rose-50 text-rose-600 rounded-xl text-xs font-bold transition-all"
-                  >
-                    Deactivate Staff
-                  </button>
-                ) : (
-                  <button 
-                    onClick={() => handleToggleActive(s.loginId, false)}
-                    className="flex-1 h-10 border border-emerald-200 hover:bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold transition-all"
-                  >
-                    Reactivate Staff
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {/* Floating Action Button (Mobile First) */}
-      <div className="fixed bottom-24 right-5 md:bottom-10 md:right-10 z-50">
-        <button 
-          onClick={() => window.location.href = "/propertyowner/add-staff"}
-          className="flex items-center justify-center size-14 bg-indigo-600 text-white rounded-full shadow-xl hover:bg-indigo-700 transition-all hover:scale-105 active:scale-95"
-        >
-          <Plus className="size-6" />
-        </button>
-      </div>
+      {/* Detail Modal */}
+      {detailStaff && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-black text-slate-900 text-lg">Staff Profile</h3>
+              <button onClick={() => setDetailStaff(null)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
+                <X size={18} className="text-slate-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-5">
+              <div className="flex items-center gap-4">
+                <div className={`w-16 h-16 rounded-2xl ${ROLE_AVATAR_BG[detailStaff.role] || "bg-slate-600"} flex items-center justify-center text-white text-2xl font-black shadow-lg overflow-hidden`}>
+                  {detailStaff.photoDataUrl
+                    ? <img src={detailStaff.photoDataUrl} alt={detailStaff.name} className="w-full h-full object-cover" />
+                    : detailStaff.name[0]?.toUpperCase()}
+                </div>
+                <div>
+                  <h4 className="text-xl font-black text-slate-900">{detailStaff.name}</h4>
+                  <p className="text-xs text-slate-500 font-bold font-mono">{detailStaff.loginId}</p>
+                  <span className={`inline-block text-[10px] font-black px-2 py-0.5 rounded-full mt-1 ${ROLE_COLORS[detailStaff.role] || "bg-slate-100 text-slate-700"}`}>{detailStaff.role}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: "Phone", value: detailStaff.phone || "N/A" },
+                  { label: "Email", value: detailStaff.email || "N/A" },
+                  { label: "Shift", value: detailStaff.shift || "N/A" },
+                  { label: "Property", value: detailStaff.assignedPropertyName || "All Properties" },
+                  { label: "Status", value: detailStaff.status },
+                  { label: "Joining Date", value: detailStaff.joiningDate ? new Date(detailStaff.joiningDate).toLocaleDateString("en-IN") : "N/A" },
+                ].map(({ label, value }) => (
+                  <div key={label} className="bg-slate-50 rounded-xl p-3">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
+                    <p className="text-xs font-bold text-slate-800 break-all">{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {detailStaff.permissions?.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Permissions</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {detailStaff.permissions.map(p => (
+                      <span key={p} className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg">{p}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setDetailStaff(null)} className="flex-1 h-10 border border-slate-200 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all">Close</button>
+                <button
+                  onClick={() => { handleToggle(detailStaff); setDetailStaff(null); }}
+                  className={`flex-1 h-10 rounded-xl text-xs font-black transition-all ${detailStaff.status === "Active" ? "bg-rose-600 hover:bg-rose-700 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"}`}
+                >
+                  {detailStaff.status === "Active" ? "Deactivate" : "Activate"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </PropertyOwnerLayout>
   );
 }

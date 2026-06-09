@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   LayoutDashboard, Users, Home, AlertCircle, 
   ClipboardList, Bell, Search, LogOut, 
@@ -9,10 +9,42 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
+function getStaffSession() {
+  try {
+    const raw = sessionStorage.getItem("staff_session") || localStorage.getItem("staff_session");
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return null;
+}
+
+function clearStaffSession() {
+  sessionStorage.removeItem("staff_session");
+  localStorage.removeItem("staff_session");
+}
+
 export default function StaffLayout({ children, title, subtitle }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [staff, setStaff] = useState(null);
+
+  useEffect(() => {
+    const session = getStaffSession();
+    if (!session?.loginId) {
+      window.location.href = "/staff/login";
+      return;
+    }
+    setStaff(session);
+  }, []);
+
+  const handleLogout = () => {
+    clearStaffSession();
+    window.location.href = "/staff/login";
+  };
+
+  if (!staff) return null; // wait for session check
+
+  const initials = (staff.name || "S").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 
   const NAV_ITEMS = [
     { label: "Dashboard", icon: LayoutDashboard, path: "/staff" },
@@ -72,18 +104,22 @@ export default function StaffLayout({ children, title, subtitle }) {
           <div className="bg-white/5 rounded-[2rem] p-4 border border-white/5 relative group cursor-pointer hover:bg-white/10 transition-all">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm shadow-sm italic">
-                JS
+                {initials}
               </div>
               {sidebarOpen && (
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-black text-white truncate italic leading-none mb-1.5">Operations Staff</p>
+                  <p className="text-[11px] font-black text-white truncate italic leading-none mb-1.5">{staff.name || "Staff Member"}</p>
                   <div className="space-y-1">
-                    <p className="text-[9px] text-slate-400 font-black truncate uppercase tracking-widest italic leading-none">staff@roomhy.com</p>
-                    <p className="text-[9px] text-slate-500 font-black truncate uppercase tracking-widest italic leading-none opacity-60">Member Since: Jan 2026</p>
+                    <p className="text-[9px] text-slate-400 font-black truncate uppercase tracking-widest italic leading-none">{staff.role || "Staff"}</p>
+                    <p className="text-[9px] text-slate-500 font-black truncate uppercase tracking-widest italic leading-none opacity-60">{staff.loginId}</p>
                   </div>
                 </div>
               )}
-              {sidebarOpen && <LogOut size={14} className="text-slate-500 hover:text-rose-500 transition-colors" />}
+              {sidebarOpen && (
+                <button onClick={handleLogout} title="Logout" className="text-slate-500 hover:text-rose-500 transition-colors">
+                  <LogOut size={14} />
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -110,9 +146,9 @@ export default function StaffLayout({ children, title, subtitle }) {
           <div className="flex items-center gap-3">
              <HeaderIcon icon={Bell} badge />
              <HeaderIcon icon={Settings} />
-             <div className="w-10 h-10 rounded-xl bg-blue-50 p-0.5 border border-blue-100 shadow-sm cursor-pointer hover:scale-105 transition-transform active:scale-95 ml-2">
+             <div className="w-10 h-10 rounded-xl bg-blue-50 p-0.5 border border-blue-100 shadow-sm cursor-pointer hover:scale-105 transition-transform active:scale-95 ml-2" onClick={handleLogout} title="Logout">
                 <div className="w-full h-full rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-sm italic">
-                   JS
+                   {initials}
                 </div>
              </div>
           </div>

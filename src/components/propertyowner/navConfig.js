@@ -119,6 +119,7 @@ export const PROPERTY_OWNER_NAV = [
       { label: "All Staff", href: "/propertyowner/all-staff", goldOnly: false },
       { label: "Add Staff", href: "/propertyowner/add-staff", goldOnly: false },
       { label: "Roles & Permissions", href: "/propertyowner/roles-permissions", goldOnly: false },
+      { label: "Staff Tasks", href: "/propertyowner/staff-tasks", goldOnly: false },
       { label: "Attendance", href: "/propertyowner/staff-attendance", goldOnly: false },
       { label: "Salaries", href: "/propertyowner/staff-salaries", goldOnly: false },
       { label: "Shift Management", href: "/propertyowner/shift-management", goldOnly: false },
