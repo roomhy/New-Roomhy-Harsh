@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { fetchJson } from "../../utils/api";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
-import { MobileTabs, MobileEmptyState } from "../../components/propertyowner/MobileComponents";
+import { MobileTabs, MobileEmptyState, cn } from "../../components/propertyowner/MobileComponents";
 import {
   Plus, Search, ArrowUpDown, Download, Users, ExternalLink,
   User, CalendarClock, CheckCircle, AlertTriangle, Phone,
   Shield, Building2, FileText, BadgeCheck, X, MapPin, Mail,
-  CreditCard, Home, Edit, Eye, Activity, MessageSquare
+  CreditCard, Home, Edit, Eye, Activity, MessageSquare, IndianRupee
 } from "lucide-react";
 import {
   clearOwnerRuntimeSession,
@@ -41,9 +41,6 @@ const Pill = ({ tone = "muted", children }) => {
     </span>
   );
 };
-
-// Quick helper
-const cn = (...classes) => classes.filter(Boolean).join(" ");
 
 export default function Tenants() {
   const [owner, setOwner] = useState(null);
@@ -278,25 +275,7 @@ export default function Tenants() {
       </div>
 
 
-      <div className="block md:hidden">
-        <MobileTabs 
-          tabs={[
-            { id: "all", label: `All (${counts.all})` },
-            { id: "active", label: `Active (${counts.active})` },
-            { id: "notice", label: `On Notice (${counts.notice})` },
-            { id: "dues", label: `With Dues (${counts.dues})` },
-            { id: "add", label: "Add Tenant", href: "/propertyowner/tenantrec" },
-            { id: "upcoming", label: "Upcoming Move-ins", href: "/propertyowner/upcoming-moveins" },
-            { id: "moveouts", label: "Move-out Requests", href: "/propertyowner/moveout-requests" },
-            { id: "ex", label: "Ex-Tenants", href: "/propertyowner/ex-tenants" },
-            { id: "docs", label: "Tenant Documents", href: "/propertyowner/tenant-docs" },
-            { id: "verification", label: "Police Verification", href: "/propertyowner/police-verification" },
-            { id: "feedback", label: "Tenant Feedback", href: "/propertyowner/review" },
-          ]} 
-          activeTab={tab} 
-          onTabChange={setTab} 
-        />
-      </div>
+
 
       {errorMsg && <div className="text-sm text-destructive mb-4 bg-destructive/10 px-4 py-3 rounded-lg">{errorMsg}</div>}
 
@@ -306,31 +285,18 @@ export default function Tenants() {
           { k: "all", label: "All", count: counts.all },
           { k: "active", label: "Active", count: counts.active },
           { k: "notice", label: "On notice", count: counts.notice },
-          { k: "dues", label: "With dues", count: counts.dues },
-          { k: "add", label: "Add Tenant", href: "/propertyowner/tenantrec" },
-          { k: "upcoming", label: "Upcoming Move-ins", href: "/propertyowner/upcoming-moveins" },
-          { k: "moveouts", label: "Move-out Requests", href: "/propertyowner/moveout-requests" },
-          { k: "ex", label: "Ex-Tenants", href: "/propertyowner/ex-tenants" },
-          { k: "docs", label: "Tenant Documents", href: "/propertyowner/tenant-docs" },
-          { k: "verification", label: "Police Verification", href: "/propertyowner/police-verification" },
-          { k: "feedback", label: "Tenant Feedback", href: "/propertyowner/review" },
+          { k: "dues", label: "With dues", count: counts.dues }
         ].map((t, i) => (
-          t.href ? (
-            <a key={t.k} href={t.href} className="px-3 py-2 text-[13px] font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors -mb-px">
-              {t.label}
-            </a>
-          ) : (
-            <button
-              key={t.k}
-              onClick={() => setTab(t.k)}
-              className={[
-                "px-3 py-2 text-[13px] font-medium border-b-2 -mb-px transition-colors",
-                tab === t.k ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
-              ].join(" ")}
-            >
-              {t.label} {t.count !== undefined && <span className="text-muted-foreground/70 ml-0.5">{t.count}</span>}
-            </button>
-          )
+          <button
+            key={t.k}
+            onClick={() => setTab(t.k)}
+            className={[
+              "px-3 py-2 text-[13px] font-medium border-b-2 -mb-px transition-colors",
+              tab === t.k ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+            ].join(" ")}
+          >
+            {t.label} {t.count !== undefined && <span className="text-muted-foreground/70 ml-0.5">{t.count}</span>}
+          </button>
         ))}
       </div>
 
@@ -491,73 +457,73 @@ export default function Tenants() {
               </div>
             </div>
 
-            {/* Mobile Cards (CRM Style Redesign) */}
+            {/* Mobile Cards (Redesigned) */}
             <div className="block md:hidden space-y-3 pb-12">
               {filtered.map((t) => (
-                <div key={`mob-${t._id || t.id}`} className="bg-white rounded-[20px] p-4 border border-slate-100 shadow-sm relative overflow-hidden">
+                <div key={`mob-${t._id || t.id}`} className="bg-white rounded-2xl p-4 border border-slate-200/60 shadow-sm relative overflow-hidden">
                   
-                  {/* Status Badges Row */}
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className={cn("text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg",
-                      t.status === "active" ? "bg-emerald-50 text-emerald-600 border border-emerald-100" :
-                      t.status === "notice" ? "bg-amber-50 text-amber-600 border border-amber-100" :
-                      "bg-slate-50 text-slate-600 border border-slate-200"
-                    )}>
-                      {t.status || "active"}
-                    </span>
-                    <span className={cn("text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg",
-                      (t.kycStatus || t.kyc) === "verified" ? "bg-blue-50 text-blue-600 border border-blue-100" :
-                      "bg-rose-50 text-rose-600 border border-rose-100"
-                    )}>
-                      {(t.kycStatus || t.kyc) === "verified" ? "Verified" : "KYC Pending"}
-                    </span>
-                  </div>
-
-                  {/* Profile Row */}
-                  <div className="flex items-center gap-3 border-b border-slate-50 pb-3 mb-3">
-                    <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-[18px] font-black shrink-0 border border-indigo-100">
-                      {getInitial(t.name)}
+                  {/* Header Row: Avatar, Name, Room, Status */}
+                  <div className="flex justify-between items-start mb-2.5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-[16px] font-bold shrink-0 border border-slate-200/50 shadow-inner">
+                        {getInitial(t.name)}
+                      </div>
+                      <div>
+                        <h3 className="text-[15px] font-bold text-slate-900 leading-tight">{t.name || "—"}</h3>
+                        <p className="text-[11.5px] text-slate-500 mt-0.5 flex items-center gap-1 font-medium">
+                          <Building2 className="w-3 h-3 text-slate-400" />
+                          Room {t.roomNo || "—"} • {t.propertyTitle || t.propertyName || (t.property && typeof t.property === "object" ? t.property.title || t.property.name : t.property) || "Property"}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-[16px] font-black text-slate-900 truncate">{t.name || "—"}</h3>
-                      <p className="text-[11.5px] font-semibold text-slate-500 flex items-center gap-1.5 mt-0.5 truncate">
-                        <Building2 className="w-3.5 h-3.5" /> Room {t.roomNo || "—"} • {t.propertyTitle || t.propertyName || (t.property && typeof t.property === "object" ? t.property.title || t.property.name : t.property) || "Property"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Rent Info Row */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Rent</p>
-                       <p className="text-[16px] font-black text-slate-800 leading-none">₹{(t.agreedRent || t.rent || 0).toLocaleString("en-IN")}</p>
-                    </div>
-                    <div className="text-right">
-                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Dues</p>
-                       {(t.dueAmount || t.dues || t.balance) > 0 ? (
-                          <p className="text-[16px] font-black text-rose-600 leading-none">₹{((t.dueAmount || t.dues || t.balance) || 0).toLocaleString("en-IN")}</p>
-                       ) : (
-                          <p className="text-[13px] font-bold text-emerald-500 mt-1">Cleared</p>
-                       )}
+                    
+                    {/* Badges */}
+                    <div className="flex flex-col items-end gap-1.5">
+                      <span className={cn("text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md",
+                        t.status === "active" ? "bg-emerald-50 text-emerald-600 border border-emerald-100/50" :
+                        t.status === "notice" ? "bg-amber-50 text-amber-600 border border-amber-100/50" :
+                        "bg-slate-50 text-slate-600 border border-slate-200/50"
+                      )}>
+                        {t.status || "active"}
+                      </span>
+                      <span className={cn("text-[8.5px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md",
+                        (t.kycStatus || t.kyc) === "verified" ? "bg-blue-50 text-blue-600 border border-blue-100/50" :
+                        "bg-rose-50 text-rose-600 border border-rose-100/50"
+                      )}>
+                        {(t.kycStatus || t.kyc) === "verified" ? "Verified" : "Pending"}
+                      </span>
                     </div>
                   </div>
 
-                  {/* CRM Action Buttons */}
-                  <div className="flex gap-2">
-                    <a href={`tel:${t.phone}`} className="flex-1 py-3 rounded-xl bg-slate-50 text-slate-600 text-[11px] font-black uppercase tracking-wider flex flex-col items-center justify-center gap-1 hover:bg-slate-100 transition-colors border border-slate-100 shadow-sm">
-                      <Phone className="w-4 h-4 text-blue-500 mb-0.5" />
-                      Call
-                    </a>
-                    <a href={`https://wa.me/${String(t.phone).replace(/\D/g, '')}?text=Hi%20${t.name}`} target="_blank" rel="noopener noreferrer" className="flex-1 py-3 rounded-xl bg-slate-50 text-slate-600 text-[11px] font-black uppercase tracking-wider flex flex-col items-center justify-center gap-1 hover:bg-slate-100 transition-colors border border-slate-100 shadow-sm">
-                      <MessageSquare className="w-4 h-4 text-emerald-500 mb-0.5" />
-                      WhatsApp
-                    </a>
-                    <button onClick={() => window.location.href = `/propertyowner/payment?tenant=${t._id}`} className="flex-1 py-3 rounded-xl bg-slate-50 text-slate-600 text-[11px] font-black uppercase tracking-wider flex flex-col items-center justify-center gap-1 hover:bg-slate-100 transition-colors border border-slate-100 shadow-sm">
-                      <IndianRupee className="w-4 h-4 text-amber-500 mb-0.5" />
-                      Collect
-                    </button>
+                  {/* Footer: Financials and Actions */}
+                  <div className="flex items-center justify-between pt-2.5 border-t border-slate-100/80">
+                    <div className="flex gap-4 mb-1">
+                       <div>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Rent</p>
+                          <p className="text-[13.5px] font-black text-slate-800 leading-none">₹{(t.agreedRent || t.rent || 0).toLocaleString("en-IN")}</p>
+                       </div>
+                       <div>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Dues</p>
+                          {(t.dueAmount || t.dues || t.balance) > 0 ? (
+                             <p className="text-[13.5px] font-black text-rose-600 leading-none">₹{((t.dueAmount || t.dues || t.balance) || 0).toLocaleString("en-IN")}</p>
+                          ) : (
+                             <p className="text-[13px] font-bold text-emerald-500 leading-none">Cleared</p>
+                          )}
+                       </div>
+                    </div>
+
+                    <div className="flex gap-1.5 items-center shrink-0">
+                       <a href={`tel:${t.phone}`} className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200/50 flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors">
+                          <Phone size={13} />
+                       </a>
+                       <a href={`https://wa.me/${String(t.phone).replace(/\D/g, '')}?text=Hi%20${t.name}`} target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-full bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 hover:bg-emerald-100 transition-colors">
+                          <MessageSquare size={13} className="fill-emerald-600/20" />
+                       </a>
+                       <button onClick={() => window.location.href = `/propertyowner/payment?tenant=${t._id}`} className="h-8 px-3.5 rounded-full bg-blue-50 border border-blue-100/50 text-blue-700 flex items-center gap-1.5 hover:bg-blue-100 transition-colors text-[11px] font-bold ml-1">
+                          Collect
+                       </button>
+                    </div>
                   </div>
-                  
                 </div>
               ))}
               <div className="text-center text-[12px] font-semibold text-slate-400 py-2">

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { getApiBase, getAuthHeader } from "../../utils/api";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
-import { MobileTabs, MobileEmptyState } from "../../components/propertyowner/MobileComponents";
+import { MobileTabs, MobileEmptyState, cn } from "../../components/propertyowner/MobileComponents";
 import { requireOwnerSession } from "../../utils/ownerSession";
 import { fetchOwnerProperties } from "../../utils/propertyowner";
 import {
@@ -38,7 +38,6 @@ const HOUSE_RULES_FIELDS = [
 ];
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────────
-const cn = (...c) => c.filter(Boolean).join(" ");
 const fmtVal = (val) => {
   if (val === null || val === undefined || val === "") return "—";
   if (typeof val === "boolean") return val ? "Yes" : "No";
@@ -1003,18 +1002,7 @@ export default function Properties() {
       </div>
 
 
-      <div className="block md:hidden">
-        <MobileTabs 
-          tabs={[
-            { id: "all", label: "All Properties" },
-            { id: "rooms", label: "Rooms" },
-            { id: "amenities", label: "Amenities" },
-            { id: "locations", label: "Locations" }
-          ]} 
-          activeTab={mobileTab} 
-          onTabChange={setMobileTab} 
-        />
-      </div>
+
 
       {errorMsg && <div className="text-sm text-destructive mb-4 bg-destructive/10 px-4 py-3 rounded-lg">{errorMsg}</div>}
 
@@ -1051,7 +1039,7 @@ export default function Properties() {
             <div className="w-16 h-16 bg-muted/60 rounded-full flex items-center justify-center mb-4"><BedDouble className="size-8 text-muted-foreground" /></div>
             <h3 className="font-serif text-[22px] text-foreground mb-1">No properties found</h3>
             <p className="text-[13.5px] text-muted-foreground mb-4">Add your first property to get started.</p>
-            <a href="/propertyowner/add-property" className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg bg-foreground text-background text-[13px] font-medium hover:opacity-90">
+            <a href="/propertyowner/add-property" className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg bg-blue-600 text-white text-[13px] font-medium hover:bg-blue-700">
               <Plus className="size-4" /> Add Property
             </a>
           </div>
@@ -1175,7 +1163,7 @@ export default function Properties() {
                         <Eye className="size-3.5" /> View
                       </button>
                       <button onClick={() => setEditProperty(p)}
-                        className="flex-1 flex items-center justify-center gap-1 py-2.5 bg-foreground text-background font-bold rounded-lg text-[11px] hover:opacity-90 transition-all shadow-sm">
+                        className="flex-1 flex items-center justify-center gap-1 py-2.5 bg-blue-600 text-white font-bold rounded-lg text-[11px] hover:bg-blue-700 transition-all shadow-sm">
                         <Edit className="size-3.5" /> Edit
                       </button>
                     </div>

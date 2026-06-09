@@ -41,7 +41,6 @@ const FULL_NAV_ITEMS = [
   { href: "/propertyowner/payment", label: "Payments", icon: CreditCard },
   { href: "/propertyowner/booking_request", label: "Booking Requests", icon: CalendarCheck },
   { href: "/propertyowner/ownerchat", label: "Chat", icon: MessageCircle },
-  { href: "/propertyowner/location", label: "Location", icon: MapPin },
   { href: "/propertyowner/ownerprofile", label: "Profile", icon: User },
   { href: "/propertyowner/settings", label: "Settings", icon: Settings }
 ];
@@ -51,7 +50,6 @@ const SETTINGS_DESKTOP_ITEMS = [
   { href: "/propertyowner/rooms", label: "Rooms", icon: BedDouble },
   { href: "/propertyowner/tenantrec", label: "Tenant Records", icon: ClipboardList },
   { href: "/propertyowner/payment", label: "Payments", icon: CreditCard },
-  { href: "/propertyowner/location", label: "Location", icon: MapPin },
   { href: "#", label: "Chat", icon: MessageSquare, disabled: true },
   { href: "/propertyowner/ownerprofile", label: "Profile", icon: User },
   { href: "/propertyowner/settings", label: "Settings", icon: Settings }
@@ -62,7 +60,6 @@ const CHAT_DESKTOP_ITEMS = [
   { href: "/propertyowner/rooms", label: "Rooms", icon: BedDouble },
   { href: "/propertyowner/tenantrec", label: "Tenant Records", icon: ClipboardList },
   { href: "/propertyowner/payment", label: "Payments", icon: CreditCard },
-  { href: "/propertyowner/location", label: "Location", icon: MapPin },
   { href: "/propertyowner/ownerchat", label: "Chat", icon: MessageSquare },
   { href: "/propertyowner/ownerprofile", label: "Profile", icon: User },
   { href: "/propertyowner/settings", label: "Settings", icon: Settings }
@@ -118,7 +115,7 @@ export default function PropertyOwnerLayout({
   const [properties, setProperties] = useState([]);
   const [activePropertyId, setActivePropertyId] = useState('all');
   const [switcherOpen, setSwitcherOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" ? window.innerWidth < 1024 : false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

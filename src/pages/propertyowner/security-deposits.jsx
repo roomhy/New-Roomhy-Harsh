@@ -419,7 +419,8 @@ export default function SecurityDepositsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      {/* Stats — Desktop 3-col grid */}
+      <div className="hidden md:grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wider">Total Held</span>
@@ -441,6 +442,28 @@ export default function SecurityDepositsPage() {
           </div>
           <div className="font-serif text-[28px] leading-none text-foreground">{deposits.length}</div>
         </div>
+      </div>
+
+      {/* Mobile Stat Strip */}
+      <div className="flex overflow-x-auto gap-3 pb-2 mb-5 md:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        {[
+          { title: "Total Held",   value: fmt(totalHeld),    subtext: "Deposits held",   icon: ShieldCheck,  bg: "bg-emerald-50", ic: "text-emerald-600" },
+          { title: "Pending",      value: fmt(totalPending), subtext: "Still owed",      icon: AlertTriangle,bg: "bg-rose-50",    ic: "text-rose-600" },
+          { title: "Tenants",      value: deposits.length,   subtext: "Active",          icon: CheckCircle2, bg: "bg-blue-50",    ic: "text-blue-600" },
+        ].map(({ title, value, subtext, icon: Icon, bg, ic }) => (
+          <div key={title} className="shrink-0 w-[130px] bg-white rounded-[20px] p-4 shadow-sm border border-slate-100 flex flex-col justify-between">
+            <div className="flex items-start mb-2">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${bg}`}>
+                <Icon className={`w-5 h-5 ${ic}`} />
+              </div>
+            </div>
+            <div>
+              <h3 className="text-[18px] font-black text-slate-900 leading-tight">{value}</h3>
+              <p className="text-[12px] font-semibold text-slate-500 mt-0.5">{title}</p>
+              <p className="text-[10px] font-medium text-slate-400 mt-1">{subtext}</p>
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">

@@ -11,11 +11,27 @@ const Pill = ({ tone="muted", children }) => {
 };
 
 const StatCard = ({ label, value, icon:Icon, tone="muted" }) => {
-  const bg = { muted:"bg-muted/40", warning:"bg-amber-50", success:"bg-green-50", danger:"bg-red-50" };
+  const bg = {
+    muted: "bg-slate-50 border-slate-150/60 text-slate-600 dark:bg-slate-950/10",
+    warning: "bg-amber-50/50 border-amber-150/60 text-amber-600 dark:bg-amber-950/10",
+    success: "bg-emerald-50/50 border-emerald-150/60 text-emerald-600 dark:bg-emerald-950/10",
+    danger: "bg-rose-50/50 border-rose-150/60 text-rose-600 dark:bg-rose-950/10"
+  };
+  
+  const textClr = {
+    muted: "text-slate-900 dark:text-slate-300",
+    warning: "text-amber-900 dark:text-amber-300",
+    success: "text-emerald-900 dark:text-emerald-300",
+    danger: "text-rose-900 dark:text-rose-300"
+  };
+
   return (
-    <div className={`rounded-2xl border border-border p-4 shadow-soft ${bg[tone]||bg.muted}`}>
-      <div className="flex items-center justify-between mb-3"><span className="text-[12.5px] text-muted-foreground font-medium">{label}</span>{Icon&&<Icon className="size-4 text-muted-foreground"/>}</div>
-      <div className="font-serif text-[26px] leading-none text-foreground">{value}</div>
+    <div className={`w-[38%] md:w-auto shrink-0 snap-start rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${bg[tone]||bg.muted}`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[11px] font-bold uppercase tracking-wider">{label}</span>
+        {Icon&&<Icon className="size-4 shrink-0"/>}
+      </div>
+      <div className={`text-2xl font-black leading-none ${textClr[tone]||textClr.muted}`}>{value}</div>
     </div>
   );
 };
@@ -112,7 +128,7 @@ export default function Complaints() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+          <div className="flex overflow-x-auto snap-x gap-3 pb-3 mb-6 no-scrollbar scroll-smooth md:grid md:grid-cols-4 md:pb-0">
             <StatCard label="Total" value={complaints.length} icon={AlertCircle} tone="muted"/>
             <StatCard label="Open" value={complaints.filter(c=>(c.status||"Open")==="Open").length} icon={AlertCircle} tone="danger"/>
             <StatCard label="In Progress" value={complaints.filter(c=>["In Progress", "Taken"].includes(c.status)).length} icon={Clock} tone="warning"/>
@@ -123,18 +139,7 @@ export default function Complaints() {
               <button key={k} onClick={()=>setTab(k)} className={`px-3 py-2 text-[13px] font-medium border-b-2 -mb-px transition-colors ${tab===k?"border-primary text-foreground":"border-transparent text-muted-foreground hover:text-foreground"}`}>{l}</button>
             ))}
           </div>
-          <div className="block md:hidden mb-4">
-            <MobileTabs 
-              tabs={[
-                { id: "all", label: `All (${complaints.length})` },
-                { id: "open", label: `Open (${complaints.filter(c=>(c.status||"Open")==="Open").length})` },
-                { id: "in-progress", label: `In Progress (${complaints.filter(c=>["In Progress", "Taken"].includes(c.status)).length})` },
-                { id: "resolved", label: `Resolved (${complaints.filter(c=>c.status==="Resolved").length})` }
-              ]} 
-              activeTab={tab} 
-              onTabChange={setTab} 
-            />
-          </div>
+
           <div className="relative mb-4">
             <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/>
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search complaints…" className="w-full h-10 pl-9 pr-3 rounded-lg bg-card border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"/>

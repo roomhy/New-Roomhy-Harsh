@@ -19,27 +19,27 @@ export function StatCard({
     primary: "bg-primary/15 text-primary",
   };
   return (
-    <div className={["rounded-2xl border border-border p-5 shadow-soft", tones[tone]].join(" ")}>
-      <div className="flex items-start justify-between">
-        <div className="text-[12.5px] font-medium text-muted-foreground">{label}</div>
+    <div className={["w-[38%] md:w-auto shrink-0 snap-start rounded-[20px] border p-3.5 md:p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between min-h-[90px] md:min-h-auto", tones[tone], tone === "default" ? "border-slate-100 bg-white" : "border-transparent"].join(" ")}>
+      <div className="flex items-center justify-between mb-2 md:mb-0">
         {Icon && (
-          <div className={["size-8 w-8 h-8 rounded-lg flex items-center justify-center", iconTones[tone]].join(" ")}>
-            <Icon className="size-4 w-4 h-4" />
+          <div className={["w-8 h-8 md:w-10 md:h-10 rounded-xl flex items-center justify-center shrink-0", iconTones[tone]].join(" ")}>
+            <Icon className="w-4 h-4 md:w-5 md:h-5" />
           </div>
         )}
-      </div>
-      <div className="mt-2.5 font-serif text-[30px] leading-none text-foreground">{value}</div>
-      <div className="mt-2 flex items-center gap-2">
         {trend && (
           <span className={[
-            "inline-flex items-center gap-0.5 text-[11.5px] font-medium rounded-full px-1.5 py-0.5",
-            trend.up ? "bg-success/15 text-success-foreground" : "bg-destructive/10 text-destructive"
+            "inline-flex items-center gap-0.5 text-[10px] md:text-[11.5px] font-black rounded-full px-1.5 py-0.5",
+            trend.up ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
           ].join(" ")}>
-            {trend.up ? <ArrowUpRight className="size-3 w-3 h-3" /> : <ArrowDownRight className="size-3 w-3 h-3" />}
+            {trend.up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
             {trend.value}
           </span>
         )}
-        {hint && <span className="text-[11.5px] text-muted-foreground">{hint}</span>}
+      </div>
+      <div className="mt-auto">
+        <h3 className="text-[20px] md:text-[28px] font-black text-slate-900 leading-tight">{value}</h3>
+        <p className="text-[11px] md:text-[12.5px] font-bold text-slate-500 mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis">{label}</p>
+        {hint && <span className="text-[10px] text-slate-400 mt-1 block">{hint}</span>}
       </div>
     </div>
   );

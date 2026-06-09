@@ -372,6 +372,15 @@ export default function TenantRec() {
   const [properties, setProperties] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [errors, setErrors] = useState({});
+  const [isMobile, setIsMobile] = useState(false);
+  const [activeMobileTab, setActiveMobileTab] = useState(1);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 1024);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   
   // Section 1: Basic Details
   const [basicDetails, setBasicDetails] = useState({
@@ -679,106 +688,135 @@ export default function TenantRec() {
           <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Add New Tenant</h1>
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">Register details, assign beds and trigger automatic E-KYC verification.</p>
         </div>
-        <div className="flex items-center gap-3 md:mt-2">
-          <button onClick={() => navigate(-1)} className="px-5 h-11 rounded-xl border border-border text-xs font-bold hover:bg-muted transition-colors">
+        <div className="flex items-center gap-2 md:mt-2">
+          <button onClick={() => navigate(-1)} className="px-4 h-10 rounded-lg border border-border text-xs font-bold hover:bg-muted transition-colors">
             Cancel
           </button>
-          <button 
-            onClick={handleSubmit} 
-            disabled={submitting}
-            className="px-5 h-11 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-slate-900/10"
-          >
-            {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-            Save & Onboard
-          </button>
+          {(!isMobile || activeMobileTab === 4) && (
+            <button 
+              onClick={handleSubmit} 
+              disabled={submitting}
+              className="px-4 h-10 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-md shadow-slate-900/10"
+            >
+              {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              Save & Onboard
+            </button>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Form Sections */}
         <div className="lg:col-span-8 space-y-8">
+          {isMobile && (
+            <div className="flex gap-2 border-b border-slate-100 pb-3 mb-6 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {[
+                { id: 1, label: "Personal Details" },
+                { id: 2, label: "Room Allocation" },
+                { id: 3, label: "Stay & Billing" },
+                { id: 4, label: "Occupation & Summary" }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveMobileTab(tab.id)}
+                  className={cn(
+                    "px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shrink-0",
+                    activeMobileTab === tab.id
+                      ? "bg-slate-900 text-white shadow-md"
+                      : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Section 1 */}
-          <div className="rounded-2xl border border-border bg-card p-6 shadow-soft space-y-6">
-            <h3 className="font-serif text-[20px] text-slate-800 flex items-center gap-2">
-              <User size={18} className="text-primary" />
-              1. Resident Personal Profile
-            </h3>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <FormField 
-                label="Full Name" 
-                required
-                value={basicDetails.fullName}
-                onChange={e => setBasicDetails({...basicDetails, fullName: e.target.value})}
-                placeholder="Enter full name"
-                error={errors.fullName}
-              />
-              <FormField 
-                label="Email Address" 
-                required
-                value={basicDetails.email}
-                onChange={e => setBasicDetails({...basicDetails, email: e.target.value})}
-                placeholder="Enter email address"
-                type="email"
-                error={errors.email}
-              />
-              <FormField 
-                label="Phone Number" 
-                required
-                value={basicDetails.phone}
-                onChange={e => setBasicDetails({...basicDetails, phone: e.target.value})}
-                placeholder="Enter phone number"
-                prefix="+91"
-                error={errors.phone}
-              />
-              <CustomDatePicker 
-                label="Date of Birth" 
-                required
-                value={basicDetails.dob}
-                onChange={val => setBasicDetails({...basicDetails, dob: val})}
-                placeholder="Select date of birth"
-                error={errors.dob}
-              />
-              <FormSelect 
-                label="Gender" 
-                required
-                value={basicDetails.gender}
-                onChange={e => setBasicDetails({...basicDetails, gender: e.target.value})}
-                options={["Male", "Female", "Other"]}
-                placeholder="Select gender"
-                error={errors.gender}
-              />
-              <FormSelect 
-                label="ID Proof Type" 
-                required
-                value={basicDetails.idProofType}
-                onChange={e => setBasicDetails({...basicDetails, idProofType: e.target.value})}
-                options={["Aadhaar Card", "PAN Card", "Voter ID", "Driving License", "Passport"]}
-              />
-              <FormField 
-                label="ID Proof Number" 
-                required
-                value={basicDetails.idProofNumber}
-                onChange={e => setBasicDetails({...basicDetails, idProofNumber: e.target.value})}
-                placeholder="Enter ID proof number"
-                error={errors.idProofNumber}
-              />
-              <div className="sm:col-span-2">
-                <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">
-                  Upload ID Proof File <span className="text-rose-500">*</span>
-                </label>
-                <MultiSourceUpload
-                  value={basicDetails.idProofFile}
-                  onUpload={handlePhotoUpload}
-                  error={errors.idProofFile}
+          {(!isMobile || activeMobileTab === 1) && (
+            <div className="rounded-2xl border border-border bg-card p-6 shadow-soft space-y-6">
+              <h3 className="font-serif text-[20px] text-slate-800 flex items-center gap-2">
+                <User size={18} className="text-primary" />
+                1. Resident Personal Profile
+              </h3>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <FormField 
+                  label="Full Name" 
+                  required
+                  value={basicDetails.fullName}
+                  onChange={e => setBasicDetails({...basicDetails, fullName: e.target.value})}
+                  placeholder="Enter full name"
+                  error={errors.fullName}
                 />
-                {errors.idProofFile && <span className="text-[8px] font-bold text-rose-500 mt-2 uppercase tracking-widest block">{errors.idProofFile}</span>}
+                <FormField 
+                  label="Email Address" 
+                  required
+                  value={basicDetails.email}
+                  onChange={e => setBasicDetails({...basicDetails, email: e.target.value})}
+                  placeholder="Enter email address"
+                  type="email"
+                  error={errors.email}
+                />
+                <FormField 
+                  label="Phone Number" 
+                  required
+                  value={basicDetails.phone}
+                  onChange={e => setBasicDetails({...basicDetails, phone: e.target.value})}
+                  placeholder="Enter phone number"
+                  prefix="+91"
+                  error={errors.phone}
+                />
+                <CustomDatePicker 
+                  label="Date of Birth" 
+                  required
+                  value={basicDetails.dob}
+                  onChange={val => setBasicDetails({...basicDetails, dob: val})}
+                  placeholder="Select date of birth"
+                  error={errors.dob}
+                />
+                <FormSelect 
+                  label="Gender" 
+                  required
+                  value={basicDetails.gender}
+                  onChange={e => setBasicDetails({...basicDetails, gender: e.target.value})}
+                  options={["Male", "Female", "Other"]}
+                  placeholder="Select gender"
+                  error={errors.gender}
+                />
+                <FormSelect 
+                  label="ID Proof Type" 
+                  required
+                  value={basicDetails.idProofType}
+                  onChange={e => setBasicDetails({...basicDetails, idProofType: e.target.value})}
+                  options={["Aadhaar Card", "PAN Card", "Voter ID", "Driving License", "Passport"]}
+                />
+                <FormField 
+                  label="ID Proof Number" 
+                  required
+                  value={basicDetails.idProofNumber}
+                  onChange={e => setBasicDetails({...basicDetails, idProofNumber: e.target.value})}
+                  placeholder="Enter ID proof number"
+                  error={errors.idProofNumber}
+                />
+                <div className="sm:col-span-2">
+                  <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">
+                    Upload ID Proof File <span className="text-rose-500">*</span>
+                  </label>
+                  <MultiSourceUpload
+                    value={basicDetails.idProofFile}
+                    onUpload={handlePhotoUpload}
+                    error={errors.idProofFile}
+                  />
+                  {errors.idProofFile && <span className="text-[8px] font-bold text-rose-500 mt-2 uppercase tracking-widest block">{errors.idProofFile}</span>}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Section 2 */}
-          {(() => {
+          {(!isMobile || activeMobileTab === 2) && (() => {
             const floorOptions = [...new Set(rooms.map(r => r.floor).filter(Boolean))].sort();
             const hasVacantBed = (r) => {
               if (Array.isArray(r.beds)) {
@@ -901,261 +939,283 @@ export default function TenantRec() {
           })()}
 
           {/* Section 3 */}
-          <div className="rounded-2xl border border-border bg-card p-6 shadow-soft space-y-6">
-            <h3 className="font-serif text-[20px] text-slate-800 flex items-center gap-2">
-              <Clock size={18} className="text-primary" />
-              3. Stay & Billing Details
-            </h3>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-              <FormField 
-                label="Rent Amount (₹)" 
-                required
-                value={tenancyDetails.rentAmount}
-                onChange={e => setTenancyDetails({...tenancyDetails, rentAmount: e.target.value})}
-                placeholder="Enter rent amount"
-                type="number"
-                error={errors.rentAmount}
-              />
-              <FormField 
-                label="Deposit Amount (₹)" 
-                required
-                value={tenancyDetails.depositAmount}
-                onChange={e => setTenancyDetails({...tenancyDetails, depositAmount: e.target.value})}
-                placeholder="Enter deposit amount"
-                type="number"
-                error={errors.depositAmount}
-              />
-              <FormField 
-                label="Move-in Date" 
-                required
-                value={tenancyDetails.moveInDate}
-                onChange={e => setTenancyDetails({...tenancyDetails, moveInDate: e.target.value})}
-                type="date"
-                error={errors.moveInDate}
-              />
-              <FormField 
-                label="Minimum Stay (Months)" 
-                required
-                value={tenancyDetails.minStay}
-                onChange={e => setTenancyDetails({...tenancyDetails, minStay: e.target.value})}
-                placeholder="Enter minimum stay"
-                type="number"
-              />
-              <FormField 
-                label="Notice Period (Days)" 
-                required
-                value={tenancyDetails.noticePeriod}
-                onChange={e => setTenancyDetails({...tenancyDetails, noticePeriod: e.target.value})}
-                placeholder="Enter notice period"
-                type="number"
-              />
-              <FormField
-                label="License Fee Due Date (day of month)"
-                value={tenancyDetails.rentDueDate}
-                onChange={e => setTenancyDetails({...tenancyDetails, rentDueDate: e.target.value})}
-                placeholder="e.g. 5"
-                type="number"
-              />
-              <FormField
-                label="License Duration (months)"
-                value={tenancyDetails.licenseDuration}
-                onChange={e => setTenancyDetails({...tenancyDetails, licenseDuration: e.target.value})}
-                placeholder="e.g. 11"
-                type="number"
-              />
-              <FormSelect
-                label="Payment Frequency"
-                required
-                value={tenancyDetails.paymentFrequency}
-                onChange={e => setTenancyDetails({...tenancyDetails, paymentFrequency: e.target.value})}
-                options={["Monthly", "Quarterly", "Semi-Annually", "Annually"]}
-                error={errors.paymentFrequency}
-              />
-              <FormField
-                label="Move Out Charges (₹)"
-                value={tenancyDetails.moveOutCharges}
-                onChange={e => setTenancyDetails({...tenancyDetails, moveOutCharges: e.target.value})}
-                placeholder="0"
-                type="number"
-              />
-              <FormField
-                label="Notice Period Charges (₹)"
-                value={tenancyDetails.noticePeriodCharges}
-                onChange={e => setTenancyDetails({...tenancyDetails, noticePeriodCharges: e.target.value})}
-                placeholder="0"
-                type="number"
-              />
-              <FormField
-                label="GST Charges (₹)"
-                value={tenancyDetails.gstCharges}
-                onChange={e => setTenancyDetails({...tenancyDetails, gstCharges: e.target.value})}
-                placeholder="0"
-                type="number"
-              />
-              <FormField
-                label="Late Fee (₹)"
-                value={tenancyDetails.lateFee}
-                onChange={e => setTenancyDetails({...tenancyDetails, lateFee: e.target.value})}
-                placeholder="0"
-                type="number"
-              />
-              <div className="sm:col-span-4">
-                <FormField
-                  label="Inclusions (WiFi, meals, etc.)"
-                  value={tenancyDetails.inclusions}
-                  onChange={e => setTenancyDetails({...tenancyDetails, inclusions: e.target.value})}
-                  placeholder="e.g. WiFi, 2 meals/day, housekeeping"
+          {(!isMobile || activeMobileTab === 3) && (
+            <div className="rounded-2xl border border-border bg-card p-6 shadow-soft space-y-6">
+              <h3 className="font-serif text-[20px] text-slate-800 flex items-center gap-2">
+                <Clock size={18} className="text-primary" />
+                3. Stay & Billing Details
+              </h3>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <FormField 
+                  label="Rent Amount (₹)" 
+                  required
+                  value={tenancyDetails.rentAmount}
+                  onChange={e => setTenancyDetails({...tenancyDetails, rentAmount: e.target.value})}
+                  placeholder="Enter rent amount"
+                  type="number"
+                  error={errors.rentAmount}
                 />
+                <FormField 
+                  label="Deposit Amount (₹)" 
+                  required
+                  value={tenancyDetails.depositAmount}
+                  onChange={e => setTenancyDetails({...tenancyDetails, depositAmount: e.target.value})}
+                  placeholder="Enter deposit amount"
+                  type="number"
+                  error={errors.depositAmount}
+                />
+                <FormField 
+                  label="Move-in Date" 
+                  required
+                  value={tenancyDetails.moveInDate}
+                  onChange={e => setTenancyDetails({...tenancyDetails, moveInDate: e.target.value})}
+                  type="date"
+                  error={errors.moveInDate}
+                />
+                <FormField 
+                  label="Minimum Stay (Months)" 
+                  required
+                  value={tenancyDetails.minStay}
+                  onChange={e => setTenancyDetails({...tenancyDetails, minStay: e.target.value})}
+                  placeholder="Enter minimum stay"
+                  type="number"
+                />
+                <FormField 
+                  label="Notice Period (Days)" 
+                  required
+                  value={tenancyDetails.noticePeriod}
+                  onChange={e => setTenancyDetails({...tenancyDetails, noticePeriod: e.target.value})}
+                  placeholder="Enter notice period"
+                  type="number"
+                />
+                <FormField
+                  label="License Fee Due Date (day of month)"
+                  value={tenancyDetails.rentDueDate}
+                  onChange={e => setTenancyDetails({...tenancyDetails, rentDueDate: e.target.value})}
+                  placeholder="e.g. 5"
+                  type="number"
+                />
+                <FormField
+                  label="License Duration (months)"
+                  value={tenancyDetails.licenseDuration}
+                  onChange={e => setTenancyDetails({...tenancyDetails, licenseDuration: e.target.value})}
+                  placeholder="e.g. 11"
+                  type="number"
+                />
+                <FormSelect
+                  label="Payment Frequency"
+                  required
+                  value={tenancyDetails.paymentFrequency}
+                  onChange={e => setTenancyDetails({...tenancyDetails, paymentFrequency: e.target.value})}
+                  options={["Monthly", "Quarterly", "Semi-Annually", "Annually"]}
+                  error={errors.paymentFrequency}
+                />
+                <FormField
+                  label="Move Out Charges (₹)"
+                  value={tenancyDetails.moveOutCharges}
+                  onChange={e => setTenancyDetails({...tenancyDetails, moveOutCharges: e.target.value})}
+                  placeholder="0"
+                  type="number"
+                />
+                <FormField
+                  label="Notice Period Charges (₹)"
+                  value={tenancyDetails.noticePeriodCharges}
+                  onChange={e => setTenancyDetails({...tenancyDetails, noticePeriodCharges: e.target.value})}
+                  placeholder="0"
+                  type="number"
+                />
+                <FormField
+                  label="GST Charges (₹)"
+                  value={tenancyDetails.gstCharges}
+                  onChange={e => setTenancyDetails({...tenancyDetails, gstCharges: e.target.value})}
+                  placeholder="0"
+                  type="number"
+                />
+                <FormField
+                  label="Late Fee (₹)"
+                  value={tenancyDetails.lateFee}
+                  onChange={e => setTenancyDetails({...tenancyDetails, lateFee: e.target.value})}
+                  placeholder="0"
+                  type="number"
+                />
+                <div className="sm:col-span-4">
+                  <FormField
+                    label="Inclusions (WiFi, meals, etc.)"
+                    value={tenancyDetails.inclusions}
+                    onChange={e => setTenancyDetails({...tenancyDetails, inclusions: e.target.value})}
+                    placeholder="e.g. WiFi, 2 meals/day, housekeeping"
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Section 4 */}
-          <div className="rounded-2xl border border-border bg-card p-6 shadow-soft space-y-6">
-            <h3 className="font-serif text-[20px] text-slate-800 flex items-center gap-2">
-              <Briefcase size={18} className="text-primary" />
-              4. Occupation & Emergencies
-            </h3>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <FormField 
-                label="Occupation" 
-                value={additionalDetails.occupation}
-                onChange={e => setAdditionalDetails({...additionalDetails, occupation: e.target.value})}
-                placeholder="Enter occupation"
-              />
-              <FormField 
-                label="Company / Organization" 
-                value={additionalDetails.company}
-                onChange={e => setAdditionalDetails({...additionalDetails, company: e.target.value})}
-                placeholder="Enter company name"
-              />
-              <FormField 
-                label="Emergency Contact Name" 
-                required
-                value={additionalDetails.emergencyName}
-                onChange={e => setAdditionalDetails({...additionalDetails, emergencyName: e.target.value})}
-                placeholder="Enter contact name"
-                error={errors.emergencyName}
-              />
-              <FormField 
-                label="Emergency Contact Number" 
-                required
-                value={additionalDetails.emergencyPhone}
-                onChange={e => setAdditionalDetails({...additionalDetails, emergencyPhone: e.target.value})}
-                placeholder="Enter phone number"
-                prefix="+91"
-                error={errors.emergencyPhone}
-              />
-              <FormField 
-                label="Relationship" 
-                required
-                value={additionalDetails.relationship}
-                onChange={e => setAdditionalDetails({...additionalDetails, relationship: e.target.value})}
-                placeholder="Select relationship"
-                error={errors.relationship}
-              />
-              <div className="sm:col-span-3">
-                <FormField
-                  label="Permanent Address (optional — tenant can fill in KYC)"
-                  value={additionalDetails.permanentAddress}
-                  onChange={e => setAdditionalDetails({...additionalDetails, permanentAddress: e.target.value})}
-                  placeholder="House/Flat No., Street, Area, City, State, PIN"
+          {(!isMobile || activeMobileTab === 4) && (
+            <div className="rounded-2xl border border-border bg-card p-6 shadow-soft space-y-6">
+              <h3 className="font-serif text-[20px] text-slate-800 flex items-center gap-2">
+                <Briefcase size={18} className="text-primary" />
+                4. Occupation & Emergencies
+              </h3>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <FormField 
+                  label="Occupation" 
+                  value={additionalDetails.occupation}
+                  onChange={e => setAdditionalDetails({...additionalDetails, occupation: e.target.value})}
+                  placeholder="Enter occupation"
                 />
-              </div>
-              <div className="sm:col-span-3">
-                <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">Remarks (Optional)</label>
-                <textarea
-                  value={additionalDetails.remarks}
-                  onChange={e => setAdditionalDetails({...additionalDetails, remarks: e.target.value})}
-                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-[11.5px] font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-200 transition-all h-24 resize-none"
-                  placeholder="Enter remarks..."
+                <FormField 
+                  label="Company / Organization" 
+                  value={additionalDetails.company}
+                  onChange={e => setAdditionalDetails({...additionalDetails, company: e.target.value})}
+                  placeholder="Enter company name"
                 />
+                <FormField 
+                  label="Emergency Contact Name" 
+                  required
+                  value={additionalDetails.emergencyName}
+                  onChange={e => setAdditionalDetails({...additionalDetails, emergencyName: e.target.value})}
+                  placeholder="Enter contact name"
+                  error={errors.emergencyName}
+                />
+                <FormField 
+                  label="Emergency Contact Number" 
+                  required
+                  value={additionalDetails.emergencyPhone}
+                  onChange={e => setAdditionalDetails({...additionalDetails, emergencyPhone: e.target.value})}
+                  placeholder="Enter phone number"
+                  prefix="+91"
+                  error={errors.emergencyPhone}
+                />
+                <FormField 
+                  label="Relationship" 
+                  required
+                  value={additionalDetails.relationship}
+                  onChange={e => setAdditionalDetails({...additionalDetails, relationship: e.target.value})}
+                  placeholder="Select relationship"
+                  error={errors.relationship}
+                />
+                <div className="sm:col-span-3">
+                  <FormField
+                    label="Permanent Address (optional — tenant can fill in KYC)"
+                    value={additionalDetails.permanentAddress}
+                    onChange={e => setAdditionalDetails({...additionalDetails, permanentAddress: e.target.value})}
+                    placeholder="House/Flat No., Street, Area, City, State, PIN"
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">Remarks (Optional)</label>
+                  <textarea
+                    value={additionalDetails.remarks}
+                    onChange={e => setAdditionalDetails({...additionalDetails, remarks: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-[11.5px] font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-200 transition-all h-24 resize-none"
+                    placeholder="Enter remarks..."
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          <div className="flex items-center gap-3 p-6 bg-blue-50/50 rounded-2xl border border-blue-100">
-             <div 
-               onClick={() => setConfirmDetails(!confirmDetails)}
-               className={cn(
-                 "w-5 h-5 rounded border-2 flex items-center justify-center cursor-pointer transition-all",
-                 confirmDetails ? "bg-slate-900 border-slate-900 shadow-md" : "bg-white border-slate-200"
-               )}
-             >
-               {confirmDetails && <Check className="w-3.5 h-3.5 text-white" />}
-             </div>
-             <p className="text-[10px] font-black text-slate-700 uppercase tracking-tight">I confirm the above details are correct.</p>
-          </div>
+          {(!isMobile || activeMobileTab === 4) && (
+            <div className="flex items-center gap-3 p-6 bg-blue-50/50 rounded-2xl border border-blue-100">
+               <div 
+                 onClick={() => setConfirmDetails(!confirmDetails)}
+                 className={cn(
+                   "w-5 h-5 rounded border-2 flex items-center justify-center cursor-pointer transition-all",
+                   confirmDetails ? "bg-slate-900 border-slate-900 shadow-md" : "bg-white border-slate-200"
+                 )}
+               >
+                 {confirmDetails && <Check className="w-3.5 h-3.5 text-white" />}
+               </div>
+               <p className="text-[10px] font-black text-slate-700 uppercase tracking-tight">I confirm the above details are correct.</p>
+            </div>
+          )}
+
+          {isMobile && activeMobileTab === 4 && (
+            <div className="flex items-center justify-between gap-2 mt-6">
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="w-full h-10 rounded-lg bg-emerald-600 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2"
+              >
+                {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                Save & Onboard
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Sidebar info */}
-        <div className="lg:col-span-4">
-          <div className="sticky top-24 space-y-6">
+        {(!isMobile || activeMobileTab === 4) && (
+          <div className="lg:col-span-4">
+            <div className="sticky top-24 space-y-6">
 
-          {/* Onboarding Summary */}
-          <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-            <h3 className="font-serif text-[16px] text-foreground">Onboarding Summary</h3>
-            <div className="divide-y divide-border">
-              {(() => {
-                const propName = properties.find(p => p._id === roomAssignment.propertyId)?.title;
-                const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-                const rows = [
-                  { label: "Tenant Name",       val: basicDetails.fullName },
-                  { label: "Email",             val: basicDetails.email },
-                  { label: "Phone",             val: basicDetails.phone },
-                  { label: "Property",          val: propName },
-                  { label: "Floor",             val: roomAssignment.floor },
-                  { label: "Room Number",       val: roomAssignment.roomUnit },
-                  { label: "Accommodation Type",val: roomAssignment.roomType },
-                  { label: "Bed",               val: roomAssignment.bed },
-                  { label: "Monthly Rent (₹)",  val: tenancyDetails.rentAmount ? `₹${tenancyDetails.rentAmount}` : null },
-                  { label: "Security Deposit",  val: tenancyDetails.depositAmount ? `₹${tenancyDetails.depositAmount}` : null },
-                  { label: "Move-in Date",      val: fmtDate(tenancyDetails.moveInDate) !== "—" ? fmtDate(tenancyDetails.moveInDate) : null },
-                  { label: "Minimum Stay",      val: tenancyDetails.minStay ? `${tenancyDetails.minStay} months` : null },
-                  { label: "Notice Period",     val: tenancyDetails.noticePeriod ? `${tenancyDetails.noticePeriod} days` : null },
-                  { label: "Rent Due Date",     val: tenancyDetails.rentDueDate },
-                ];
-                return rows.map(({ label, val }) => (
-                  <div key={label} className="flex justify-between items-center py-2 gap-2">
-                    <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-tight shrink-0">{label}</span>
-                    <span className="text-[10.5px] font-black text-slate-700 text-right truncate max-w-[55%]">{val || "—"}</span>
-                  </div>
-                ));
-              })()}
+            {/* Onboarding Summary */}
+            <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+              <h3 className="font-serif text-[16px] text-foreground">Onboarding Summary</h3>
+              <div className="divide-y divide-border">
+                {(() => {
+                  const propName = properties.find(p => p._id === roomAssignment.propertyId)?.title;
+                  const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+                  const rows = [
+                    { label: "Tenant Name",       val: basicDetails.fullName },
+                    { label: "Email",             val: basicDetails.email },
+                    { label: "Phone",             val: basicDetails.phone },
+                    { label: "Property",          val: propName },
+                    { label: "Floor",             val: roomAssignment.floor },
+                    { label: "Room Number",       val: roomAssignment.roomUnit },
+                    { label: "Accommodation Type",val: roomAssignment.roomType },
+                    { label: "Bed",               val: roomAssignment.bed },
+                    { label: "Monthly Rent (₹)",  val: tenancyDetails.rentAmount ? `₹${tenancyDetails.rentAmount}` : null },
+                    { label: "Security Deposit",  val: tenancyDetails.depositAmount ? `₹${tenancyDetails.depositAmount}` : null },
+                    { label: "Move-in Date",      val: fmtDate(tenancyDetails.moveInDate) !== "—" ? fmtDate(tenancyDetails.moveInDate) : null },
+                    { label: "Minimum Stay",      val: tenancyDetails.minStay ? `${tenancyDetails.minStay} months` : null },
+                    { label: "Notice Period",     val: tenancyDetails.noticePeriod ? `${tenancyDetails.noticePeriod} days` : null },
+                    { label: "Rent Due Date",     val: tenancyDetails.rentDueDate },
+                  ];
+                  return rows.map(({ label, val }) => (
+                    <div key={label} className="flex justify-between items-center py-2 gap-2">
+                      <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-tight shrink-0">{label}</span>
+                      <span className="text-[10.5px] font-black text-slate-700 text-right truncate max-w-[55%]">{val || "—"}</span>
+                    </div>
+                  ));
+                })()}
+              </div>
             </div>
-          </div>
 
-          {/* Onboarding Timeline */}
-          <div className="bg-card border border-border rounded-2xl p-6 space-y-6">
-            <h3 className="font-serif text-[16px] text-foreground">Onboarding Timeline</h3>
-            <div className="space-y-6">
-              {[
-                { step: 1, title: "Personal Details & Room", sub: "Add tenant details, assign room and tenancy information.", status: "In Progress" },
-                { step: 2, title: "E-KYC Verification", sub: "An E-KYC link will be sent to the tenant's email and phone.", status: "Pending" },
-                { step: 3, title: "E-Sign Agreement", sub: "After successful KYC, rental agreement link will be sent for e-sign.", status: "Pending" },
-                { step: 4, title: "Tenant Added", sub: "Tenant will be added after agreement is signed successfully.", status: "Pending" }
-              ].map((item, i) => (
-                <div key={i} className="flex gap-4 relative group">
-                  {i !== 3 && <div className="absolute left-[11px] top-6 bottom-[-20px] w-[2px] bg-slate-100 group-last:hidden" />}
-                  <div className={cn(
-                    "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 relative z-10",
-                    item.status === "In Progress" ? "bg-slate-900 text-white ring-4 ring-slate-100" : "bg-slate-100 text-slate-400"
-                  )}>
-                    {item.step}
+            {/* Onboarding Timeline */}
+            <div className="bg-card border border-border rounded-2xl p-6 space-y-6">
+              <h3 className="font-serif text-[16px] text-foreground">Onboarding Timeline</h3>
+              <div className="space-y-6">
+                {[
+                  { step: 1, title: "Personal Details & Room", sub: "Add tenant details, assign room and tenancy information.", status: "In Progress" },
+                  { step: 2, title: "E-KYC Verification", sub: "An E-KYC link will be sent to the tenant's email and phone.", status: "Pending" },
+                  { step: 3, title: "E-Sign Agreement", sub: "After successful KYC, rental agreement link will be sent for e-sign.", status: "Pending" },
+                  { step: 4, title: "Tenant Added", sub: "Tenant will be added after agreement is signed successfully.", status: "Pending" }
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-4 relative group">
+                    {i !== 3 && <div className="absolute left-[11px] top-6 bottom-[-20px] w-[2px] bg-slate-100 group-last:hidden" />}
+                    <div className={cn(
+                      "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 relative z-10",
+                      item.status === "In Progress" ? "bg-slate-900 text-white ring-4 ring-slate-100" : "bg-slate-100 text-slate-400"
+                    )}>
+                      {item.step}
+                    </div>
+                    <div>
+                      <h4 className={cn("text-[10px] font-black uppercase tracking-tight mb-1", item.status === "In Progress" ? "text-slate-800" : "text-slate-400")}>{item.title}</h4>
+                      <p className="text-[9.5px] font-bold text-slate-400 leading-normal max-w-[200px]">{item.sub}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className={cn("text-[10px] font-black uppercase tracking-tight mb-1", item.status === "In Progress" ? "text-slate-800" : "text-slate-400")}>{item.title}</h4>
-                    <p className="text-[9.5px] font-bold text-slate-400 leading-normal max-w-[200px]">{item.sub}</p>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
 
-          </div>{/* end scrollable sticky wrapper */}
-        </div>
+            </div>{/* end scrollable sticky wrapper */}
+          </div>
+        )}
       </div>
 
       {/* Success Modal */}

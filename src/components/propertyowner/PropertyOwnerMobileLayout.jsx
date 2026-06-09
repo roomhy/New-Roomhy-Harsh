@@ -165,7 +165,7 @@ export default function PropertyOwnerMobileLayout({
             {/* Profile Avatar */}
             <button 
               onClick={() => setProfileDrawerOpen(true)}
-              className="w-7.5 h-7.5 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center border border-white/20 shadow-sm shrink-0"
+              className="w-9 h-9 rounded-full bg-blue-600 text-white font-black text-sm flex items-center justify-center border-2 border-white/30 shadow-md shrink-0 hover:scale-105 transition-transform"
             >
               {ownerInitial}
             </button>
@@ -201,24 +201,30 @@ export default function PropertyOwnerMobileLayout({
     <div className="w-10 h-1 bg-blue-600 rounded-full mx-auto mt-2 opacity-80" />
   </div>
 )}
-<div className={cn("w-full px-2.5 py-2 mobile-page-container", contentClassName)}>
+        {activeParent?.submenus && !disableSubmenuStrip && (
+          <div className="px-4 py-2 overflow-x-auto flex gap-2 border-b border-slate-100 bg-white" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {activeParent.submenus.map((sub, i) => {
+              const isSubActive = pathname === sub.href || pathname.startsWith(sub.href + '/');
+              return (
+                <Link
+                  key={i}
+                  to={sub.href}
+                  className={cn(
+                    "shrink-0 px-4 py-1.5 rounded-full text-[12px] font-bold border transition-all whitespace-nowrap",
+                    isSubActive 
+                      ? "bg-blue-600 text-white border-blue-600" 
+                      : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                  )}
+                >
+                  {sub.label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+        <div className={cn("w-full px-2.5 py-2 mobile-page-container", contentClassName)}>
           {children}
         </div>
-        
-        {/* Pagination Controls */}
-   <div className="flex justify-center gap-4 mt-4">
-     <button
-       disabled={currentPage === 1 || loading}
-       onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
-       className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
-     >Prev</button>
-     <span className="px-2 py-1">Page {currentPage}</span>
-     <button
-       disabled={totalRooms < pageSize || loading}
-       onClick={() => setCurrentPage(p => p + 1)}
-       className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
-     >Next</button>
-   </div>
       </main>
 
       {/* 3. PREMIUM BOTTOM NAVBAR */}
@@ -268,7 +274,7 @@ export default function PropertyOwnerMobileLayout({
 
         {/* Tab 4: Leads */}
         <Link 
-          to="/propertyowner/booking"
+          to="/propertyowner/enquiry"
           className={cn(
             "flex flex-col items-center justify-center w-14 py-1.5 transition-all rounded-xl",
             isTabActive(["/propertyowner/booking", "/propertyowner/booking_request", "/propertyowner/enquiry"]) 
@@ -373,13 +379,13 @@ export default function PropertyOwnerMobileLayout({
 
       {/* PROPERTY SWITCHER DRAWER (BOTTOM SHEET) */}
       <div className={cn(
-        "fixed bottom-0 left-0 right-0 bg-[#0F172A] border-t border-white/10 rounded-t-[2rem] shadow-2xl z-50 p-6 transition-all duration-500 ease-out transform max-h-[70vh] flex flex-col",
+        "fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 rounded-t-[2rem] shadow-2xl z-50 p-6 transition-all duration-500 ease-out transform max-h-[70vh] flex flex-col",
         switcherOpen ? "translate-y-0" : "translate-y-full"
       )}>
-        <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-4 cursor-pointer" onClick={() => setSwitcherOpen(false)} />
+        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4 cursor-pointer" onClick={() => setSwitcherOpen(false)} />
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-black text-white uppercase tracking-wider">Switch Property</h3>
-          <button onClick={() => setSwitcherOpen(false)} className="text-slate-400 hover:text-white p-1">
+          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Switch Property</h3>
+          <button onClick={() => setSwitcherOpen(false)} className="text-slate-400 hover:text-slate-700 p-1">
             <X size={18} />
           </button>
         </div>
@@ -391,13 +397,13 @@ export default function PropertyOwnerMobileLayout({
             className={cn(
               "w-full flex items-center justify-between p-3.5 rounded-2xl text-xs font-bold transition-all border text-left",
               activePropertyId === 'all' 
-                ? "bg-blue-600/10 border-blue-500/30 text-blue-400" 
-                : "border-white/5 hover:bg-white/5 text-slate-300"
+                ? "bg-blue-50 border-blue-200 text-blue-600" 
+                : "border-slate-100 hover:bg-slate-50 text-slate-600"
             )}
           >
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center">
-                <LayoutDashboard size={14} />
+              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                <LayoutDashboard size={14} className="text-slate-500" />
               </div>
               <span>All Properties (Overview)</span>
             </div>
@@ -415,17 +421,17 @@ export default function PropertyOwnerMobileLayout({
                 className={cn(
                   "w-full flex items-center justify-between p-3.5 rounded-2xl text-xs font-bold transition-all border text-left",
                   isActive 
-                    ? "bg-blue-600/10 border-blue-500/30 text-blue-400" 
-                    : "border-white/5 hover:bg-white/5 text-slate-300"
+                    ? "bg-blue-50 border-blue-200 text-blue-600" 
+                    : "border-slate-100 hover:bg-slate-50 text-slate-600"
                 )}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center shrink-0">
-                    <Building2 size={14} className={isActive ? "text-blue-400" : "text-slate-400"} />
+                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                    <Building2 size={14} className={isActive ? "text-blue-500" : "text-slate-400"} />
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="truncate text-white">{p.title || p.name || "Property"}</span>
-                    <span className="text-[10px] text-slate-500 font-medium truncate mt-0.5">{p.city || p.area || "No Location"}</span>
+                    <span className="truncate text-slate-800">{p.title || p.name || "Property"}</span>
+                    <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{p.city || p.area || "No Location"}</span>
                   </div>
                 </div>
                 {isActive && <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />}
@@ -437,14 +443,14 @@ export default function PropertyOwnerMobileLayout({
 
       {/* NOTIFICATIONS SLIDE-UP DRAWER */}
       <div className={cn(
-        "fixed bottom-0 left-0 right-0 bg-[#0F172A] border-t border-white/10 rounded-t-[2rem] shadow-2xl z-50 p-6 transition-all duration-500 ease-out transform max-h-[80vh] flex flex-col",
+        "fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 rounded-t-[2rem] shadow-2xl z-50 p-6 transition-all duration-500 ease-out transform max-h-[80vh] flex flex-col",
         notifDrawerOpen ? "translate-y-0" : "translate-y-full"
       )}>
-        <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-4 cursor-pointer" onClick={() => setNotifDrawerOpen(false)} />
-        <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-3">
+        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4 cursor-pointer" onClick={() => setNotifDrawerOpen(false)} />
+        <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
-            <Bell size={18} className="text-blue-400" />
-            <h3 className="text-sm font-black text-white uppercase tracking-wider">Alerts & Logs</h3>
+            <Bell size={18} className="text-blue-500" />
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Alerts & Logs</h3>
           </div>
           <div className="flex gap-4">
             {displayNotifications.length > 0 && (
@@ -464,12 +470,12 @@ export default function PropertyOwnerMobileLayout({
                     }
                   }
                 }}
-                className="text-[10px] font-bold text-blue-400 hover:text-blue-300"
+                className="text-[10px] font-bold text-blue-600 hover:text-blue-700"
               >
                 Mark Read
               </button>
             )}
-            <button onClick={() => setNotifDrawerOpen(false)} className="text-slate-450 hover:text-white">
+            <button onClick={() => setNotifDrawerOpen(false)} className="text-slate-400 hover:text-slate-700">
               <X size={18} />
             </button>
           </div>
@@ -477,15 +483,15 @@ export default function PropertyOwnerMobileLayout({
 
         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2.5">
           {displayNotifications.length === 0 ? (
-            <div className="py-16 text-center text-slate-500">
-              <Bell className="w-10 h-10 mx-auto opacity-20 mb-3" />
+            <div className="py-16 text-center text-slate-400">
+              <Bell className="w-10 h-10 mx-auto opacity-30 mb-3" />
               <p className="text-xs font-bold uppercase tracking-widest">No notifications yet</p>
             </div>
           ) : (
             displayNotifications.map((n, i) => (
-              <div key={i} className="p-3.5 bg-white/5 border border-white/5 rounded-2xl">
-                <p className="text-[11px] font-black text-white leading-tight mb-1">{n.title}</p>
-                <p className="text-[10px] text-slate-400 leading-relaxed">{n.message}</p>
+              <div key={i} className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
+                <p className="text-[11px] font-black text-slate-800 leading-tight mb-1">{n.title}</p>
+                <p className="text-[10px] text-slate-500 leading-relaxed">{n.message}</p>
               </div>
             ))
           )}
@@ -494,38 +500,38 @@ export default function PropertyOwnerMobileLayout({
 
       {/* PROFILE & LOGOUT SLIDE-UP DRAWER */}
       <div className={cn(
-        "fixed bottom-0 left-0 right-0 bg-[#0F172A] border-t border-white/10 rounded-t-[2rem] shadow-2xl z-50 p-6 transition-all duration-500 ease-out transform",
+        "fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 rounded-t-[2rem] shadow-2xl z-50 p-6 transition-all duration-500 ease-out transform",
         profileDrawerOpen ? "translate-y-0" : "translate-y-full"
       )}>
-        <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-4 cursor-pointer" onClick={() => setProfileDrawerOpen(false)} />
+        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4 cursor-pointer" onClick={() => setProfileDrawerOpen(false)} />
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-sm font-black text-white uppercase tracking-wider">Account Control</h3>
-          <button onClick={() => setProfileDrawerOpen(false)} className="text-slate-450 hover:text-white">
+          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Account</h3>
+          <button onClick={() => setProfileDrawerOpen(false)} className="text-slate-400 hover:text-slate-700">
             <X size={18} />
           </button>
         </div>
 
-        <div className="bg-white/5 border border-white/5 p-4 rounded-2xl flex items-center gap-3.5 mb-6">
-          <div className="w-12 h-12 rounded-full bg-blue-600 border border-white/15 flex items-center justify-center font-black text-lg text-white">
+        <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl flex items-center gap-3.5 mb-5">
+          <div className="w-12 h-12 rounded-full bg-blue-600 border-2 border-white shadow-md flex items-center justify-center font-black text-lg text-white">
             {ownerInitial}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-black text-white truncate leading-none mb-1">{displayName}</p>
-            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider italic leading-none">{owner?.loginId}</p>
+            <p className="text-sm font-black text-slate-900 truncate leading-none mb-1">{displayName}</p>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider italic leading-none">{owner?.loginId}</p>
           </div>
         </div>
 
         <div className="space-y-2">
           <Link 
             to="/propertyowner/ownerprofile"
-            className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-bold text-center text-slate-200 transition-all flex items-center justify-center gap-2"
+            className="w-full py-3 px-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl text-xs font-bold text-center text-slate-700 transition-all flex items-center justify-center gap-2"
           >
-            <UserCircle size={15} className="text-blue-400" />
+            <UserCircle size={15} className="text-blue-500" />
             <span>Profile Settings</span>
           </Link>
           <button 
             onClick={handleLogout}
-            className="w-full py-3 px-4 bg-rose-600/10 hover:bg-rose-600 text-rose-500 hover:text-white rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 border border-rose-600/20"
+            className="w-full py-3 px-4 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 border border-rose-200"
           >
             <LogOut size={15} />
             <span>Log Out</span>
@@ -535,39 +541,36 @@ export default function PropertyOwnerMobileLayout({
 
       {/* MORE SERVICES SLIDE-UP DRAWER (THE SYSTEM PORTAL) */}
       <div className={cn(
-        "fixed bottom-0 left-0 right-0 bg-[#0F172A] border-t border-white/10 rounded-t-[2.5rem] shadow-2xl z-50 p-6 pb-8 transition-all duration-500 ease-out transform max-h-[85vh] flex flex-col",
+        "fixed bottom-0 left-0 right-0 bg-slate-50 border-t border-slate-200 rounded-t-[2.5rem] shadow-2xl z-50 p-6 pb-8 transition-all duration-500 ease-out transform max-h-[85vh] flex flex-col",
         moreDrawerOpen ? "translate-y-0" : "translate-y-full"
       )}>
-        <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-4 cursor-pointer" onClick={() => setMoreDrawerOpen(false)} />
-        <div className="flex items-center justify-between mb-5 border-b border-white/5 pb-3 shrink-0">
+        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4 cursor-pointer" onClick={() => setMoreDrawerOpen(false)} />
+        <div className="flex items-center justify-between mb-5 border-b border-slate-200 pb-3 shrink-0">
           <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-yellow-400 fill-yellow-400" />
-            <h3 className="text-sm font-black text-white uppercase tracking-wider">Extended Panel</h3>
+            <Sparkles size={16} className="text-blue-500 fill-blue-200" />
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Extended Panel</h3>
           </div>
-          <button onClick={() => setMoreDrawerOpen(false)} className="text-slate-450 hover:text-white p-1">
+          <button onClick={() => setMoreDrawerOpen(false)} className="text-slate-400 hover:text-slate-700 p-1">
             <X size={18} />
           </button>
         </div>
 
         {/* GROUPED SERVICES */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 pb-4 space-y-6">
+        <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 pb-4 space-y-4">
           
           {/* TENANTS GROUP */}
           <div>
-
             <div className="grid grid-cols-3 gap-3">
               <GridItem to="/propertyowner/tenants" icon={Users} label="All Tenants" active={pathname.startsWith("/propertyowner/tenants")} />
               <GridItem to="/propertyowner/tenantrec" icon={UserPlus} label="Add Tenant" active={pathname.startsWith("/propertyowner/tenantrec")} />
               <GridItem to="/propertyowner/tenant-docs" icon={FileText} label="Tenant Docs" active={pathname.startsWith("/propertyowner/tenant-docs")} />
               <GridItem to="/propertyowner/upcoming-moveins" icon={CalendarCheck} label="Upcoming Move-ins" active={pathname.startsWith("/propertyowner/upcoming-moveins")} />
-
               <GridItem to="/propertyowner/ex-tenants" icon={History} label="Ex-Tenants" active={pathname.startsWith("/propertyowner/ex-tenants")} />
             </div>
           </div>
 
           {/* BUSINESS GROUP */}
           <div>
-
             <div className="grid grid-cols-3 gap-3">
               <GridItem to="/propertyowner/payment" icon={IndianRupee} label="Rent & Payments" active={pathname.startsWith("/propertyowner/payment")} />
               <GridItem to="/propertyowner/collection-report" icon={Wallet} label="Accounting" active={pathname.startsWith("/propertyowner/collection-report")} />
@@ -577,7 +580,6 @@ export default function PropertyOwnerMobileLayout({
 
           {/* OPERATIONS GROUP */}
           <div>
-
             <div className="grid grid-cols-3 gap-3">
               <GridItem to="/propertyowner/complaints" icon={Headset} label="Complaints" active={pathname.startsWith("/propertyowner/complaints")} />
               <GridItem to="/propertyowner/all-staff" icon={Briefcase} label="Staff Mgmt" active={pathname.startsWith("/propertyowner/all-staff")} />
@@ -587,7 +589,6 @@ export default function PropertyOwnerMobileLayout({
 
           {/* MARKETING GROUP */}
           <div>
-
             <div className="grid grid-cols-3 gap-3">
               <GridItem to="/propertyowner/ownerchat" icon={MessageCircle} label="Chat & Msgs" active={pathname.startsWith("/propertyowner/ownerchat")} />
               <GridItem to="/propertyowner/vacancy-promotion" icon={Megaphone} label="Marketing" active={pathname.startsWith("/propertyowner/vacancy-promotion")} />
@@ -596,7 +597,6 @@ export default function PropertyOwnerMobileLayout({
 
           {/* SYSTEM GROUP */}
           <div>
-
             <div className="grid grid-cols-3 gap-3">
               <GridItem to="/propertyowner/agreement" icon={FileText} label="Documents" active={pathname.startsWith("/propertyowner/agreement")} />
               <GridItem to="/propertyowner/settings" icon={Settings} label="Settings" active={pathname.startsWith("/propertyowner/settings") && window.location.hash !== "#backup"} />
@@ -606,10 +606,10 @@ export default function PropertyOwnerMobileLayout({
                   setMoreDrawerOpen(false);
                   setSwitcherOpen(true);
                 }}
-                className="flex flex-col items-center justify-center p-3.5 rounded-2xl border border-white/5 hover:border-white/10 bg-white/5 hover:bg-white/10 transition-all text-slate-350"
+                className="flex flex-col items-center justify-center p-3.5 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 transition-all text-slate-600"
               >
-                <Building2 size={20} className="text-blue-400 mb-1.5" />
-                <span className="text-[10px] font-bold tracking-tight text-center leading-tight">Switch Prop.</span>
+                <Building2 size={20} className="text-blue-500 mb-1.5" />
+                <span className="text-[10px] font-bold tracking-tight text-center leading-tight text-slate-600">Switch Prop.</span>
               </button>
             </div>
           </div>
@@ -617,11 +617,11 @@ export default function PropertyOwnerMobileLayout({
         </div>
 
         {/* FOOTER */}
-        <div className="border-t border-white/5 pt-4 shrink-0 flex items-center justify-between">
-          <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest italic">Roomhy Owner Pro v2.0</p>
+        <div className="border-t border-slate-200 pt-4 shrink-0 flex items-center justify-between">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Roomhy Owner Pro v2.0</p>
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-1 text-[10px] font-black uppercase text-rose-500 hover:text-rose-400"
+            className="flex items-center gap-1 text-[10px] font-black uppercase text-rose-500 hover:text-rose-600"
           >
             <LogOut size={12} />
             <span>Logout</span>
@@ -638,13 +638,13 @@ function GridItem({ to, icon: Icon, label, active }) {
     <Link 
       to={to} 
       className={cn(
-        "flex flex-col items-center justify-center p-3.5 rounded-2xl border transition-all text-slate-300",
+        "flex flex-col items-center justify-center p-3.5 rounded-2xl border transition-all",
         active 
-          ? "bg-blue-600/10 border-blue-500/30 text-blue-400" 
-          : "border-white/5 bg-white/5 hover:bg-white/10"
+          ? "bg-blue-50 border-blue-200 text-blue-600" 
+          : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
       )}
     >
-      <Icon size={20} className={cn("mb-1.5", active ? "text-blue-400" : "text-slate-400")} />
+      <Icon size={20} className={cn("mb-1.5", active ? "text-blue-500" : "text-slate-500")} />
       <span className="text-[10px] font-bold tracking-tight text-center leading-tight">{label}</span>
     </Link>
   );

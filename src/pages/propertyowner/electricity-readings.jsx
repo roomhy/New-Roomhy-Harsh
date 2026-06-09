@@ -8,22 +8,24 @@ import { toast } from "react-hot-toast";
 const cn = (...c) => c.filter(Boolean).join(" ");
 
 export default function ElectricityReadings() {
-  const [owner, setOwner] = useState(null);
+  const owner = getOwnerRuntimeSession();
+  if (!owner?.loginId && typeof window !== "undefined") {
+    window.location.href = "/propertyowner/ownerlogin";
+    return null;
+  }
+
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [readingForm, setReadingForm] = useState({
-    billingMonth: new Date().toISOString().slice(0, 7), // YYYY-MM
+    billingMonth: new Date().toISOString().slice(0, 7),
     currentReading: ""
   });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const s = getOwnerRuntimeSession();
-    if (!s?.loginId) { window.location.href = "/propertyowner/ownerlogin"; return; }
-    setOwner(s);
-    loadRooms(s.loginId);
+    loadRooms(owner.loginId);
   }, []);
 
   const loadRooms = async (loginId) => {
@@ -125,7 +127,8 @@ export default function ElectricityReadings() {
   return (
     <PropertyOwnerLayout owner={owner} title="Electricity Readings" onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}>
       <div className="max-w-6xl mx-auto">
-        <div className="mb-6 flex items-start justify-between">
+        {/* Desktop Header - hidden on mobile */}
+        <div className="hidden md:flex mb-6 items-start justify-between">
           <div>
             <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground mb-2">Electricity Readings</h1>
             <p className="text-[13.5px] text-muted-foreground">Log monthly meter readings for rooms automatically.</p>
@@ -135,7 +138,81 @@ export default function ElectricityReadings() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Mobile Stat Strip - hidden on desktop */}
+        <div className="flex md:hidden overflow-x-auto gap-3 pb-2 mb-5" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          {[
+            { title: "Total Rooms",    value: loading ? "..." : rooms.length,                                                                subtext: "Metered rooms",  icon: Zap,      bg: "bg-amber-50",  ic: "text-amber-500" },
+            { title: "Readings Logged",value: loading ? "..." : rooms.filter(r => r.history?.length > 0).length,                             subtext: "Have history",   icon: Calendar, bg: "bg-blue-50",   ic: "text-blue-600" },
+            { title: "This Month",     value: loading ? "..." : rooms.filter(r => r.latest?.billingMonth === new Date().toISOString().slice(0,7)).length, subtext: "Updated", icon: RotateCw, bg: "bg-emerald-50",ic: "text-emerald-600" },
+          ].map(({ title, value, subtext, icon: Icon, bg, ic }) => (
+            <div key={title} className="shrink-0 w-[130px] bg-white rounded-[20px] p-4 shadow-sm border border-slate-100 flex flex-col justify-between">
+              <div className="flex items-start mb-2">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${bg}`}>
+                  <Icon className={`w-5 h-5 ${ic}`} />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-[22px] font-black text-slate-900 leading-tight">{value}</h3>
+                <p className="text-[12px] font-semibold text-slate-500 mt-0.5">{title}</p>
+                <p className="text-[10px] font-medium text-slate-400 mt-1">{subtext}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Mobile Room Cards - hidden on desktop */}
+        <div className="md:hidden space-y-3 mb-6">
+          {loading ? (
+            <div className="animate-pulse space-y-3">
+              {[1,2,3].map(i => <div key={i} className="h-24 bg-slate-100 rounded-2xl" />)}
+            </div>
+          ) : rooms.length === 0 ? (
+            <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400">
+              <Zap size={32} className="mx-auto mb-2 opacity-30" />
+              <p className="text-sm font-semibold">No rooms found</p>
+            </div>
+          ) : rooms.map(room => (
+            <div key={room.roomId}
+              onClick={() => setSelectedRoom(selectedRoom?.roomId === room.roomId ? null : room)}
+              className={`bg-white rounded-2xl border p-4 shadow-sm cursor-pointer transition-all ${
+                selectedRoom?.roomId === room.roomId ? "border-blue-400 ring-2 ring-blue-100" : "border-slate-100"
+              }`}>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <p className="font-black text-slate-900 text-[15px]">Room {room.roomNo || "—"}</p>
+                  <p className="text-[11px] text-slate-500">{room.propertyTitle}</p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
+                  <Zap className="w-5 h-5 text-amber-500" />
+                </div>
+              </div>
+              {room.latest ? (
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  <div className="bg-slate-50 rounded-xl p-2.5">
+                    <p className="text-[9px] text-slate-400 font-bold uppercase">Last Reading</p>
+                    <p className="text-[16px] font-black text-slate-900">{room.latest.currentReading}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-2.5">
+                    <p className="text-[9px] text-slate-400 font-bold uppercase">Unit Cost</p>
+                    <p className="text-[16px] font-black text-slate-900">₹{room.latest.unitCost || room.roomUnitCost || 0}</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-400 mt-2">No readings yet — tap to add</p>
+              )}
+              {selectedRoom?.roomId === room.roomId && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setModalOpen(true); }}
+                  className="w-full mt-3 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-[13px] flex items-center justify-center gap-2">
+                  <Plus size={16} /> Log Reading
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop 2-col Grid - hidden on mobile */}
+        <div className="hidden md:grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left: Room List */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-soft h-fit">
             <h2 className="text-[16px] font-semibold text-foreground mb-4">Rooms</h2>
@@ -161,7 +238,7 @@ export default function ElectricityReadings() {
             </div>
           </div>
 
-          {/* Right: Readings & Bill */}
+          {/* Right: Readings & Bill - Desktop Only */}
           <div className="lg:col-span-2 space-y-4">
             {!selectedRoom ? (
               <div className="rounded-2xl border-2 border-dashed border-border bg-card p-12 text-center">

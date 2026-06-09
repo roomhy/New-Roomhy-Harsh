@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession, fetchActiveOwnerTenants } from "../../utils/propertyowner";
+import { MobileStatCard } from "../../components/propertyowner/MobileComponents";
 import { 
   Users, Search, ShieldCheck, Mail, Phone, ExternalLink, 
-  MapPin, CheckCircle, Clock, AlertTriangle, User, CalendarClock
+  MapPin, CheckCircle, Clock, AlertTriangle, User, CalendarClock, BedDouble, FileText
 } from "lucide-react";
 
 export default function ActiveTenantsPage() {
@@ -55,15 +56,15 @@ export default function ActiveTenantsPage() {
       title="Active Tenants" 
       onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
     >
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6 hidden md:flex">
         <div>
           <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Active Tenants</h1>
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">Comprehensive list of currently residing tenants, including contact info, KYC verification status, and move-in timelines.</p>
         </div>
       </div>
 
-      {/* Stats Header */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* Stats Header — Desktop: 4-col grid, Mobile: horizontal scroll strip */}
+      <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
           <span className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wider">Active Residents</span>
           <h3 className="text-[28px] font-bold text-foreground mt-1">
@@ -90,6 +91,29 @@ export default function ActiveTenantsPage() {
         </div>
       </div>
 
+      {/* Mobile Stats: single row horizontal scroll (premium card style) */}
+      <div className="flex overflow-x-auto gap-3 pb-2 mb-5 md:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        {[
+          { title: "Tenants",  value: loading ? "..." : tenants.length,                                                                                                   subtext: "Active",     icon: Users,       bg: "bg-blue-50",   ic: "text-blue-600" },
+          { title: "KYC %",    value: loading ? "..." : `${tenants.length > 0 ? Math.round((tenants.filter(t => t.kycStatus === "verified").length / tenants.length) * 100) : 0}%`, subtext: "Verified",   icon: ShieldCheck, bg: "bg-emerald-50",ic: "text-emerald-600" },
+          { title: "Rooms",    value: loading ? "..." : new Set(tenants.map(t => t.roomNo || t.room?.number).filter(Boolean)).size,                                         subtext: "Occupied",   icon: BedDouble,   bg: "bg-indigo-50", ic: "text-indigo-600" },
+          { title: "Signed",   value: loading ? "..." : tenants.filter(t => t.agreementSigned).length,                                                                     subtext: "Agreement",  icon: FileText,    bg: "bg-purple-50", ic: "text-purple-600" },
+        ].map(({ title, value, subtext, icon: Icon, bg, ic }) => (
+          <div key={title} className="shrink-0 w-[130px] bg-white rounded-[20px] p-4 shadow-sm border border-slate-100 flex flex-col justify-between cursor-pointer active:scale-[0.98] transition-transform">
+            <div className="flex items-start justify-between mb-2">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${bg}`}>
+                <Icon className={`w-5 h-5 ${ic}`} />
+              </div>
+            </div>
+            <div>
+              <h3 className="text-[22px] font-black text-slate-900 leading-tight">{value}</h3>
+              <p className="text-[12px] font-semibold text-slate-500 mt-0.5">{title}</p>
+              <p className="text-[10px] font-medium text-slate-400 mt-1">{subtext}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
@@ -103,8 +127,8 @@ export default function ActiveTenantsPage() {
         </div>
       </div>
 
-      {/* Active Tenants List Table */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-soft">
+      {/* Active Tenants List Table - Desktop */}
+      <div className="hidden md:block rounded-2xl border border-border bg-card overflow-hidden shadow-soft">
         <div className="overflow-x-auto">
           {loading ? (
             <div className="p-8 text-center text-muted-foreground">Loading active tenants...</div>
@@ -115,7 +139,7 @@ export default function ActiveTenantsPage() {
               <thead>
                 <tr className="text-left text-[11.5px] uppercase tracking-wider text-muted-foreground bg-muted/50">
                   <th className="px-6 py-3.5 font-semibold">Tenant Name</th>
-                  <th className="px-6 py-3.5 font-semibold">Room & Bed</th>
+                  <th className="px-6 py-3.5 font-semibold">Room &amp; Bed</th>
                   <th className="px-6 py-3.5 font-semibold">Join Date</th>
                   <th className="px-6 py-3.5 font-semibold">Contact Info</th>
                   <th className="px-6 py-3.5 font-semibold">KYC Verification</th>
@@ -187,6 +211,95 @@ export default function ActiveTenantsPage() {
           )}
         </div>
       </div>
+
+      {/* Mobile Cards */}
+      <div className="block md:hidden space-y-3 pb-12">
+        {loading ? (
+          <div className="space-y-3">
+            {[1,2,3].map(i => <div key={i} className="h-24 bg-white rounded-2xl border border-slate-100 animate-pulse" />)}
+          </div>
+        ) : filteredTenants.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-100 p-10 text-center shadow-sm">
+            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Users className="w-6 h-6 text-slate-400" />
+            </div>
+            <p className="text-[14px] font-bold text-slate-700">No active tenants</p>
+            <p className="text-[12px] text-slate-400 mt-1">Add tenants to see them here.</p>
+          </div>
+        ) : filteredTenants.map((t) => (
+          <div key={`mob-${t._id}`} className="bg-white rounded-2xl p-4 border border-slate-200/60 shadow-sm relative overflow-hidden">
+            
+            {/* Header: Avatar + Name + Room + Badges */}
+            <div className="flex justify-between items-start mb-2.5">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-[16px] font-bold shrink-0 border border-slate-200/50 shadow-inner">
+                  {(t.name || "T")[0].toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-[15px] font-bold text-slate-900 leading-tight">{t.name}</h3>
+                  <p className="text-[11.5px] text-slate-500 mt-0.5 flex items-center gap-1 font-medium">
+                    <MapPin className="w-3 h-3 text-slate-400" />
+                    Room {t.roomNo || t.room?.number || "N/A"}{t.bedNo ? ` · Bed ${t.bedNo}` : ""}
+                  </p>
+                </div>
+              </div>
+
+              {/* Badges */}
+              <div className="flex flex-col items-end gap-1.5">
+                <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+                  t.kycStatus === "verified"
+                    ? "bg-emerald-50 text-emerald-600 border-emerald-100/50"
+                    : t.kycStatus === "submitted"
+                    ? "bg-blue-50 text-blue-600 border-blue-100/50"
+                    : "bg-amber-50 text-amber-600 border-amber-100/50"
+                }`}>
+                  {getKycLabel(t.kycStatus)} KYC
+                </span>
+                <span className="text-[8.5px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                  Active
+                </span>
+              </div>
+            </div>
+
+            {/* Footer: Rent + Actions */}
+            <div className="flex items-center justify-between pt-2.5 border-t border-slate-100/80">
+              <div className="flex gap-4">
+                <div>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Rent</p>
+                  <p className="text-[13.5px] font-black text-slate-800 leading-none">₹{(t.agreedRent || t.room?.rent || 0).toLocaleString("en-IN")}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Joined</p>
+                  <p className="text-[12px] font-semibold text-slate-600 leading-none">{t.moveInDate ? new Date(t.moveInDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : "—"}</p>
+                </div>
+              </div>
+
+              <div className="flex gap-1.5 items-center shrink-0">
+                <a href={`tel:${t.phone}`} className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200/50 flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors">
+                  <Phone size={13} />
+                </a>
+                {t.phone && (
+                  <a href={`https://wa.me/${String(t.phone).replace(/\D/g, '')}?text=Hi%20${t.name}`} target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-full bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 hover:bg-emerald-100 transition-colors">
+                    <Mail size={13} />
+                  </a>
+                )}
+                <button
+                  onClick={() => { setSelectedTenant(t); setModalOpen(true); }}
+                  className="h-8 px-3.5 rounded-full bg-blue-50 border border-blue-100/50 text-blue-700 flex items-center gap-1.5 hover:bg-blue-100 transition-colors text-[11px] font-bold ml-1"
+                >
+                  View
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+        {!loading && filteredTenants.length > 0 && (
+          <div className="text-center text-[12px] font-semibold text-slate-400 py-2">
+            Showing {filteredTenants.length} active tenant{filteredTenants.length !== 1 ? "s" : ""}
+          </div>
+        )}
+      </div>
+
 
       {/* Tenant Details Modal */}
       {modalOpen && selectedTenant && (

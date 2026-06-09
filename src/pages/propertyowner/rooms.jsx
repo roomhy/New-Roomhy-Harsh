@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { X, Plus, Building2, ChevronDown, UploadCloud, Loader2, Wind, Table as TableIcon, Tv, Bath, LayoutTemplate, Refrigerator, DoorClosed, Armchair, Utensils, Microwave, Flame, Shirt, Video, Fan, Check, Edit2, Trash2 } from "lucide-react";
+import { X, Plus, Building2, ChevronDown, UploadCloud, Loader2, Wind, Table as TableIcon, Tv, Bath, LayoutTemplate, Refrigerator, DoorClosed, Armchair, Utensils, Microwave, Flame, Shirt, Video, Fan, Check, Edit2, Trash2, BedDouble, Home } from "lucide-react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getApiBase, getAuthHeader } from "../../utils/api";
 import {
@@ -90,10 +90,21 @@ export default function Rooms() {
 
   const [showFilter, setShowFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [clientPage, setClientPage] = useState(1);
+  const [propPages, setPropPages] = useState({});
   const [totalRooms, setTotalRooms] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [floorFilter, setFloorFilter] = useState("all");
   const [sharingFilter, setSharingFilter] = useState("all");
+  const ROOMS_PER_PAGE = 3;
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 1024);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const currentProperty = useMemo(() => properties[0] || null, [properties]);
   const currentPropertyDisplay = useMemo(() => {
@@ -118,26 +129,26 @@ export default function Rooms() {
   };
 
   const load = async (session, page = 1, limit = 3) => {
-  setLoading(true);
-  try {
-    const [props, roomData, tList] = await Promise.all([
-      fetchOwnerProperties(session.loginId),
-      fetchOwnerRooms(session.loginId, page, limit),
-      fetchOwnerTenants(session.loginId),
-    ]);
-    setProperties(props);
-    setRooms(mergeRooms(session.loginId, roomData.rooms || []));
-    setTenants(tList);
-    const total = roomData.total || (roomData.rooms ? roomData.rooms.length : 0);
-    setTotalRooms(total);
-    setCurrentPage(page);
-    setTotalPages(Math.ceil(total / limit));
-  } catch (e) {
-    setErrorMsg(e?.body || e?.message || "Failed to load.");
-  } finally {
-    setLoading(false);
-  }
-};
+    setLoading(true);
+    try {
+      const [props, roomData, tList] = await Promise.all([
+        fetchOwnerProperties(session.loginId),
+        fetchOwnerRooms(session.loginId, page, limit),
+        fetchOwnerTenants(session.loginId),
+      ]);
+      setProperties(props);
+      setRooms(mergeRooms(session.loginId, roomData.rooms || []));
+      setTenants(tList);
+      const total = roomData.total || (roomData.rooms ? roomData.rooms.length : 0);
+      setTotalRooms(total);
+      setCurrentPage(page);
+      setTotalPages(Math.ceil(total / limit));
+    } catch (e) {
+      setErrorMsg(e?.body || e?.message || "Failed to load.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
 
   useEffect(() => {
@@ -146,8 +157,18 @@ export default function Rooms() {
     setOwner(s);
     // Always bypass cache on mount so occupancy reflects the latest DB state
     clearOwnerFetchCache(s.loginId);
-    load(s);
+    const isMob = window.innerWidth < 1024;
+    load(s, 1, isMob ? 100 : 3);
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("action") === "add") {
+      setRoomForm(defaultRoomForm);
+      setRoomModalOpen(true);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [window.location.search]);
 
   const openAssignModal = (room, bedIdx) => {
     const beds = toLegacyBeds(room);
@@ -315,78 +336,95 @@ export default function Rooms() {
 
       {/* Header */}
       {/* Stats Panel */}
-      <div className="grid grid-cols-2 sm:grid-cols-6 gap-4 mb-6">
-        <div className="bg-card p-4 rounded-xl shadow-sm">
-          <p className="text-sm text-muted-foreground">Total Rooms</p>
-          <p className="text-xl font-semibold text-foreground">{rooms.length}</p>
+      {/* Stats Panel */}
+      <div className="flex overflow-x-auto snap-x gap-3 pb-3 mb-6 no-scrollbar scroll-smooth md:grid md:grid-cols-3 lg:grid-cols-6 md:pb-0">
+        <div className="w-[38%] md:w-auto shrink-0 snap-start bg-white rounded-[20px] p-4 shadow-sm border border-slate-100 flex flex-col justify-between min-h-[90px] md:min-h-[120px] hover:shadow-md transition-all">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <Building2 size={20} />
+          </div>
+          <div className="mt-3">
+            <h3 className="text-[22px] font-black text-slate-900 leading-tight">{rooms.length}</h3>
+            <p className="text-[12px] font-semibold text-slate-500 mt-0.5">Total Rooms</p>
+          </div>
         </div>
-        <div className="bg-card p-4 rounded-xl shadow-sm">
-          <p className="text-sm text-muted-foreground">Total Beds</p>
-          <p className="text-xl font-semibold text-foreground">{rooms.reduce((s,r)=> s+ (r.beds?.length||0),0)}</p>
+        <div className="w-[38%] md:w-auto shrink-0 snap-start bg-white rounded-[20px] p-4 shadow-sm border border-slate-100 flex flex-col justify-between min-h-[90px] md:min-h-[120px] hover:shadow-md transition-all">
+          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+            <BedDouble size={20} />
+          </div>
+          <div className="mt-3">
+            <h3 className="text-[22px] font-black text-slate-900 leading-tight">{rooms.reduce((s,r)=> s+ (r.beds?.length||0),0)}</h3>
+            <p className="text-[12px] font-semibold text-slate-500 mt-0.5">Total Beds</p>
+          </div>
         </div>
-        <div className="bg-card p-4 rounded-xl shadow-sm">
-          <p className="text-sm text-muted-foreground">Vacant Beds</p>
-          <p className="text-xl font-semibold text-foreground">{rooms.reduce((s,r)=>s+ r.beds.filter(b=>b.status==='available').length,0)}</p>
+        <div className="w-[38%] md:w-auto shrink-0 snap-start bg-white rounded-[20px] p-4 shadow-sm border border-slate-100 flex flex-col justify-between min-h-[90px] md:min-h-[120px] hover:shadow-md transition-all">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <BedDouble size={20} />
+          </div>
+          <div className="mt-3">
+            <h3 className="text-[22px] font-black text-slate-900 leading-tight">{rooms.reduce((s,r)=>s+ r.beds.filter(b=>b.status==='available').length,0)}</h3>
+            <p className="text-[12px] font-semibold text-slate-500 mt-0.5">Vacant Beds</p>
+          </div>
         </div>
-        <div className="bg-card p-4 rounded-xl shadow-sm">
-          <p className="text-sm text-muted-foreground">Occupied Beds</p>
-          <p className="text-xl font-semibold text-foreground">{rooms.reduce((s,r)=>s+ r.beds.filter(b=>b.status==='occupied').length,0)}</p>
+        <div className="w-[38%] md:w-auto shrink-0 snap-start bg-white rounded-[20px] p-4 shadow-sm border border-slate-100 flex flex-col justify-between min-h-[90px] md:min-h-[120px] hover:shadow-md transition-all">
+          <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
+            <BedDouble size={20} />
+          </div>
+          <div className="mt-3">
+            <h3 className="text-[22px] font-black text-slate-900 leading-tight">{rooms.reduce((s,r)=>s+ r.beds.filter(b=>b.status==='occupied').length,0)}</h3>
+            <p className="text-[12px] font-semibold text-slate-500 mt-0.5">Occupied Beds</p>
+          </div>
         </div>
-        <div className="bg-card p-4 rounded-xl shadow-sm">
-          <p className="text-sm text-muted-foreground">Vacant Rooms</p>
-          <p className="text-xl font-semibold text-foreground">{rooms.filter(r=> r.beds.filter(b=>b.status==='available').length>0).length}</p>
+        <div className="w-[38%] md:w-auto shrink-0 snap-start bg-white rounded-[20px] p-4 shadow-sm border border-slate-100 flex flex-col justify-between min-h-[90px] md:min-h-[120px] hover:shadow-md transition-all">
+          <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
+            <Home size={20} />
+          </div>
+          <div className="mt-3">
+            <h3 className="text-[22px] font-black text-slate-900 leading-tight">{rooms.filter(r=> r.beds.filter(b=>b.status==='available').length>0).length}</h3>
+            <p className="text-[12px] font-semibold text-slate-500 mt-0.5">Vacant Rooms</p>
+          </div>
         </div>
-        <div className="bg-card p-4 rounded-xl shadow-sm">
-          <p className="text-sm text-muted-foreground">Occupied Rooms</p>
-          <p className="text-xl font-semibold text-foreground">{rooms.filter(r=> r.beds.filter(b=>b.status==='occupied').length>0).length}</p>
+        <div className="w-[38%] md:w-auto shrink-0 snap-start bg-white rounded-[20px] p-4 shadow-sm border border-slate-100 flex flex-col justify-between min-h-[90px] md:min-h-[120px] hover:shadow-md transition-all">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <Building2 size={20} />
+          </div>
+          <div className="mt-3">
+            <h3 className="text-[22px] font-black text-slate-900 leading-tight">{rooms.filter(r=> r.beds.filter(b=>b.status==='occupied').length>0).length}</h3>
+            <p className="text-[12px] font-semibold text-slate-500 mt-0.5">Occupied Rooms</p>
+          </div>
         </div>
       </div>
       {/* Filter Row */}
-      <div className="flex flex-wrap items-center gap-4 mb-6">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Show:</span>
-          <select value={showFilter} onChange={e => setShowFilter(e.target.value)} className="bg-card border border-border rounded-lg px-3 py-1 text-sm outline-none focus:ring-1 focus:ring-primary">
-            <option value="all">All Rooms</option>
-            <option value="vacant">Vacant</option>
-            <option value="occupied">Occupied</option>
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Floor:</span>
-          <select value={floorFilter} onChange={e => setFloorFilter(e.target.value)} className="bg-card border border-border rounded-lg px-3 py-1 text-sm outline-none focus:ring-1 focus:ring-primary">
-            <option value="all">All Floors</option>
-            {/* Dynamically generate floor options */}
-            {Array.from(new Set(rooms.map(r=>r.floor).filter(Boolean))).map(f=>(
-              <option key={f} value={f}>{f}</option>
-            ))}
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Sharing:</span>
-          <select value={sharingFilter} onChange={e => setSharingFilter(e.target.value)} className="bg-card border border-border rounded-lg px-3 py-1 text-sm outline-none focus:ring-1 focus:ring-primary">
-            <option value="all">All</option>
-            <option value="Single Sharing">Single</option>
-            <option value="Double Sharing">Double</option>
-            <option value="Triple Sharing">Triple</option>
-            <option value="Four Sharing">Four</option>
-            <option value="Private Room (No Sharing)">Private</option>
-          </select>
-        </div>
-      </div>
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Rooms &amp; Beds</h1>
-          <p className="mt-1.5 text-[13.5px] text-muted-foreground">
-            Visual bed-by-bed view. {rooms.reduce((s,r) => s + toLegacyBeds(r).filter(b => b.status==="occupied"||b.tenantId).length, 0)} of {rooms.reduce((s,r) => s + toLegacyBeds(r).length, 0)} beds occupied.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 md:mt-2">
-          <button className="inline-flex items-center gap-1.5 h-10 px-3 rounded-lg border border-border bg-card text-[13px] font-medium hover:border-primary/40 transition-colors">
-            <ChevronDown size={14} /> Filter
-          </button>
-          <button type="button" onClick={() => { setRoomForm(defaultRoomForm); setRoomModalOpen(true); }} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg bg-foreground text-background text-[13px] font-medium hover:opacity-90 transition-opacity">
-            <Plus size={16} /> Add room
-          </button>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[12px] font-semibold text-muted-foreground">Show:</span>
+            <select value={showFilter} onChange={e => setShowFilter(e.target.value)} className="bg-card border border-border rounded-lg px-2 py-1 text-[12px] outline-none focus:ring-1 focus:ring-primary">
+              <option value="all">All Rooms</option>
+              <option value="vacant">Vacant</option>
+              <option value="occupied">Occupied</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[12px] font-semibold text-muted-foreground">Floor:</span>
+            <select value={floorFilter} onChange={e => setFloorFilter(e.target.value)} className="bg-card border border-border rounded-lg px-2 py-1 text-[12px] outline-none focus:ring-1 focus:ring-primary max-w-[100px]">
+              <option value="all">All Floors</option>
+              {/* Dynamically generate floor options */}
+              {Array.from(new Set(rooms.map(r=>r.floor).filter(Boolean))).map(f=>(
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[12px] font-semibold text-muted-foreground">Sharing:</span>
+            <select value={sharingFilter} onChange={e => setSharingFilter(e.target.value)} className="bg-card border border-border rounded-lg px-2 py-1 text-[12px] outline-none focus:ring-1 focus:ring-primary max-w-[120px]">
+              <option value="all">All Sharing</option>
+              <option value="Single Sharing">Single</option>
+              <option value="Double Sharing">Double</option>
+              <option value="Triple Sharing">Triple</option>
+              <option value="Four Sharing">Four</option>
+              <option value="Private Room (No Sharing)">Private</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -417,25 +455,6 @@ export default function Rooms() {
       </div>
 
       {errorMsg && <div className="text-sm text-destructive mb-6 bg-destructive/10 p-4 rounded-xl">{errorMsg}</div>}
-{totalPages > 1 && (
-  <div className="flex justify-center items-center gap-4 mt-6">
-    <button
-      disabled={currentPage <= 1}
-      onClick={() => load(owner, currentPage - 1)}
-      className="px-3 py-1 rounded bg-card border border-border text-sm disabled:opacity-50"
-    >
-      Prev
-    </button>
-    <span className="text-sm">Page {currentPage} of {totalPages}</span>
-    <button
-      disabled={currentPage >= totalPages}
-      onClick={() => load(owner, currentPage + 1)}
-      className="px-3 py-1 rounded bg-card border border-border text-sm disabled:opacity-50"
-    >
-      Next
-    </button>
-  </div>
-)}
 
       <div className="space-y-7">
         {loading ? (
@@ -448,146 +467,190 @@ export default function Rooms() {
             <div className="w-14 h-14 bg-muted/60 rounded-full flex items-center justify-center mb-3"><Building2 className="size-7 text-muted-foreground" /></div>
             <h3 className="font-serif text-[22px] text-foreground mb-1">No rooms yet</h3>
             <p className="text-[13.5px] text-muted-foreground mb-4">Add your first room to manage beds and tenants.</p>
-            <button type="button" onClick={() => { setRoomForm(defaultRoomForm); setRoomModalOpen(true); }} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg bg-foreground text-background text-[13px] font-medium hover:opacity-90"><Plus size={16}/> Add Room</button>
+            <button type="button" onClick={() => { setRoomForm(defaultRoomForm); setRoomModalOpen(true); }} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg bg-blue-600 text-white text-[13px] font-medium hover:bg-blue-700"><Plus size={16}/> Add Room</button>
           </div>
-        ) : Object.entries(grouped).map(([propTitle, propRooms]) => {
-          const allBeds = propRooms.flatMap(r => toLegacyBeds(r));
-          const pOcc = allBeds.filter(b => b.status==="occupied"||b.tenantId).length;
-          const pTotal = allBeds.length;
-          const pct = pTotal ? Math.round((pOcc/pTotal)*100) : 0;
-          return (
-            <section key={propTitle} className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="font-serif text-[22px] leading-tight text-foreground">{propTitle}</h2>
-                  <div className="text-[12px] text-muted-foreground mt-0.5">{currentPropertyLocation && `${currentPropertyLocation} · `}{propRooms.length} rooms · {pOcc}/{pTotal} beds occupied</div>
-                </div>
-                <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11.5px] font-medium", pct>90?"bg-success/15 text-success-foreground":"bg-info/15 text-foreground")}>{pct}% full</span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                {propRooms.map(room => {
-                  const beds = toLegacyBeds(room);
-                  const occupiedCount = beds.filter(b => b.status === "occupied" || b.tenantId).length;
-                  const totalBeds = beds.length;
-
-                  let headerClass = "";
-                  let bodyClass = "";
-                  let cardBorderClass = "";
-                  let badgeClass = "";
-                  let statusLabel = "";
-                  let dotColor = "";
-
-                  if (occupiedCount === 0) {
-                    // Fully Vacant
-                    headerClass = "bg-emerald-600 dark:bg-emerald-700 text-white";
-                    bodyClass = "bg-emerald-50/20 dark:bg-emerald-950/10";
-                    cardBorderClass = "border-emerald-500 dark:border-emerald-800/80";
-                    badgeClass = "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300";
-                    statusLabel = "Vacant";
-                    dotColor = "bg-emerald-400";
-                  } else if (occupiedCount === totalBeds) {
-                    // Fully Occupied
-                    headerClass = "bg-teal-600 dark:bg-teal-700 text-white";
-                    bodyClass = "bg-teal-50/20 dark:bg-teal-950/10";
-                    cardBorderClass = "border-teal-500 dark:border-teal-800/80";
-                    badgeClass = "bg-teal-100 dark:bg-teal-900/40 text-teal-800 dark:text-teal-300";
-                    statusLabel = "Full";
-                    dotColor = "bg-teal-400";
-                  } else {
-                    // Partially Occupied
-                    headerClass = "bg-amber-500 dark:bg-amber-600 text-white";
-                    bodyClass = "bg-amber-50/20 dark:bg-amber-950/10";
-                    cardBorderClass = "border-amber-500 dark:border-amber-800/80";
-                    badgeClass = "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300";
-                    statusLabel = `${occupiedCount}/${totalBeds} Beds`;
-                    dotColor = "bg-amber-400";
-                  }
-
-                  return (
-                    <div key={room._id||room.id} className={cn("group rounded-xl border overflow-hidden hover:shadow-md transition-all", cardBorderClass)}>
-                      {/* Colored Header Bar */}
-                      <div className={cn("px-3 py-1.5 flex items-center justify-between font-medium text-[13px]", headerClass)}>
-                        <div className="flex items-center gap-2">
-                          Room {room.number||room.roomNo||room.title}
-                          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
-                            <button onClick={(e) => { e.stopPropagation(); handleEditRoom(room); }} className="p-0.5 text-white/80 hover:text-white"><Edit2 size={11}/></button>
-                            <button onClick={(e) => { e.stopPropagation(); handleDeleteRoom(room); }} className="p-0.5 text-white/80 hover:text-white"><Trash2 size={11}/></button>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-bold shadow-sm", badgeClass)}>
-                            <span className={cn("size-1 rounded-full", dotColor)} />
-                            {statusLabel}
-                          </span>
+          ) : (
+            <>
+              {Object.entries(grouped).map(([propTitle, allPropRooms]) => {
+                const allBeds = allPropRooms.flatMap(r => toLegacyBeds(r));
+                const pOcc = allBeds.filter(b => b.status==="occupied"||b.tenantId).length;
+                const pTotal = allBeds.length;
+                const pct = pTotal ? Math.round((pOcc/pTotal)*100) : 0;
+                // Per-property pagination
+                const propPage = propPages[propTitle] || 1;
+                const propTotalPages = Math.max(1, Math.ceil(allPropRooms.length / ROOMS_PER_PAGE));
+                const safePropPage = Math.min(propPage, propTotalPages);
+                const propRooms = isMobile
+                  ? allPropRooms
+                  : allPropRooms.slice((safePropPage - 1) * ROOMS_PER_PAGE, safePropPage * ROOMS_PER_PAGE);
+                const setPropertyPage = (p) => setPropPages(prev => ({ ...prev, [propTitle]: p }));
+                return (
+                  <section key={propTitle} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    {/* Property Header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h2 className="font-semibold text-[17px] leading-tight text-slate-800">{propTitle}</h2>
+                        <div className="text-[12px] text-slate-400 mt-0.5">
+                          {currentPropertyLocation && `${currentPropertyLocation} · `}
+                          {allPropRooms.length} rooms · {pOcc}/{pTotal} beds occupied
                         </div>
                       </div>
-
-                      {/* Card Body */}
-                      <div className={cn("p-3 space-y-2.5", bodyClass)}>
-                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                          <span>{room.gender||"Mixed"}</span>
-                          <span className="bg-card text-foreground px-1.5 py-0.5 rounded border border-border text-[10.5px] font-medium">{room.type||"AC"}</span>
-                        </div>
-
-                        {/* Beds display */}
-                        <div className="flex gap-1.5 py-1">
-                          {beds.map((bed,i) => {
-                            const isOcc = bed.status==="occupied"||!!bed.tenantId;
-                            return (
-                              <div key={i}
-                                onClick={() => openAssignModal(room, i)}
-                                title={isOcc ? `Occupied${bed.tenantName ? ` — ${bed.tenantName}` : ""}` : "Vacant — Click to assign"}
-                                className={cn("flex-1 h-9 rounded-md grid place-items-center text-[10.5px] font-semibold transition-colors",
-                                  isOcc
-                                    ? "bg-primary/80 text-primary-foreground cursor-pointer hover:bg-primary/70"
-                                    : i===0&&beds.length>2
-                                      ? "bg-warning/30 text-foreground cursor-pointer hover:bg-warning/50"
-                                      : "border border-dashed border-border text-muted-foreground cursor-pointer hover:bg-muted bg-card")}
-                              >
-                                {String.fromCharCode(65+i)}
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {/* Bottom Info and Manage Button */}
-                        <div className="flex items-center justify-between pt-2.5 border-t border-border/30">
-                          <span className="text-[11px] text-muted-foreground">₹{(room.rent||0).toLocaleString("en-IN")}/bed</span>
-                          <button type="button" onClick={() => {
-                            const firstVacant = beds.findIndex(b=>!(b.status==="occupied"||b.tenantId));
-                            openAssignModal(room, firstVacant !== -1 ? firstVacant : 0);
-                          }} className="text-[11px] font-semibold text-primary hover:underline">Manage</button>
-                        </div>
-                      </div>
+                      <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold",
+                        pct > 90 ? "bg-blue-50 text-blue-600" : pct > 0 ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"
+                      )}>{pct}% full</span>
                     </div>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })}
-      </div>
 
-      {/* Pagination Controls */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-4 mt-6">
-          <button
-            disabled={currentPage <= 1}
-            onClick={() => load(owner, currentPage - 1)}
-            className="px-3 py-1 rounded bg-card border border-border text-sm disabled:opacity-50"
-          >
-            Prev
-          </button>
-          <span className="text-sm">Page {currentPage} of {totalPages}</span>
-          <button
-            disabled={currentPage >= totalPages}
-            onClick={() => load(owner, currentPage + 1)}
-            className="px-3 py-1 rounded bg-card border border-border text-sm disabled:opacity-50"
-          >
-            Next
-          </button>
+                    {/* Room Cards Grid */}
+                    <div className="flex overflow-x-auto snap-x gap-3 pb-3 no-scrollbar scroll-smooth md:grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                      {propRooms.map(room => {
+                        const beds = toLegacyBeds(room);
+                        const occupiedCount = beds.filter(b => b.status === "occupied" || b.tenantId).length;
+                        const totalBeds = beds.length;
+
+                        let headerClass, bodyClass, cardBorderClass, badgeClass, statusLabel, dotColor;
+
+                        if (occupiedCount === 0) {
+                          headerClass = "bg-emerald-50 text-emerald-700 border-b border-emerald-100";
+                          bodyClass = "bg-white";
+                          cardBorderClass = "border-emerald-200";
+                          badgeClass = "bg-emerald-100 text-emerald-700";
+                          statusLabel = "Vacant";
+                          dotColor = "bg-emerald-500";
+                        } else if (occupiedCount === totalBeds) {
+                          headerClass = "bg-blue-50 text-blue-700 border-b border-blue-100";
+                          bodyClass = "bg-white";
+                          cardBorderClass = "border-blue-200";
+                          badgeClass = "bg-blue-100 text-blue-700";
+                          statusLabel = "Full";
+                          dotColor = "bg-blue-500";
+                        } else {
+                          headerClass = "bg-amber-50 text-amber-700 border-b border-amber-100";
+                          bodyClass = "bg-white";
+                          cardBorderClass = "border-amber-200";
+                          badgeClass = "bg-amber-100 text-amber-700";
+                          statusLabel = `${occupiedCount}/${totalBeds} Beds`;
+                          dotColor = "bg-amber-500";
+                        }
+
+                        return (
+                          <div key={room._id||room.id} className={cn("group rounded-2xl p-4 border shadow-sm relative overflow-hidden bg-white hover:shadow-md transition-all w-[85%] md:w-auto shrink-0 snap-start", cardBorderClass || "border-slate-200/60")}>
+                            {/* Header Row */}
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="flex items-center gap-3">
+                                <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-[15px] font-bold shrink-0 border shadow-inner", 
+                                  occupiedCount === totalBeds ? "bg-blue-50 text-blue-600 border-blue-100/50" : 
+                                  occupiedCount === 0 ? "bg-emerald-50 text-emerald-600 border-emerald-100/50" : 
+                                  "bg-amber-50 text-amber-600 border-amber-100/50"
+                                )}>
+                                  <BedDouble className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <h3 className="text-[14px] font-bold text-slate-900 leading-tight">Room {room.number||room.roomNo||room.title}</h3>
+                                  <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1 font-medium">
+                                    {room.gender||"Mixed"} • {room.type||"AC"}
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              <div className="flex flex-col items-end gap-1.5">
+                                <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold", badgeClass)}>
+                                  <span className={cn("size-1.5 rounded-full", dotColor)} />
+                                  {statusLabel}
+                                </span>
+                                {/* Edit/Delete visible on hover for desktop */}
+                                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity hidden md:flex mt-1">
+                                  <button onClick={(e) => { e.stopPropagation(); handleEditRoom(room); }} className="p-1 opacity-60 hover:opacity-100"><Edit2 size={11}/></button>
+                                  <button onClick={(e) => { e.stopPropagation(); handleDeleteRoom(room); }} className="p-1 opacity-60 hover:opacity-100 text-rose-500"><Trash2 size={11}/></button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Beds Grid */}
+                            <div className="flex gap-1.5 py-1 mb-2">
+                              {beds.map((bed, i) => {
+                                const isOcc = bed.status==="occupied"||!!bed.tenantId;
+                                return (
+                                  <div key={i}
+                                    onClick={() => openAssignModal(room, i)}
+                                    title={isOcc ? `Occupied${bed.tenantName ? ` — ${bed.tenantName}` : ""}` : "Vacant — Click to assign"}
+                                    className={cn("flex-1 h-8 rounded-lg grid place-items-center text-[10px] font-bold transition-colors cursor-pointer border",
+                                      isOcc
+                                        ? "bg-blue-500 text-white border-blue-600 shadow-sm"
+                                        : i===0 && beds.length>2
+                                          ? "bg-amber-50 text-amber-600 hover:bg-amber-100 border-amber-200"
+                                          : "bg-slate-50 border-slate-200 border-dashed text-slate-400 hover:bg-slate-100")}
+                                  >
+                                    {String.fromCharCode(65+i)}
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="flex items-center justify-between pt-2.5 border-t border-slate-100/80 mt-2">
+                              <div className="flex gap-4 mb-1">
+                                <div>
+                                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Rent</p>
+                                   <p className="text-[13.5px] font-black text-slate-800 leading-none">₹{(room.rent||0).toLocaleString("en-IN")}<span className="text-[10px] text-slate-500 font-semibold">/bed</span></p>
+                                </div>
+                              </div>
+                              <div className="flex items-center shrink-0">
+                                <button type="button" onClick={() => {
+                                  const firstVacant = beds.findIndex(b => !(b.status==="occupied"||b.tenantId));
+                                  openAssignModal(room, firstVacant !== -1 ? firstVacant : 0);
+                                }} className="h-7 px-3.5 rounded-full bg-blue-50 border border-blue-100/50 text-blue-700 flex items-center gap-1.5 hover:bg-blue-100 transition-colors text-[11px] font-bold">
+                                  Manage
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Per-Property Pagination */}
+                    {!isMobile && propTotalPages > 1 && (
+                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+                        <span className="text-[12px] text-slate-400 font-medium">
+                          Showing {(safePropPage-1)*ROOMS_PER_PAGE+1}–{Math.min(safePropPage*ROOMS_PER_PAGE, allPropRooms.length)} of {allPropRooms.length} rooms
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            disabled={safePropPage <= 1}
+                            onClick={() => setPropertyPage(safePropPage - 1)}
+                            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 text-[12px] font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                          >
+                            ←
+                          </button>
+                          {Array.from({ length: propTotalPages }, (_, i) => i + 1).map(p => (
+                            <button
+                              key={p}
+                              onClick={() => setPropertyPage(p)}
+                              className={cn("w-8 h-8 rounded-lg text-[12px] font-semibold transition-all",
+                                p === safePropPage
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-white border border-slate-200 text-slate-400 hover:bg-slate-50"
+                              )}
+                            >
+                              {p}
+                            </button>
+                          ))}
+                          <button
+                            disabled={safePropPage >= propTotalPages}
+                            onClick={() => setPropertyPage(safePropPage + 1)}
+                            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 text-[12px] font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                          >
+                            →
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
+            </>
+          )}
         </div>
-      )}
 
       {/* Add Room Modal */}
       <div className={cn("fixed inset-0 z-[100] flex items-center justify-center bg-black/70 transition-all", roomModalOpen?"opacity-100 pointer-events-auto":"opacity-0 pointer-events-none")}>

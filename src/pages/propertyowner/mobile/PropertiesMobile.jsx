@@ -29,8 +29,6 @@ export default function PropertiesMobile({ owner, defaultTab = "all" }) {
   const getInitialTab = () => {
     if (defaultTab) return defaultTab;
     if (location.pathname.includes('/rooms')) return "rooms";
-    if (location.pathname.includes('/amenities')) return "amenities";
-    if (location.pathname.includes('/location')) return "locations";
     return "all";
   };
 
@@ -63,8 +61,6 @@ export default function PropertiesMobile({ owner, defaultTab = "all" }) {
   const tabs = [
     { id: "all", label: "Properties", count: properties.length },
     { id: "rooms", label: "Rooms", count: rooms.length },
-    { id: "amenities", label: "Amenities", count: 6 },
-    { id: "locations", label: "Locations", count: 2 },
   ];
 
   // Filters & Search logic
@@ -263,75 +259,6 @@ export default function PropertiesMobile({ owner, defaultTab = "all" }) {
           </div>
         )}
 
-        {/* Amenities Tab */}
-        {activeTab === "amenities" && (
-          <div className="space-y-3">
-            {amenities.map((amenity) => (
-              <div 
-                key={amenity.id} 
-                className={`bg-white rounded-2xl border p-3.5 shadow-sm transition-all flex items-center justify-between ${
-                  amenity.active ? "border-slate-150" : "border-slate-100 opacity-60"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                    {amenity.name.includes("WiFi") ? <Wifi size={16} /> : 
-                     amenity.name.includes("Air") ? <Wind size={16} /> : 
-                     amenity.name.includes("Geyser") ? <Flame size={16} /> : 
-                     amenity.name.includes("Power") ? <ShieldCheck size={16} /> : <Coffee size={16} />}
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-extrabold text-slate-800">{amenity.name}</h4>
-                    <span className="text-[9px] font-bold text-slate-500 mt-0.5 block">{amenity.billing}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => {
-                      setAmenities(prev => prev.map(a => a.id === amenity.id ? { ...a, active: !a.active } : a));
-                    }}
-                    className={`px-2.5 py-1 rounded-full text-[9px] font-black border transition-all ${
-                      amenity.active 
-                        ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
-                        : "bg-slate-150 text-slate-400 border-slate-200"
-                    }`}
-                  >
-                    {amenity.active ? "Active" : "Off"}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Locations Tab */}
-        {activeTab === "locations" && (
-          <div className="space-y-4">
-            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 flex flex-col items-center">
-              <MapPin size={24} className="text-blue-600 mb-2" />
-              <h4 className="text-xs font-extrabold text-slate-800">Localities Log</h4>
-              <p className="text-[10px] text-slate-400 font-semibold text-center mt-1">Manage operations and location codes mapped to properties.</p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="bg-white rounded-xl border border-slate-150 p-3 shadow-sm flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-extrabold text-slate-800">Koramangala, Bengaluru</h4>
-                  <p className="text-[9px] text-slate-400 font-semibold mt-0.5">3 Active Properties</p>
-                </div>
-                <ChevronRight size={14} className="text-slate-400" />
-              </div>
-              <div className="bg-white rounded-xl border border-slate-150 p-3 shadow-sm flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-extrabold text-slate-800">Indore, MP</h4>
-                  <p className="text-[9px] text-slate-400 font-semibold mt-0.5">5 Active Properties</p>
-                </div>
-                <ChevronRight size={14} className="text-slate-400" />
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Property Details Modal (Mobile Sheet) */}

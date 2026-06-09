@@ -122,8 +122,8 @@ export default function TenantAttendancePage() {
         </div>
       </div>
 
-      {/* Tenants Table */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-soft">
+      {/* Desktop Table */}
+      <div className="hidden md:block rounded-2xl border border-border bg-card overflow-hidden shadow-soft">
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
             <thead>
@@ -160,7 +160,7 @@ export default function TenantAttendancePage() {
                     {t.status !== "Inside" && (
                       <button 
                         onClick={() => handleStatusToggle(t.id, "Inside")}
-                        className="inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold"
+                        className="inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors"
                       >
                         <LogIn size={12} /> Check-In
                       </button>
@@ -168,7 +168,7 @@ export default function TenantAttendancePage() {
                     {t.status === "Inside" && (
                       <button 
                         onClick={() => handleStatusToggle(t.id, "Outside")}
-                        className="inline-flex items-center gap-1 h-8 px-3 border border-border rounded-lg text-xs font-bold text-muted-foreground hover:text-foreground"
+                        className="inline-flex items-center gap-1 h-8 px-3 border border-border rounded-lg text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
                       >
                         <LogOut size={12} /> Check-Out
                       </button>
@@ -179,6 +179,86 @@ export default function TenantAttendancePage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobile Cards */}
+      <div className="block md:hidden space-y-3 pb-12">
+        {loading ? (
+          <div className="space-y-3">
+            {[1,2,3].map(i => <div key={i} className="h-24 bg-white rounded-2xl border border-slate-100 animate-pulse" />)}
+          </div>
+        ) : filteredTenants.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-100 p-10 text-center shadow-sm">
+            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Users className="w-6 h-6 text-slate-400" />
+            </div>
+            <p className="text-[14px] font-bold text-slate-700">No tenants found</p>
+            <p className="text-[12px] text-slate-400 mt-1">Try a different search term.</p>
+          </div>
+        ) : filteredTenants.map((t) => (
+          <div key={`mob-${t.id}`} className="bg-white rounded-2xl p-4 border border-slate-200/60 shadow-sm relative overflow-hidden">
+            
+            {/* Header: Avatar + Name + Room + Status Badge */}
+            <div className="flex justify-between items-start mb-2.5">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-[16px] font-bold shrink-0 border border-slate-200/50 shadow-inner">
+                  {(t.name || "T")[0].toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-[15px] font-bold text-slate-900 leading-tight">{t.name}</h3>
+                  <p className="text-[11.5px] text-slate-500 mt-0.5 flex items-center gap-1 font-medium">
+                    <MapPin className="w-3 h-3 text-slate-400" /> Room {t.room}
+                  </p>
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+                t.status === "Inside"
+                  ? "bg-emerald-50 text-emerald-600 border-emerald-100/50"
+                  : t.status === "Outside"
+                  ? "bg-amber-50 text-amber-600 border-amber-100/50"
+                  : "bg-blue-50 text-blue-600 border-blue-100/50"
+              }`}>
+                {t.status === "Inside" ? "● Inside" : t.status === "Outside" ? "● Outside" : t.status}
+              </span>
+            </div>
+
+            {/* Footer: Last Scan + Action Buttons */}
+            <div className="flex items-center justify-between pt-2.5 border-t border-slate-100/80">
+              <div>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Last Activity</p>
+                <p className="text-[12px] font-semibold text-slate-700 leading-none flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-slate-400" /> {t.lastScan || "No activity"}
+                </p>
+              </div>
+
+              <div className="flex gap-1.5 items-center shrink-0">
+                {t.status !== "Inside" && (
+                  <button
+                    onClick={() => handleStatusToggle(t.id, "Inside")}
+                    className="h-8 px-3.5 rounded-full bg-emerald-50 border border-emerald-100/50 text-emerald-700 flex items-center gap-1.5 hover:bg-emerald-100 transition-colors text-[11px] font-bold"
+                  >
+                    <LogIn size={12} /> Check-In
+                  </button>
+                )}
+                {t.status === "Inside" && (
+                  <button
+                    onClick={() => handleStatusToggle(t.id, "Outside")}
+                    className="h-8 px-3.5 rounded-full bg-amber-50 border border-amber-100/50 text-amber-700 flex items-center gap-1.5 hover:bg-amber-100 transition-colors text-[11px] font-bold"
+                  >
+                    <LogOut size={12} /> Check-Out
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+        {!loading && filteredTenants.length > 0 && (
+          <div className="text-center text-[12px] font-semibold text-slate-400 py-2">
+            Showing {filteredTenants.length} resident{filteredTenants.length !== 1 ? "s" : ""}
+          </div>
+        )}
       </div>
     </PropertyOwnerLayout>
   );

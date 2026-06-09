@@ -34,15 +34,28 @@ const Pill = ({ tone = "muted", children }) => {
 };
 
 const StatCard = ({ label, value, icon: Icon, tone = "default", hint }) => {
-  const toneBg = { info: "bg-info/10", success: "bg-success/10", warning: "bg-warning/15", default: "bg-muted/60" };
+  const toneBg = {
+    info: "bg-blue-50/50 border border-blue-150/60 text-blue-600 dark:bg-blue-950/10",
+    success: "bg-emerald-50/50 border border-emerald-150/60 text-emerald-600 dark:bg-emerald-950/10",
+    warning: "bg-amber-50/50 border border-amber-150/60 text-amber-600 dark:bg-amber-950/10",
+    default: "bg-slate-50/50 border border-slate-150/60 text-slate-600 dark:bg-slate-950/10"
+  };
+  
+  const textClr = {
+    info: "text-blue-900 dark:text-blue-300",
+    success: "text-emerald-900 dark:text-emerald-300",
+    warning: "text-amber-900 dark:text-amber-300",
+    default: "text-slate-900 dark:text-slate-300"
+  };
+
   return (
-    <div className={`rounded-2xl border border-border p-4 shadow-soft ${toneBg[tone] || toneBg.default}`}>
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[12.5px] text-muted-foreground font-medium">{label}</span>
-        {Icon && <Icon className="size-4 text-muted-foreground" />}
+    <div className={`w-[38%] md:w-auto shrink-0 snap-start rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${toneBg[tone] || toneBg.default}`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[11px] font-bold uppercase tracking-wider">{label}</span>
+        {Icon && <Icon className="size-4 shrink-0" />}
       </div>
-      <div className="font-serif text-[26px] leading-none text-foreground">{value}</div>
-      {hint && <div className="text-[11.5px] text-muted-foreground mt-1.5">{hint}</div>}
+      <div className={`text-2xl font-black leading-none ${textClr[tone] || textClr.default}`}>{value}</div>
+      {hint && <div className="text-[10px] opacity-70 mt-1 font-semibold">{hint}</div>}
     </div>
   );
 };
@@ -414,7 +427,7 @@ export default function Payment() {
       )}
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+      <div className="flex overflow-x-auto snap-x gap-3 pb-3 mb-4 no-scrollbar scroll-smooth md:grid md:grid-cols-4 md:pb-0">
         <StatCard label="Outstanding" value={fmt(totalDue)} icon={Wallet} tone="info" />
         <StatCard label="Pending tenants" value={counts.due + counts.overdue + counts.partial} icon={Clock} tone="warning" hint={`${pctDone}% collected`} />
         <StatCard label="Penalties accrued" value={fmt(totalPenalty)} icon={AlertTriangle} tone="default" />
@@ -481,18 +494,7 @@ export default function Payment() {
             );
           })}
         </div>
-        <div className="block md:hidden w-full">
-          <MobileTabs 
-            tabs={[
-              { id: "Collection", label: `Collection (${counts.all})` },
-              { id: "Pending", label: `Pending (${counts.due + counts.partial + counts.overdue})` },
-              { id: "History", label: `History (${counts.paid})` },
-              { id: "Receipts", label: `Receipts (${counts.paid})` }
-            ]} 
-            activeTab={tab} 
-            onTabChange={setTab} 
-          />
-        </div>
+
         <div className="relative">
           <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -650,46 +652,61 @@ export default function Payment() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Monthly Rent</p>
-                  <p className="text-[15px] font-black text-slate-800">{fmt(t.agreedRent || t.rent || 0)}</p>
-                  <p className="text-[9.5px] font-semibold text-slate-500 mt-0.5 truncate">{t.propertyName || (t.property && typeof t.property === "object" ? t.property.title || t.property.name : t.property) || "—"}</p>
-                </div>
-                <div className={`rounded-xl p-3 border ${t.outstandingAmount > 0 ? "bg-rose-50 border-rose-100" : "bg-emerald-50 border-emerald-100"}`}>
-                  <p className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${t.outstandingAmount > 0 ? "text-rose-400" : "text-emerald-500"}`}>Outstanding</p>
-                  <p className={`text-[16px] font-black ${t.outstandingAmount > 0 ? "text-rose-700" : "text-emerald-700"}`}>{fmt(t.outstandingAmount)}</p>
-                </div>
-              </div>
 
-              <div className="flex gap-2">
+              {/* Footer: Financials row + Action Buttons (Tenants-style) */}
+              <div className="pt-2.5 border-t border-slate-100/80">
                 {t.payStatus === "no-invoice" ? (
-                  <div className="w-full text-center py-2 text-[11px] text-slate-400 italic font-semibold">No invoice generated</div>
+                  <div className="w-full text-center py-2 text-[11px] text-slate-400 italic font-semibold">No invoice generated for this month</div>
                 ) : t.payStatus !== "paid" ? (
-                  <>
-                    <button
-                      title="Send reminder"
-                      disabled={remindingId === (t._id || t.id)}
-                      onClick={() => handleSendReminder(t)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-black uppercase tracking-wider hover:bg-blue-100 transition-colors disabled:opacity-50"
-                    >
-                      {remindingId === (t._id || t.id) ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5" />}
-                      Remind
-                    </button>
-                    <button
-                      onClick={() => openPayModal(t)}
-                      className="flex-[2] flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider hover:bg-slate-800 transition-colors shadow-md"
-                    >
-                      <Banknote className="w-3.5 h-3.5" /> Mark Paid
-                    </button>
-                  </>
+                  <div className="flex items-center justify-between">
+                    <div className="flex gap-4">
+                      <div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Monthly Rent</p>
+                        <p className="text-[13.5px] font-black text-slate-800 leading-none">{fmt(t.agreedRent || t.rent || 0)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Outstanding</p>
+                        <p className={`text-[13.5px] font-black leading-none ${t.outstandingAmount > 0 ? "text-rose-600" : "text-emerald-500"}`}>{fmt(t.outstandingAmount)}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1.5 items-center shrink-0">
+                      <button
+                        title="Send reminder"
+                        disabled={remindingId === (t._id || t.id)}
+                        onClick={() => handleSendReminder(t)}
+                        className="w-8 h-8 rounded-full bg-blue-50 border border-blue-100/50 flex items-center justify-center text-blue-600 hover:bg-blue-100 transition-colors disabled:opacity-50"
+                      >
+                        {remindingId === (t._id || t.id) ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle size={13} />}
+                      </button>
+                      <button
+                        onClick={() => openPayModal(t)}
+                        className="h-8 px-3.5 rounded-full bg-emerald-600 text-white flex items-center gap-1.5 hover:bg-emerald-700 transition-colors text-[11px] font-bold ml-1"
+                      >
+                        <Banknote size={12} /> Mark Paid
+                      </button>
+                    </div>
+                  </div>
                 ) : (
-                  <button
-                    onClick={() => handleViewHistory(t)}
-                    className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 text-[10px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-colors"
-                  >
-                    <Receipt className="w-3.5 h-3.5" /> View Receipt
-                  </button>
+                  <div className="flex items-center justify-between">
+                    <div className="flex gap-4">
+                      <div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Monthly Rent</p>
+                        <p className="text-[13.5px] font-black text-slate-800 leading-none">{fmt(t.agreedRent || t.rent || 0)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mb-0.5">Status</p>
+                        <p className="text-[13px] font-bold text-emerald-500 leading-none">Cleared ✓</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1.5 items-center shrink-0">
+                      <button
+                        onClick={() => handleViewHistory(t)}
+                        className="h-8 px-3.5 rounded-full bg-emerald-50 border border-emerald-100/50 text-emerald-700 flex items-center gap-1.5 hover:bg-emerald-100 transition-colors text-[11px] font-bold"
+                      >
+                        <Receipt size={12} /> Receipt
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

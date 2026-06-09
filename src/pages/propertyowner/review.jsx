@@ -73,7 +73,7 @@ export default function Review() {
       title="Reviews & Feedback" 
       onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
     >
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
+      <div className="flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6 hidden md:flex">
         <div>
           <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Resident Reviews</h1>
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">Monitor service quality scores, cleanliness reviews, food ratings, and resident satisfaction levels.</p>
@@ -84,8 +84,8 @@ export default function Review() {
         <div className="text-center py-12 text-muted-foreground">Loading reviews and feedback...</div>
       ) : (
         <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+          {/* Summary Cards — Desktop 3-col grid */}
+          <div className="hidden md:grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
             <div className="rounded-2xl border border-border bg-card p-6 shadow-soft flex items-center justify-between">
               <div>
                 <span className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wider">Average Rating</span>
@@ -111,12 +111,34 @@ export default function Review() {
             <div className="rounded-2xl border border-border bg-card p-6 shadow-soft flex items-center justify-between">
               <div>
                 <span className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wider">Top Compliant Area</span>
-                <h3 className="text-[20px] font-bold text-emerald-600 mt-2">Amenities & Staff</h3>
+                <h3 className="text-[20px] font-bold text-emerald-600 mt-2">Amenities &amp; Staff</h3>
               </div>
               <div className="size-12 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
                 <span className="text-xl">🏆</span>
               </div>
             </div>
+          </div>
+
+          {/* Mobile Stat Strip — horizontal scroll, same as enquiry page */}
+          <div className="flex overflow-x-auto gap-3 pb-2 mb-5 md:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {[
+              { title: "Avg Rating", value: avgRating,         subtext: "Out of 5.0",    icon: Star,         bg: "bg-amber-50",  ic: "text-amber-500",  fill: true },
+              { title: "Reviews",   value: feedbacks.length,  subtext: "Total feedback", icon: MessageSquare,bg: "bg-blue-50",   ic: "text-blue-600",  fill: false },
+              { title: "This Month",value: feedbacks.filter(f => new Date(f.createdAt) > new Date(Date.now() - 30*24*60*60*1000)).length, subtext: "Last 30 days", icon: Calendar, bg: "bg-indigo-50", ic: "text-indigo-600", fill: false },
+            ].map(({ title, value, subtext, icon: Icon, bg, ic, fill }) => (
+              <div key={title} className="shrink-0 w-[130px] bg-white rounded-[20px] p-4 shadow-sm border border-slate-100 flex flex-col justify-between">
+                <div className="flex items-start justify-between mb-2">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${bg}`}>
+                    <Icon className={`w-5 h-5 ${ic}`} fill={fill ? "currentColor" : "none"} />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-[22px] font-black text-slate-900 leading-tight">{value}</h3>
+                  <p className="text-[12px] font-semibold text-slate-500 mt-0.5">{title}</p>
+                  <p className="text-[10px] font-medium text-slate-400 mt-1">{subtext}</p>
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Filter Tabs */}

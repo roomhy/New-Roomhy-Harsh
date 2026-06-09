@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
-import { MobileTabs, MobileEmptyState } from "../../components/propertyowner/MobileComponents";
+import { MobileTabs, MobileEmptyState, MobileStatCard, cn } from "../../components/propertyowner/MobileComponents";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession, fetchOwnerProperties } from "../../utils/propertyowner";
 import { apiFetch } from "../../services/api";
-import { Search, Plus, Phone, MessageCircle, MoreHorizontal, X, Mail, MapPin, Loader2, Trash2 } from "lucide-react";
+import { Search, Plus, Phone, MessageCircle, MoreHorizontal, X, Mail, MapPin, Loader2, Trash2, Users, TrendingUp, CalendarCheck, UserCheck, BookOpen } from "lucide-react";
 
 const Pill = ({ tone="muted", children }) => {
   const t = { 
@@ -177,32 +177,44 @@ export default function Enquiry() {
         </button>
       </div>
 
-      <div className="block md:hidden">
-        <MobileTabs 
-          tabs={[
-            { id: "all", label: `All (${totalCount})` },
-            { id: "new", label: `New (${newCount})` },
-            { id: "follow-up", label: `Follow-up (${followupCount})` },
-            { id: "site-visit", label: `Site Visit (${visitCount})` },
-            { id: "bookings", label: `Bookings (${bookingsCount})` }
-          ]} 
-          activeTab={tab} 
-          onTabChange={setTab} 
-        />
+
+
+      {/* Stats Cards — Desktop: 5-col horizontal strip, Mobile: 2x2 grid */}
+      <div className="hidden md:grid md:grid-cols-5 gap-3 mb-6">
+        {[
+          { l: "Total", v: totalCount, bg: "bg-blue-50/50 border border-blue-150/60 text-blue-600 dark:bg-blue-950/10", text: "text-blue-900 dark:text-blue-300" },
+          { l: "New", v: newCount, bg: "bg-indigo-50/50 border border-indigo-150/60 text-indigo-600 dark:bg-indigo-950/10", text: "text-indigo-900 dark:text-indigo-300" },
+          { l: "Follow-up", v: followupCount, bg: "bg-amber-50/50 border border-amber-150/60 text-amber-600 dark:bg-amber-950/10", text: "text-amber-900 dark:text-amber-300" },
+          { l: "Site Visit", v: visitCount, bg: "bg-emerald-50/50 border border-emerald-150/60 text-emerald-600 dark:bg-emerald-950/10", text: "text-emerald-900 dark:text-emerald-300" },
+          { l: "Bookings", v: bookingsCount, bg: "bg-purple-50/50 border border-purple-150/60 text-purple-600 dark:bg-purple-950/10", text: "text-purple-900 dark:text-purple-300" }
+        ].map(({ l, v, bg, text }) => (
+          <div key={l} className={`rounded-xl border p-4 shadow-sm text-center hover:shadow-md transition-all ${bg}`}>
+            <div className={`text-2xl font-black leading-none ${text}`}>{v}</div>
+            <div className="text-[11px] font-bold uppercase tracking-wider mt-1.5">{l}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      {/* Mobile Stats: single row horizontal scroll (MobileStatCard style) */}
+      <div className="flex overflow-x-auto gap-3 pb-2 mb-5 md:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {[
-          { l: "Total", v: totalCount },
-          { l: "New", v: newCount },
-          { l: "Follow-up", v: followupCount },
-          { l: "Site Visit", v: visitCount },
-          { l: "Bookings", v: bookingsCount }
-        ].map(({ l, v }) => (
-          <div key={l} className="rounded-2xl border border-border bg-card p-5 shadow-soft text-center hover:border-primary/20 transition-all">
-            <div className="font-serif text-[32px] font-bold text-foreground leading-none">{v}</div>
-            <div className="text-[12px] text-muted-foreground mt-1.5 font-medium">{l}</div>
+          { title: "Total",     value: totalCount,    subtext: "All leads",    icon: Users,         bg: "bg-blue-50",   ic: "text-blue-600" },
+          { title: "New",       value: newCount,      subtext: "Needs action", icon: TrendingUp,    bg: "bg-indigo-50", ic: "text-indigo-600" },
+          { title: "Follow-up", value: followupCount, subtext: "In progress",  icon: UserCheck,     bg: "bg-amber-50",  ic: "text-amber-600" },
+          { title: "Site Visit",value: visitCount,    subtext: "Scheduled",    icon: CalendarCheck, bg: "bg-emerald-50",ic: "text-emerald-600" },
+          { title: "Bookings",  value: bookingsCount, subtext: "Confirmed",    icon: BookOpen,      bg: "bg-purple-50", ic: "text-purple-600" },
+        ].map(({ title, value, subtext, icon: Icon, bg, ic }) => (
+          <div key={title} className="shrink-0 w-[130px] bg-white rounded-[20px] p-4 shadow-sm border border-slate-100 flex flex-col justify-between cursor-pointer active:scale-[0.98] transition-transform">
+            <div className="flex items-start justify-between mb-2">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${bg}`}>
+                <Icon className={`w-5 h-5 ${ic}`} />
+              </div>
+            </div>
+            <div>
+              <h3 className="text-[22px] font-black text-slate-900 leading-tight">{value}</h3>
+              <p className="text-[12px] font-semibold text-slate-500 mt-0.5">{title}</p>
+              <p className="text-[10px] font-medium text-slate-400 mt-1">{subtext}</p>
+            </div>
           </div>
         ))}
       </div>
@@ -259,7 +271,8 @@ export default function Enquiry() {
           </div>
         </>
       ) : (
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-soft">
+        <div>
+          <div className="hidden md:block rounded-2xl border border-border bg-card overflow-hidden shadow-soft">
           <div className="overflow-x-auto">
             <table className="w-full text-[13px]">
               <thead>
@@ -342,9 +355,10 @@ export default function Enquiry() {
               </tbody>
             </table>
           </div>
+          </div>
 
-          {/* Mobile Cards View (CRM Style) */}
-          <div className="block md:hidden space-y-3 pb-8 mt-4">
+          {/* Mobile Cards (Redesigned - Tenants style) */}
+          <div className="block md:hidden space-y-3 pb-12">
             {filtered.map(l => {
               const mappedStatus = getEnquiryStatusGroup(l.status);
               const phoneClean = (l.studentPhone || "").replace(/[^0-9]/g, "");

@@ -164,8 +164,8 @@ export default function LatePaymentsPage() {
         </div>
       )}
 
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
+      {/* Page Header - desktop only */}
+      <div className="hidden md:flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
         <div>
           <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Late Fees &amp; Fines</h1>
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">Live-calculated phase penalties based on current penalty settings.</p>
@@ -180,8 +180,30 @@ export default function LatePaymentsPage() {
         </div>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+      {/* Mobile Stat Strip */}
+      <div className="flex md:hidden overflow-x-auto gap-3 pb-2 mb-5" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        {[
+          { title: "Penalties",   value: loading ? "..." : fmt(totalPenalty),    subtext: "Accrued fines",   icon: AlertTriangle, bg: "bg-rose-50",   ic: "text-rose-600" },
+          { title: "Outstanding", value: loading ? "..." : fmt(totalOutstanding), subtext: "Total due",       icon: RefreshCw,     bg: "bg-amber-50",  ic: "text-amber-600" },
+          { title: "Critical",    value: loading ? "..." : phase3Count,           subtext: "Phase 3 tenants", icon: ShieldCheck,   bg: "bg-slate-50",  ic: "text-slate-600" },
+        ].map(({ title, value, subtext, icon: Icon, bg, ic }) => (
+          <div key={title} className="shrink-0 w-[130px] bg-white rounded-[20px] p-4 shadow-sm border border-slate-100 flex flex-col justify-between">
+            <div className="flex items-start mb-2">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${bg}`}>
+                <Icon className={`w-5 h-5 ${ic}`} />
+              </div>
+            </div>
+            <div>
+              <h3 className="text-[18px] font-black text-slate-900 leading-tight">{value}</h3>
+              <p className="text-[12px] font-semibold text-slate-500 mt-0.5">{title}</p>
+              <p className="text-[10px] font-medium text-slate-400 mt-1">{subtext}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop Summary Cards */}
+      <div className="hidden md:grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         <div className="rounded-2xl border border-border bg-rose-50 p-4">
           <div className="text-[12.5px] text-rose-600 font-medium mb-1">Total Penalties Accrued</div>
           <div className="font-serif text-[26px] text-rose-700">{fmt(totalPenalty)}</div>
