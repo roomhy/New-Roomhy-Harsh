@@ -3,6 +3,7 @@ import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLay
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
 import { apiFetch } from "../../services/api";
 import { AlertCircle, CheckCircle2, Clock, Plus, Search, Loader2 } from "lucide-react";
+import { MobileTabs, MobileEmptyState } from "../../components/propertyowner/MobileComponents";
 
 const Pill = ({ tone="muted", children }) => {
   const t = { success:"bg-green-100 text-green-700", warning:"bg-amber-100 text-amber-700", danger:"bg-red-100 text-red-700", muted:"bg-gray-100 text-gray-600" };
@@ -102,12 +103,7 @@ export default function Complaints() {
 
   return (
     <PropertyOwnerLayout owner={owner} title="Complaints" onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}>
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
-        <div>
-          <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Complaints</h1>
-          <p className="mt-1.5 text-[13.5px] text-muted-foreground">Track and resolve tenant complaints from one place.</p>
-        </div>
-      </div>
+
       
       {loading ? (
         <div className="text-center py-12">
@@ -122,16 +118,30 @@ export default function Complaints() {
             <StatCard label="In Progress" value={complaints.filter(c=>["In Progress", "Taken"].includes(c.status)).length} icon={Clock} tone="warning"/>
             <StatCard label="Resolved" value={complaints.filter(c=>c.status==="Resolved").length} icon={CheckCircle2} tone="success"/>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 mb-4 border-b border-border">
+          <div className="hidden md:flex flex-wrap items-center gap-1.5 mb-4 border-b border-border">
             {[{k:"all",l:"All"},{k:"open",l:"Open"},{k:"in-progress",l:"In Progress"},{k:"resolved",l:"Resolved"}].map(({k,l}) => (
               <button key={k} onClick={()=>setTab(k)} className={`px-3 py-2 text-[13px] font-medium border-b-2 -mb-px transition-colors ${tab===k?"border-primary text-foreground":"border-transparent text-muted-foreground hover:text-foreground"}`}>{l}</button>
             ))}
+          </div>
+          <div className="block md:hidden mb-4">
+            <MobileTabs 
+              tabs={[
+                { id: "all", label: `All (${complaints.length})` },
+                { id: "open", label: `Open (${complaints.filter(c=>(c.status||"Open")==="Open").length})` },
+                { id: "in-progress", label: `In Progress (${complaints.filter(c=>["In Progress", "Taken"].includes(c.status)).length})` },
+                { id: "resolved", label: `Resolved (${complaints.filter(c=>c.status==="Resolved").length})` }
+              ]} 
+              activeTab={tab} 
+              onTabChange={setTab} 
+            />
           </div>
           <div className="relative mb-4">
             <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/>
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search complaints…" className="w-full h-10 pl-9 pr-3 rounded-lg bg-card border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"/>
           </div>
-          <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-soft">
+          <div className="w-full">
+            {/* Desktop Table */}
+            <div className="hidden md:block rounded-2xl border border-border bg-card overflow-hidden shadow-soft">
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
                 <thead><tr className="text-left text-[11.5px] uppercase tracking-wider text-muted-foreground bg-muted/50">
@@ -193,6 +203,79 @@ export default function Complaints() {
                   ))}
                 </tbody>
               </table>
+            </div>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="block md:hidden space-y-3 pb-12">
+              {filtered.length === 0 ? (
+                <MobileEmptyState
+                  icon={AlertCircle}
+                  title="No Complaints"
+                  description="Great! There are no complaints matching your criteria."
+                  actionText="Refresh"
+                  onAction={() => window.location.reload()}
+                />
+              ) : filtered.map(c => (
+                <div key={`mob-${c._id}`} className="bg-white rounded-[20px] p-4 border border-slate-100 shadow-[0_4px_16px_rgba(0,0,0,0.02)] relative overflow-hidden">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                       <h3 className="text-[16px] font-black text-slate-900">{c.tenantName}</h3>
+                       <p className="text-[11.5px] font-semibold text-slate-500 mt-0.5">Room {c.roomNo} · {c.category}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5">
+                       <span className={`inline-flex px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${
+                         c.status === "Resolved" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                         c.status === "Open" ? "bg-rose-50 text-rose-600 border-rose-100" :
+                         "bg-amber-50 text-amber-600 border-amber-100"
+                       }`}>
+                         {c.status}
+                       </span>
+                       {c.escalated && <span className="inline-flex px-2 py-0.5 rounded text-[8.5px] font-bold uppercase text-rose-600 bg-rose-50 border border-rose-100">Escalated</span>}
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 mb-3">
+                    <p className="text-[12px] font-medium text-slate-700 italic">"{c.description || "No description provided."}"</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div>
+                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Priority</p>
+                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                         (c.priority||"Low")==="High"?"bg-red-100 text-red-700":(c.priority==="Medium"?"bg-amber-100 text-amber-700":"bg-gray-100 text-gray-600")
+                       }`}>{c.priority}</span>
+                    </div>
+                    <div className="text-right flex flex-col items-end">
+                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1 w-full">Assigned</p>
+                       {c.status !== "Resolved" ? (
+                         <select 
+                           value={c.assignedStaffId || ""} 
+                           onChange={(e) => assignStaff(c._id, e.target.value)}
+                           className="bg-white border border-slate-200 text-[11px] font-semibold text-slate-700 rounded-lg px-2 py-1 outline-none w-full max-w-[120px]"
+                         >
+                           <option value="">Unassigned</option>
+                           {staffList.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
+                         </select>
+                       ) : (
+                         <span className="text-[12px] font-bold text-slate-700">{c.assignedStaffName || "Unassigned"}</span>
+                       )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                     {c.status === "Open" && (
+                        <button onClick={() => updateStatus(c._id, "In Progress")} className="flex-1 py-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-black uppercase tracking-wider hover:bg-blue-100 transition-colors">Start Work</button>
+                     )}
+                     {(c.status === "In Progress" || c.status === "Taken") && (
+                        <button onClick={() => updateStatus(c._id, "Resolved")} className="flex-1 py-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 text-[10px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-colors">Mark Resolved</button>
+                     )}
+                     {c.status === "Resolved" && (
+                        <button onClick={() => updateStatus(c._id, "Open")} className="flex-1 py-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 text-[10px] font-black uppercase tracking-wider hover:bg-amber-100 transition-colors">Reopen</button>
+                     )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </>

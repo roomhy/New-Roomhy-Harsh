@@ -190,3 +190,10 @@
   animation: slideInFromTop 0.2s ease-out;
 }
 
+/* Hide duplicate header blocks in mobile view */
+@media (max-width: 1023px) {
+  .mobile-page-container > *:first-child:has(h1) {
+    display: none !important;
+  }
+}
+

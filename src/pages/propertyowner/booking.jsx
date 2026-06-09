@@ -75,7 +75,7 @@ export default function ConfirmedBookingsPage() {
       title="Confirmed Bookings" 
       onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
     >
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8 hidden md:flex">
         <div>
           <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Confirmed Bookings</h1>
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">List of confirmed tenant bookings, agreement signing states, and schedules.</p>
@@ -107,72 +107,138 @@ export default function ConfirmedBookingsPage() {
           <p className="text-[13px] text-muted-foreground mt-1">There are no confirmed bookings for your properties at this time.</p>
         </div>
       ) : (
-        /* Bookings Table */
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-soft">
-          <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr className="text-left text-[11.5px] uppercase tracking-wider text-muted-foreground bg-muted/50">
-                  <th className="px-6 py-3.5 font-semibold">Tenant Name</th>
-                  <th className="px-6 py-3.5 font-semibold">Property</th>
-                  <th className="px-6 py-3.5 font-semibold">Token Surcharge</th>
-                  <th className="px-6 py-3.5 font-semibold">Booking Date</th>
-                  <th className="px-6 py-3.5 font-semibold">Scheduled Check-in</th>
-                  <th className="px-6 py-3.5 font-semibold">Rent Agreement</th>
-                  <th className="px-6 py-3.5 font-semibold text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredBookings.map((b) => (
-                  <tr key={b._id} className="hover:bg-muted/40 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-foreground">{b.name}</div>
-                      <div className="text-[11px] font-mono text-muted-foreground">{b.phone || b.email}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-foreground">{b.property_name}</div>
-                      {b.request_type && (
-                        <div className="text-[11px] text-muted-foreground uppercase">{b.request_type}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 font-bold text-emerald-600">
-                      ₹{(b.payment_amount || b.rent_amount || b.total_amount || 0).toLocaleString("en-IN")}
-                    </td>
-                    <td className="px-6 py-4 text-muted-foreground">
-                      {b.created_at ? new Date(b.created_at).toLocaleDateString("en-IN") : "Today"}
-                    </td>
-                    <td className="px-6 py-4 font-bold text-foreground">
-                      {b.check_in_date ? new Date(b.check_in_date).toLocaleDateString("en-IN") : "Not scheduled"}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
-                        b.payment_status === "completed" 
-                          ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
-                          : "bg-amber-50 text-amber-600 border-amber-100"
-                      }`}>
-                        {b.payment_status === "completed" ? "Signed & Paid" : "Pending Sign"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <button 
-                        onClick={() => handleDownload(b)}
-                        className="size-8 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors" 
-                        title="Download Booking Summary"
-                      >
-                        <Download size={14} />
-                      </button>
-                      <button 
-                        onClick={() => handleCancel(b._id)}
-                        className="size-8 rounded-lg border border-rose-100 bg-rose-50 text-rose-600 hover:bg-rose-100 inline-flex items-center justify-center transition-colors" 
-                        title="Cancel Booking"
-                      >
-                        <Ban size={14} />
-                      </button>
-                    </td>
+        /* Bookings List */
+        <div className="w-full">
+          {/* Desktop Table */}
+          <div className="hidden md:block rounded-2xl border border-border bg-card overflow-hidden shadow-soft">
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <thead>
+                  <tr className="text-left text-[11.5px] uppercase tracking-wider text-muted-foreground bg-muted/50">
+                    <th className="px-6 py-3.5 font-semibold">Tenant Name</th>
+                    <th className="px-6 py-3.5 font-semibold">Property</th>
+                    <th className="px-6 py-3.5 font-semibold">Token Surcharge</th>
+                    <th className="px-6 py-3.5 font-semibold">Booking Date</th>
+                    <th className="px-6 py-3.5 font-semibold">Scheduled Check-in</th>
+                    <th className="px-6 py-3.5 font-semibold">Rent Agreement</th>
+                    <th className="px-6 py-3.5 font-semibold text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredBookings.map((b) => (
+                    <tr key={b._id} className="hover:bg-muted/40 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="font-semibold text-foreground">{b.name}</div>
+                        <div className="text-[11px] font-mono text-muted-foreground">{b.phone || b.email}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-foreground">{b.property_name}</div>
+                        {b.request_type && (
+                          <div className="text-[11px] text-muted-foreground uppercase">{b.request_type}</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 font-bold text-emerald-600">
+                        ₹{(b.payment_amount || b.rent_amount || b.total_amount || 0).toLocaleString("en-IN")}
+                      </td>
+                      <td className="px-6 py-4 text-muted-foreground">
+                        {b.created_at ? new Date(b.created_at).toLocaleDateString("en-IN") : "Today"}
+                      </td>
+                      <td className="px-6 py-4 font-bold text-foreground">
+                        {b.check_in_date ? new Date(b.check_in_date).toLocaleDateString("en-IN") : "Not scheduled"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                          b.payment_status === "completed" 
+                            ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
+                            : "bg-amber-50 text-amber-600 border-amber-100"
+                        }`}>
+                          {b.payment_status === "completed" ? "Signed & Paid" : "Pending Sign"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right space-x-2">
+                        <button 
+                          onClick={() => handleDownload(b)}
+                          className="size-8 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors" 
+                          title="Download Booking Summary"
+                        >
+                          <Download size={14} />
+                        </button>
+                        <button 
+                          onClick={() => handleCancel(b._id)}
+                          className="size-8 rounded-lg border border-rose-100 bg-rose-50 text-rose-600 hover:bg-rose-100 inline-flex items-center justify-center transition-colors" 
+                          title="Cancel Booking"
+                        >
+                          <Ban size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Mobile Cards */}
+          <div className="block md:hidden space-y-3 pb-12">
+            {filteredBookings.map((b) => (
+              <div key={`mob-${b._id}`} className="bg-white rounded-[20px] p-4 border border-slate-100 shadow-[0_4px_16px_rgba(0,0,0,0.02)] relative overflow-hidden">
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex-1">
+                    <h3 className="text-[16px] font-black text-slate-900">{b.name}</h3>
+                    <p className="text-[11.5px] font-semibold text-slate-500 mt-0.5">{b.phone || b.email}</p>
+                  </div>
+                  <span className={`inline-flex px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${
+                    b.payment_status === "completed" 
+                      ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
+                      : "bg-amber-50 text-amber-600 border-amber-100"
+                  }`}>
+                    {b.payment_status === "completed" ? "Signed & Paid" : "Pending Sign"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Property</p>
+                    <p className="text-[13px] font-black text-slate-800">{b.property_name}</p>
+                    {b.request_type && (
+                      <p className="text-[10px] font-bold text-blue-600 mt-0.5">{b.request_type.toUpperCase()}</p>
+                    )}
+                  </div>
+                  <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+                    <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Token Amt</p>
+                    <p className="text-[16px] font-black text-emerald-700">
+                      ₹{(b.payment_amount || b.rent_amount || b.total_amount || 0).toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between bg-slate-50 rounded-xl p-3 border border-slate-100 mb-4">
+                  <div>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Booked On</p>
+                    <p className="text-[11px] font-semibold text-slate-700">{b.created_at ? new Date(b.created_at).toLocaleDateString("en-IN") : "Today"}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Check-in</p>
+                    <p className="text-[11px] font-semibold text-slate-700">{b.check_in_date ? new Date(b.check_in_date).toLocaleDateString("en-IN") : "Not scheduled"}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button 
+                    onClick={() => handleDownload(b)}
+                    className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-[10px] font-black uppercase tracking-wider hover:bg-slate-200 transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Download
+                  </button>
+                  <button 
+                    onClick={() => handleCancel(b._id)}
+                    className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 text-[10px] font-black uppercase tracking-wider hover:bg-rose-100 transition-colors"
+                  >
+                    <Ban className="w-3.5 h-3.5" /> Cancel
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

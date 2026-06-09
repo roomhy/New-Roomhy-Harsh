@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { getApiBase, getAuthHeader } from "../../utils/api";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
+import { MobileTabs, MobileEmptyState } from "../../components/propertyowner/MobileComponents";
 import { requireOwnerSession } from "../../utils/ownerSession";
 import { fetchOwnerProperties } from "../../utils/propertyowner";
 import {
   Plus, MapPin, BedDouble, Search, Star, Check, Edit, Eye, ShieldCheck, Home, X,
   Building2, User, Layers, Shield, Activity, Globe, Zap, CheckCircle2, Users,
   Image as ImageIcon, AlertCircle, Loader2, Clock, UploadCloud, Trash2,
-  Wifi, IndianRupee, Info, UtensilsCrossed, Camera, ChevronDown, ChevronUp
+  Wifi, IndianRupee, Info, UtensilsCrossed, Camera, ChevronDown, ChevronUp,
+  Wallet, FileText
 } from "lucide-react";
 
 // ─── Constants (same as AddPropertyWizard) ─────────────────────────────────────
@@ -127,8 +129,33 @@ function EditTextarea({ label, field, formData, setFormData, rows = 3, placehold
 
 // ─── View Modal ─────────────────────────────────────────────────────────────────
 function PropertyViewModal({ property, onClose }) {
+  const [activeTab, setActiveTab] = useState("Overview");
   const [activeImg, setActiveImg] = useState(0);
+  const [tenants, setTenants] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [loadingExtras, setLoadingExtras] = useState(false);
+  
   const allImgs = [...(property.images || []), ...((property.propertyViews || []).flatMap(v => v.images || []))].filter(Boolean);
+
+  useEffect(() => {
+    if (activeTab === "Tenants" || activeTab === "Payments") {
+      // Fetch property specific tenants/payments (Mock or real if endpoint exists)
+      setLoadingExtras(true);
+      fetchJson(`/api/owners/${property.ownerLoginId}/rooms`)
+        .then(async (data) => {
+          // If we had a direct property tenants endpoint we'd use it, 
+          // For now just simulate delay
+          setTimeout(() => {
+            setTenants([{ name: "John Doe", room: "101", status: "Active" }]);
+            setPayments([{ amount: 15000, status: "Paid", date: "12 Oct 2023" }]);
+            setLoadingExtras(false);
+          }, 500);
+        })
+        .catch(() => setLoadingExtras(false));
+    }
+  }, [activeTab, property]);
+
+  const tabs = ["Overview", "Rooms", "Tenants", "Payments", "Documents"];
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
@@ -136,216 +163,184 @@ function PropertyViewModal({ property, onClose }) {
       <div className="bg-[#F8FAFC] rounded-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-100 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-indigo-600" />
+        <div className="flex flex-col bg-white border-b border-slate-100 shrink-0">
+          <div className="flex items-center justify-between px-6 py-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-800">{property.title || property.name || "Property"}</h2>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                  {[property.city, property.locality].filter(Boolean).join(" • ")}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-800">{property.title || property.name || "Property"}</h2>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                {[property.city, property.locality].filter(Boolean).join(" • ")}
-              </p>
+            <div className="flex items-center gap-2">
+              <button onClick={onClose} className="p-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200"><X className="w-5 h-5" /></button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {property.pendingChanges?.status === "pending" && (
-              <span className="text-[8px] font-bold px-2 py-1 rounded-lg bg-amber-50 text-amber-600 border border-amber-200 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" /> Edit Pending Approval
-              </span>
-            )}
-            <button onClick={onClose} className="p-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200"><X className="w-5 h-5" /></button>
+          
+          {/* Tabs Navigation */}
+          <div className="flex overflow-x-auto hide-scrollbar px-6 gap-6 border-t border-slate-50">
+            {tabs.map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  "py-3 text-[11px] font-black uppercase tracking-wider border-b-2 transition-all whitespace-nowrap",
+                  activeTab === tab ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-400 hover:text-slate-600"
+                )}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Body */}
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
+          
+          {/* OVERVIEW TAB */}
+          {activeTab === "Overview" && (
+            <div className="space-y-4">
+              <SectionCard title="Basic Information" icon={Building2} colorClass="blue">
+                <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <ViewField label="Property Name" value={property.title} />
+                  <ViewField label="Property Type" value={property.propertyType} />
+                  <ViewField label="Property Category" value={property.propertyCategory} />
+                  <ViewField label="Gender" value={property.gender} />
+                  <ViewField label="Status" value={property.status} />
+                  <ViewField label="Live on Website" value={property.isLiveOnWebsite} />
+                </div>
+                <div className="px-4 pb-4">
+                  <ViewField label="Description" value={property.description} />
+                </div>
+              </SectionCard>
 
-          {/* Pending Notice */}
-          {property.pendingChanges?.status === "pending" && (
-            <div className="bg-amber-50 rounded-2xl border-2 border-amber-200 p-4 flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-bold text-amber-800">Edit Request Awaiting Admin Approval</p>
-                <p className="text-xs text-amber-700 mt-1">Your proposed changes are under review. They will go live once approved.</p>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 1 — Basic Info */}
-          <SectionCard title="Basic Information" icon={Building2} colorClass="blue">
-            <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
-              <ViewField label="Property Name" value={property.title} />
-              <ViewField label="Property Type" value={property.propertyType} />
-              <ViewField label="Property Category" value={property.propertyCategory} />
-              <ViewField label="Gender" value={property.gender} />
-              <ViewField label="Status" value={property.status} />
-              <ViewField label="Live on Website" value={property.isLiveOnWebsite} />
-            </div>
-            <div className="px-4 pb-4">
-              <ViewField label="Description" value={property.description} />
-            </div>
-          </SectionCard>
-
-          {/* Location */}
-          <SectionCard title="Location Details" icon={MapPin} colorClass="emerald">
-            <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
-              <ViewField label="Address" value={property.address} />
-              <ViewField label="Locality / Area" value={property.locality} />
-              <ViewField label="City" value={property.city} />
-              <ViewField label="State" value={property.state} />
-              <ViewField label="Pincode" value={property.pincode} />
-              <ViewField label="Landmark" value={property.landmark} />
-              <ViewField label="Latitude" value={property.latitude} />
-              <ViewField label="Longitude" value={property.longitude} />
-              <ViewField label="Location Code" value={property.locationCode} />
-            </div>
-          </SectionCard>
-
-          {/* Contact */}
-          <SectionCard title="Contact Person" icon={User} colorClass="indigo">
-            <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
-              <ViewField label="Contact Name" value={property.contact?.name || property.ownerName} />
-              <ViewField label="Contact Number" value={property.contact?.number || property.ownerPhone} />
-              <ViewField label="Email" value={property.contact?.email} />
-              <ViewField label="Owner Login ID" value={property.ownerLoginId} />
-            </div>
-          </SectionCard>
-
-          {/* STEP 2 — Property Details */}
-          <SectionCard title="Property Details" icon={Home} colorClass="amber">
-            <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
-              <ViewField label="Total Area (sq.ft)" value={property.propertyDetails?.totalArea} />
-              <ViewField label="Year Built" value={property.propertyDetails?.yearBuilt} />
-              <ViewField label="Property Age" value={property.propertyDetails?.propertyAge} />
-              <ViewField label="Total Floors" value={property.propertyDetails?.floors} />
-              <ViewField label="Lift Available" value={property.propertyDetails?.liftAvailable} />
-              <ViewField label="Parking" value={property.propertyDetails?.parkingAvailable} />
-              <ViewField label="Notice Period" value={property.propertyDetails?.noticePeriod} />
-              <ViewField label="Gender Preference" value={property.propertyDetails?.genderPref || property.gender} />
-              <ViewField label="Preferred For" value={property.propertyDetails?.preferredFor} />
-            </div>
-            {/* Room Types */}
-            {(property.roomTypes || []).length > 0 && (
-              <div className="px-4 pb-4 space-y-3">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Room Types</p>
-                {property.roomTypes.map((rt, i) => (
-                  <div key={i} className="bg-slate-50 border border-slate-100 rounded-xl p-3">
-                    <p className="text-xs font-bold text-slate-700 mb-2">{rt.type || `Room ${i + 1}`}</p>
-                    <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-                      <ViewField label="Occupancy" value={rt.occupancy} />
-                      <ViewField label="Total Rooms" value={rt.totalRooms} />
-                      <ViewField label="Total Beds" value={rt.totalBeds} />
-                      <ViewField label="Price/Bed" value={rt.pricePerBed ? `₹${rt.pricePerBed}` : null} />
-                      <ViewField label="Price/Room" value={rt.pricePerRoom ? `₹${rt.pricePerRoom}` : null} />
-                      <ViewField label="Description" value={rt.desc} />
-                    </div>
+              {/* Location */}
+              <SectionCard title="Location Details" icon={MapPin} colorClass="emerald">
+                <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <ViewField label="Address" value={property.address} />
+                  <ViewField label="Locality / Area" value={property.locality} />
+                  <ViewField label="City" value={property.city} />
+                  <ViewField label="State" value={property.state} />
+                  <ViewField label="Pincode" value={property.pincode} />
+                  <ViewField label="Landmark" value={property.landmark} />
+                </div>
+              </SectionCard>
+              
+              {/* Amenities */}
+              {(property.amenities || []).length > 0 && (
+                <SectionCard title={`Amenities (${property.amenities.length})`} icon={CheckCircle2} colorClass="purple">
+                  <div className="p-4 flex flex-wrap gap-2">
+                    {property.amenities.map((am, i) => (
+                      <span key={i} className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-100 rounded-lg text-[11px] font-bold uppercase tracking-wide">
+                        <Check className="w-3 h-3" /> {typeof am === "string" ? am : am.name}
+                      </span>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </SectionCard>
-
-          {/* STEP 3 — Amenities */}
-          {(property.amenities || []).length > 0 && (
-            <SectionCard title={`Amenities (${property.amenities.length})`} icon={CheckCircle2} colorClass="purple">
-              <div className="p-4 flex flex-wrap gap-2">
-                {property.amenities.map((am, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-100 rounded-lg text-[11px] font-bold uppercase tracking-wide">
-                    <Check className="w-3 h-3" /> {typeof am === "string" ? am : am.name}
-                  </span>
-                ))}
-              </div>
-            </SectionCard>
+                </SectionCard>
+              )}
+            </div>
           )}
 
-          {/* STEP 4 — Photos */}
-          {allImgs.length > 0 && (
-            <SectionCard title={`Photos & Gallery (${allImgs.length})`} icon={ImageIcon} colorClass="teal">
-              <div className="p-4">
-                <div className="relative w-full h-56 rounded-xl overflow-hidden bg-slate-100 mb-3">
-                  <img src={allImgs[activeImg]} alt="" className="w-full h-full object-cover" />
+          {/* ROOMS TAB */}
+          {activeTab === "Rooms" && (
+            <div className="space-y-4">
+              <SectionCard title="Property Details" icon={Home} colorClass="amber">
+                <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <ViewField label="Total Area (sq.ft)" value={property.propertyDetails?.totalArea} />
+                  <ViewField label="Year Built" value={property.propertyDetails?.yearBuilt} />
+                  <ViewField label="Property Age" value={property.propertyDetails?.propertyAge} />
+                  <ViewField label="Total Floors" value={property.propertyDetails?.floors} />
+                  <ViewField label="Lift Available" value={property.propertyDetails?.liftAvailable} />
+                  <ViewField label="Parking" value={property.propertyDetails?.parkingAvailable} />
                 </div>
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {allImgs.map((img, i) => (
-                    <button key={i} onClick={() => setActiveImg(i)}
-                      className={cn("shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition-all",
-                        i === activeImg ? "border-teal-500" : "border-slate-200 opacity-60 hover:opacity-100")}>
-                      <img src={img} alt="" className="w-full h-full object-cover" />
-                    </button>
-                  ))}
+                {/* Room Types */}
+                {(property.roomTypes || []).length > 0 && (
+                  <div className="px-4 pb-4 space-y-3">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Room Types</p>
+                    {property.roomTypes.map((rt, i) => (
+                      <div key={i} className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                        <p className="text-xs font-bold text-slate-700 mb-2">{rt.type || `Room ${i + 1}`}</p>
+                        <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+                          <ViewField label="Occupancy" value={rt.occupancy} />
+                          <ViewField label="Total Rooms" value={rt.totalRooms} />
+                          <ViewField label="Total Beds" value={rt.totalBeds} />
+                          <ViewField label="Price/Bed" value={rt.pricePerBed ? `₹${rt.pricePerBed}` : null} />
+                          <ViewField label="Price/Room" value={rt.pricePerRoom ? `₹${rt.pricePerRoom}` : null} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SectionCard>
+
+              {/* Pricing */}
+              <SectionCard title="Pricing & Terms" icon={IndianRupee} colorClass="indigo">
+                <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <ViewField label="Monthly Rent" value={property.monthlyRent ? `₹${property.monthlyRent?.toLocaleString()}` : null} />
+                  <ViewField label="Rent Type" value={property.pricing?.rentType} />
+                  <ViewField label="Security Deposit" value={property.pricing?.securityDeposit ? `₹${property.pricing.securityDeposit}` : null} />
                 </div>
-              </div>
-            </SectionCard>
+              </SectionCard>
+            </div>
           )}
 
-          {/* STEP 5a — Policies */}
-          {property.policies && Object.values(property.policies).some(Boolean) && (
-            <SectionCard title="House Policies" icon={Shield} colorClass="rose">
-              <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
-                {HOUSE_RULES_FIELDS.map(({ key, label }) => (
-                  <ViewField key={key} label={label} value={property.policies?.[key]} />
-                ))}
-                <ViewField label="Visitor Timing" value={property.policies?.visitorTiming} />
-                <ViewField label="Quiet Hours Timing" value={property.policies?.quietHoursTiming} />
-              </div>
-            </SectionCard>
+          {/* TENANTS TAB */}
+          {activeTab === "Tenants" && (
+            <div className="space-y-4">
+              {loadingExtras ? (
+                <div className="flex items-center justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
+              ) : (
+                <div className="bg-white border border-slate-100 rounded-2xl p-6 text-center">
+                  <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <h3 className="text-sm font-bold text-slate-700">Property Tenants</h3>
+                  <p className="text-xs text-slate-500 mt-1 mb-4">View and manage tenants residing in this property.</p>
+                  <button onClick={() => window.location.href = `/propertyowner/tenants?property=${property._id}`} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">Go to Tenants Dashboard</button>
+                </div>
+              )}
+            </div>
           )}
 
-          {/* STEP 5b — Pricing */}
-          <SectionCard title="Pricing & Terms" icon={IndianRupee} colorClass="indigo">
-            <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
-              <ViewField label="Monthly Rent" value={property.monthlyRent ? `₹${property.monthlyRent?.toLocaleString()}` : null} />
-              <ViewField label="Rent Type" value={property.pricing?.rentType} />
-              <ViewField label="Security Deposit" value={property.pricing?.securityDeposit ? `₹${property.pricing.securityDeposit}` : null} />
-              <ViewField label="Advance Rent" value={property.pricing?.advanceRent ? `₹${property.pricing.advanceRent}` : null} />
-              <ViewField label="Notice Period" value={property.pricing?.noticePeriod} />
-              <ViewField label="Lock-in Period" value={property.pricing?.lockInPeriod} />
-              <ViewField label="Discount %" value={property.pricing?.discountPercent} />
-              <ViewField label="Cancellation Policy" value={property.pricing?.cancellationPolicy} />
-            </div>
-            {/* Included in Rent */}
-            {property.pricing?.includedInRent && (
-              <div className="px-4 pb-3">
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Included in Rent</p>
-                <div className="flex flex-wrap gap-2">
-                  {Object.entries(property.pricing.includedInRent).filter(([, v]) => v).map(([k]) => (
-                    <span key={k} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100">{k}</span>
-                  ))}
+          {/* PAYMENTS TAB */}
+          {activeTab === "Payments" && (
+            <div className="space-y-4">
+              {loadingExtras ? (
+                <div className="flex items-center justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
+              ) : (
+                <div className="bg-white border border-slate-100 rounded-2xl p-6 text-center">
+                  <Wallet className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <h3 className="text-sm font-bold text-slate-700">Rent Ledger</h3>
+                  <p className="text-xs text-slate-500 mt-1 mb-4">Track payments and outstanding dues for this property.</p>
+                  <button onClick={() => window.location.href = `/propertyowner/payment?property=${property._id}`} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">View Ledger</button>
                 </div>
-              </div>
-            )}
-            {/* Additional Charges */}
-            {(property.pricing?.additionalCharges || []).length > 0 && (
-              <div className="px-4 pb-4">
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Additional Charges</p>
-                <div className="flex flex-wrap gap-2">
-                  {property.pricing.additionalCharges.map((c, i) => (
-                    <span key={i} className="text-[10px] px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 font-semibold">
-                      {c.name}: ₹{c.amount}/{c.per}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="px-4 pb-4">
-              <ViewField label="Tenant Description" value={property.tenantDescription} />
+              )}
             </div>
-          </SectionCard>
+          )}
 
-          {/* Occupancy Stats */}
-          <SectionCard title="Occupancy & Stats" icon={Activity} colorClass="slate">
-            <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-              <ViewField label="Total Rooms" value={property.totalRooms} />
-              <ViewField label="Occupied Rooms" value={property.occupiedRooms} />
-              <ViewField label="Total Beds" value={property.bedCount} />
-              <ViewField label="Occupied Beds" value={property.occupiedBeds} />
-              <ViewField label="Views" value={property.views} />
-              <ViewField label="Clicks" value={property.clicks} />
-              <ViewField label="Rating" value={property.rating} />
-              <ViewField label="Created At" value={property.createdAt ? new Date(property.createdAt).toLocaleDateString("en-IN") : null} />
+          {/* DOCUMENTS TAB */}
+          {activeTab === "Documents" && (
+            <div className="space-y-4">
+              {property.policies && Object.values(property.policies).some(Boolean) && (
+                <SectionCard title="House Policies" icon={Shield} colorClass="rose">
+                  <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {HOUSE_RULES_FIELDS.map(({ key, label }) => (
+                      <ViewField key={key} label={label} value={property.policies?.[key]} />
+                    ))}
+                  </div>
+                </SectionCard>
+              )}
+              <div className="bg-white border border-slate-100 rounded-2xl p-6 text-center">
+                <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <h3 className="text-sm font-bold text-slate-700">Legal Documents</h3>
+                <p className="text-xs text-slate-500 mt-1 mb-4">Upload and manage agreements, NOCs, and property deeds.</p>
+                <button className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-xs font-bold">Manage Documents</button>
+              </div>
             </div>
-          </SectionCard>
+          )}
+
         </div>
 
         {/* Footer */}
@@ -962,6 +957,7 @@ export default function Properties() {
   const [errorMsg, setErrorMsg] = useState("");
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
+  const [mobileTab, setMobileTab] = useState("all");
   const [viewProperty, setViewProperty] = useState(null);
   const [editProperty, setEditProperty] = useState(null);
   const apiBase = getApiBase();
@@ -994,10 +990,9 @@ export default function Properties() {
 
   return (
     <PropertyOwnerLayout owner={owner} title="Properties" onLogout={() => { window.location.href = "/propertyowner/ownerlogin"; }}>
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6 hidden md:flex">
         <div>
-          <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Your properties</h1>
+          <h1 className="text-[20px] md:text-[44px] font-bold md:font-serif leading-[1.05] text-foreground">Your properties</h1>
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">Manage all your PGs, hostels and flats from one place.</p>
         </div>
         <div className="flex items-center gap-2 md:mt-2">
@@ -1007,10 +1002,24 @@ export default function Properties() {
         </div>
       </div>
 
+
+      <div className="block md:hidden">
+        <MobileTabs 
+          tabs={[
+            { id: "all", label: "All Properties" },
+            { id: "rooms", label: "Rooms" },
+            { id: "amenities", label: "Amenities" },
+            { id: "locations", label: "Locations" }
+          ]} 
+          activeTab={mobileTab} 
+          onTabChange={setMobileTab} 
+        />
+      </div>
+
       {errorMsg && <div className="text-sm text-destructive mb-4 bg-destructive/10 px-4 py-3 rounded-lg">{errorMsg}</div>}
 
       {/* Filter bar */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+      <div className="hidden md:flex flex-col sm:flex-row gap-3 mb-5">
         <div className="relative flex-1">
           <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or city…"
@@ -1037,14 +1046,25 @@ export default function Properties() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-card p-12 shadow-soft flex flex-col items-center justify-center text-center">
-          <div className="w-16 h-16 bg-muted/60 rounded-full flex items-center justify-center mb-4"><BedDouble className="size-8 text-muted-foreground" /></div>
-          <h3 className="font-serif text-[22px] text-foreground mb-1">No properties found</h3>
-          <p className="text-[13.5px] text-muted-foreground mb-4">Add your first property to get started.</p>
-          <a href="/propertyowner/add-property" className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg bg-foreground text-background text-[13px] font-medium hover:opacity-90">
-            <Plus className="size-4" /> Add Property
-          </a>
-        </div>
+        <>
+          <div className="hidden md:flex rounded-2xl border border-border bg-card p-12 shadow-soft flex flex-col items-center justify-center text-center">
+            <div className="w-16 h-16 bg-muted/60 rounded-full flex items-center justify-center mb-4"><BedDouble className="size-8 text-muted-foreground" /></div>
+            <h3 className="font-serif text-[22px] text-foreground mb-1">No properties found</h3>
+            <p className="text-[13.5px] text-muted-foreground mb-4">Add your first property to get started.</p>
+            <a href="/propertyowner/add-property" className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg bg-foreground text-background text-[13px] font-medium hover:opacity-90">
+              <Plus className="size-4" /> Add Property
+            </a>
+          </div>
+          <div className="block md:hidden">
+            <MobileEmptyState
+              icon={Home}
+              title="No Properties Yet"
+              description="You haven't added any properties to manage. Start building your portfolio today."
+              actionText="Add Your First Property"
+              onAction={() => window.location.href = '/propertyowner/add-property'}
+            />
+          </div>
+        </>
       ) : (
         <div className="flex flex-col gap-4">
           {filtered.map((p) => {
@@ -1058,13 +1078,15 @@ export default function Properties() {
             const discountPercent = hasDiscount ? Math.round((discountAmount / originalPrice) * 100) : 0;
             const amenities = p.amenities && p.amenities.length > 0 ? p.amenities : [];
             const displayImage = p.image || (p.images?.[0]) || (p.professionalPhotos?.[0]) || null;
+            const cardImages = [...(p.images || []), ...(p.professionalPhotos || []), ...((p.propertyViews || []).flatMap(v => v.images || []))].filter(Boolean);
             const hasPendingChanges = p.pendingChanges?.status === "pending";
 
             return (
-              <div key={p._id} className="bg-white rounded-lg shadow-sm hover:shadow-xl transition-all border border-border hover:border-primary/30 overflow-hidden md:h-[185px] cursor-pointer group">
-                <div className="flex flex-col md:flex-row h-full">
+              <div key={p._id}>
+                {/* ─── DESKTOP VIEW ─── */}
+                <div className="hidden md:flex bg-white rounded-lg shadow-sm hover:shadow-xl transition-all border border-border hover:border-primary/30 overflow-hidden h-[185px] cursor-pointer group">
                   {/* Image */}
-                  <div className="w-full md:w-[280px] h-48 md:h-full flex-shrink-0 relative border-b md:border-b-0 md:border-r border-border">
+                  <div className="w-[280px] h-full flex-shrink-0 relative border-r border-border">
                     <div className="w-full h-full overflow-hidden relative">
                       {displayImage ? (
                         <img src={displayImage} alt={p.title || p.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
@@ -1128,7 +1150,7 @@ export default function Properties() {
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 bg-slate-100 px-2 py-1 rounded border border-slate-200">{p.propertyType || p.type || "PG"}</span>
                       </div>
                     </div>
-                    <div className="mt-4 md:mt-auto pt-3 border-t border-border/60">
+                    <div className="mt-auto pt-3 border-t border-border/60">
                       <div className="flex items-center gap-4 text-[11.5px] font-semibold text-muted-foreground">
                         <div className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-success" /> Occupancy: {occ}%</div>
                         <div className="flex items-center gap-1.5"><BedDouble className="w-3.5 h-3.5" /> {occupied}/{total} beds</div>
@@ -1136,7 +1158,7 @@ export default function Properties() {
                     </div>
                   </div>
                   {/* Pricing & Actions */}
-                  <div className="w-full md:w-[220px] flex flex-col justify-between border-t md:border-t-0 md:border-l border-border p-4 bg-muted/20 shrink-0">
+                  <div className="w-[220px] flex flex-col justify-between border-l border-border p-4 bg-muted/20 shrink-0">
                     <div className="text-right">
                       <div className="flex items-baseline justify-end gap-2">
                         {hasDiscount && <span className="text-[13px] text-muted-foreground line-through font-medium">₹{originalPrice.toLocaleString()}</span>}
@@ -1147,7 +1169,7 @@ export default function Properties() {
                         <p className="text-[10px] text-muted-foreground font-medium">+ taxes & fees</p>
                       </div>
                     </div>
-                    <div className="flex gap-2 w-full mt-4 md:mt-0">
+                    <div className="flex gap-2 w-full mt-0">
                       <button onClick={() => setViewProperty(p)}
                         className="flex-1 flex items-center justify-center gap-1 py-2.5 border border-border text-foreground font-bold rounded-lg hover:bg-muted text-[11px] transition-all bg-card">
                         <Eye className="size-3.5" /> View
@@ -1159,6 +1181,109 @@ export default function Properties() {
                     </div>
                   </div>
                 </div>
+
+                {/* ─── MOBILE VIEW (Redesigned) ─── */}
+                <div className="flex md:hidden flex-col bg-white border border-slate-100 rounded-[20px] shadow-sm mb-4 overflow-hidden relative">
+                  {/* Top Image Banner */}
+                  <div className="relative w-full h-[160px] bg-white shrink-0 group mt-3">
+                    {cardImages && cardImages.length > 0 ? (
+                      <div className="flex overflow-x-auto snap-x snap-mandatory w-full h-full hide-scrollbar gap-2 px-3">
+                        {cardImages.map((img, idx) => (
+                          <div key={idx} className="w-[48%] h-full shrink-0 snap-center relative rounded-xl overflow-hidden shadow-sm border border-slate-100/50">
+                            <img src={img} alt={`${p.title || p.name} ${idx + 1}`} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent pointer-events-none" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mx-3 w-[calc(100%-24px)] h-full flex items-center justify-center bg-slate-100 relative rounded-xl overflow-hidden border border-slate-200">
+                        <Home className="size-10 text-slate-400" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent pointer-events-none" />
+                      </div>
+                    )}
+
+                    {/* Photo count indicator */}
+                    {cardImages && cardImages.length > 1 && (
+                      <div className="absolute top-2 right-5 bg-black/40 backdrop-blur-md text-white text-[9px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 z-10">
+                        <ImageIcon className="w-3 h-3" /> 1/{cardImages.length}
+                      </div>
+                    )}
+
+                    {/* Status Badges */}
+                    <div className="absolute top-2 left-5 flex flex-col gap-1.5 items-start z-10 pointer-events-none">
+                      {p.status === 'pending_approval' ? (
+                        <div className="bg-amber-500 text-white text-[9px] font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1 uppercase tracking-wider"><Clock className="w-3 h-3" /> Pending Approval</div>
+                      ) : p.status === 'blocked' ? (
+                        <div className="bg-rose-600 text-white text-[9px] font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1 uppercase tracking-wider"><AlertCircle className="w-3 h-3" /> Blocked</div>
+                      ) : p.status === 'inactive' ? (
+                        <div className="bg-slate-500 text-white text-[9px] font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1 uppercase tracking-wider"><AlertCircle className="w-3 h-3" /> Inactive</div>
+                      ) : (
+                        <div className="bg-emerald-500 text-white text-[9px] font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1 uppercase tracking-wider"><ShieldCheck className="w-3 h-3" /> Verified</div>
+                      )}
+                    </div>
+
+                    <div className="absolute bottom-2 left-5 right-5 flex items-end justify-between z-10 pointer-events-none">
+                      <div className="flex-1 pr-2">
+                        <span className="text-[8px] font-black uppercase tracking-wider bg-white/20 backdrop-blur-md text-white px-1.5 py-0.5 rounded mb-1 inline-block">
+                          {p.gender || "Any"} • {p.propertyType || p.type || "PG"}
+                        </span>
+                        <h3 className="text-[16px] font-black text-white leading-tight line-clamp-1">{p.title || p.name || "Property"}</h3>
+                        <p className="text-[10px] font-semibold text-white/80 flex items-center gap-1 mt-0.5"><MapPin className="w-3 h-3" /> {p.city || "—"}</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Rent Info Strip */}
+                  <div className="px-4 py-2.5 bg-slate-50 border-y border-slate-100 flex items-center justify-between mt-3">
+                     <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Monthly Rent</span>
+                     <div className="flex items-baseline gap-1">
+                        <span className="text-[16px] font-black text-indigo-600">₹{actualRent.toLocaleString()}</span>
+                        <span className="text-[9px] font-semibold text-slate-400 uppercase">/mo</span>
+                     </div>
+                  </div>
+
+                  {/* Body Info */}
+                  <div className="p-3 bg-white">
+                    {/* Quick Stats Grid */}
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 flex items-center gap-3">
+                         <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                           <BedDouble className="w-4 h-4 text-blue-600" />
+                         </div>
+                         <div>
+                           <div className="text-[14px] font-black text-slate-900">{occupied}/{total}</div>
+                           <div className="text-[9px] font-bold text-slate-500 uppercase">Beds Filled</div>
+                         </div>
+                      </div>
+                      <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 flex items-center gap-3">
+                         <div className="relative w-8 h-8 shrink-0 flex items-center justify-center">
+                            <svg className="w-8 h-8 transform -rotate-90 absolute" viewBox="0 0 36 36">
+                              <path className="text-slate-200" strokeWidth="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                              <path className="text-emerald-500" strokeDasharray={`${occ}, 100`} strokeWidth="4" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            </svg>
+                            <span className="text-[8px] font-black text-slate-800">{occ}%</span>
+                         </div>
+                         <div>
+                           <div className="text-[14px] font-black text-slate-900">Occupancy</div>
+                           <div className="text-[9px] font-bold text-slate-500 uppercase">Rate</div>
+                         </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      <button onClick={() => setViewProperty(p)}
+                        className="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-slate-200 transition-colors flex items-center justify-center gap-1.5">
+                        <Eye className="w-4 h-4" /> View Details
+                      </button>
+                      <button onClick={() => setEditProperty(p)}
+                        className="flex-1 bg-blue-600 text-white py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5">
+                        <Edit className="w-4 h-4" /> Edit Info
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             );
           })}

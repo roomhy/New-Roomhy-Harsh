@@ -8,21 +8,30 @@ export default function InstallPWA() {
   const location = useLocation();
 
   useEffect(() => {
-    // Only show on login page
-    if (location.pathname !== '/propertyowner/ownerlogin') {
+    // Check if already installed
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
       return;
     }
 
-    // Check if dismissed previously
-    if (sessionStorage.getItem('pwa_prompt_dismissed')) {
+    // Only show inside propertyowner dashboard (not on login page)
+    if (!location.pathname.startsWith('/propertyowner') || location.pathname.includes('login')) {
+      return;
+    }
+
+    // Check if shown or dismissed previously (use localStorage so it's strictly once per device)
+    if (localStorage.getItem('pwa_prompt_shown')) {
         return;
     }
 
     const handler = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setShowPrompt(true);
-      console.log('PWA Prompt event captured and showing banner!');
+      // Ensure we only show it once ever
+      if (!localStorage.getItem('pwa_prompt_shown')) {
+        setShowPrompt(true);
+        localStorage.setItem('pwa_prompt_shown', 'true');
+        console.log('PWA Prompt event captured and showing banner!');
+      }
     };
 
     window.addEventListener('beforeinstallprompt', handler);
@@ -58,7 +67,7 @@ export default function InstallPWA() {
 
   const handleClose = () => {
     setShowPrompt(false);
-    sessionStorage.setItem('pwa_prompt_dismissed', 'true');
+    localStorage.setItem('pwa_prompt_shown', 'true');
   };
 
   if (!showPrompt) return null;

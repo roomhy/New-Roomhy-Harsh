@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
+import { MobileTabs, MobileEmptyState } from "../../components/propertyowner/MobileComponents";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession, fetchOwnerProperties } from "../../utils/propertyowner";
 import { apiFetch } from "../../services/api";
 import { Search, Plus, Phone, MessageCircle, MoreHorizontal, X, Mail, MapPin, Loader2, Trash2 } from "lucide-react";
@@ -137,6 +138,7 @@ export default function Enquiry() {
     if (s === "new" || s === "pending" || s === "request to connect") return "new";
     if (s === "follow-up") return "follow-up";
     if (s === "site-visit" || s === "visit" || s === "scheduled") return "site-visit";
+    if (s === "booking" || s === "confirmed" || s === "closed") return "bookings";
     return s;
   };
 
@@ -154,6 +156,7 @@ export default function Enquiry() {
   const newCount = enquiries.filter(x => getEnquiryStatusGroup(x.status) === "new").length;
   const followupCount = enquiries.filter(x => getEnquiryStatusGroup(x.status) === "follow-up").length;
   const visitCount = enquiries.filter(x => getEnquiryStatusGroup(x.status) === "site-visit").length;
+  const bookingsCount = enquiries.filter(x => getEnquiryStatusGroup(x.status) === "bookings").length;
 
   return (
     <PropertyOwnerLayout 
@@ -161,9 +164,9 @@ export default function Enquiry() {
       title="Leads & Enquiries" 
       onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
     >
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8 hidden md:flex">
         <div>
-          <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Leads &amp; Enquiries</h1>
+          <h1 className="text-[20px] md:text-[44px] font-bold md:font-serif leading-[1.05] text-foreground">Leads & Enquiries</h1>
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">Track every lead and convert them to tenants.</p>
         </div>
         <button 
@@ -174,13 +177,28 @@ export default function Enquiry() {
         </button>
       </div>
 
+      <div className="block md:hidden">
+        <MobileTabs 
+          tabs={[
+            { id: "all", label: `All (${totalCount})` },
+            { id: "new", label: `New (${newCount})` },
+            { id: "follow-up", label: `Follow-up (${followupCount})` },
+            { id: "site-visit", label: `Site Visit (${visitCount})` },
+            { id: "bookings", label: `Bookings (${bookingsCount})` }
+          ]} 
+          activeTab={tab} 
+          onTabChange={setTab} 
+        />
+      </div>
+
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         {[
           { l: "Total", v: totalCount },
           { l: "New", v: newCount },
           { l: "Follow-up", v: followupCount },
-          { l: "Site Visit", v: visitCount }
+          { l: "Site Visit", v: visitCount },
+          { l: "Bookings", v: bookingsCount }
         ].map(({ l, v }) => (
           <div key={l} className="rounded-2xl border border-border bg-card p-5 shadow-soft text-center hover:border-primary/20 transition-all">
             <div className="font-serif text-[32px] font-bold text-foreground leading-none">{v}</div>
@@ -190,17 +208,18 @@ export default function Enquiry() {
       </div>
 
       {/* Tabs */}
-      <div className="flex flex-wrap items-center gap-1.5 mb-5 border-b border-border">
+      <div className="hidden md:flex flex-wrap items-center gap-1.5 mb-5 border-b border-border">
         {[
           { k: "all", l: "All" },
           { k: "new", l: "New" },
           { k: "follow-up", l: "Follow-up" },
-          { k: "site-visit", l: "Site Visit" }
+          { k: "site-visit", l: "Site Visit" },
+          { k: "bookings", l: "Bookings" }
         ].map(({ k, l }) => (
           <button 
             key={k} 
             onClick={() => setTab(k)} 
-            className={`px-4 py-2 text.5-[13.5px] font-semibold border-b-2 -mb-px transition-colors ${tab === k ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+            className={`px-4 py-2 text-[13px] font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${tab === k ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
           >
             {l}
           </button>
@@ -225,9 +244,20 @@ export default function Enquiry() {
           <p className="mt-2 text-sm text-muted-foreground">Loading leads...</p>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-card p-12 text-center shadow-soft">
-          <p className="text-[13.5px] text-muted-foreground">No leads found matching current filters.</p>
-        </div>
+        <>
+          <div className="hidden md:flex rounded-2xl border border-border bg-card p-12 text-center shadow-soft">
+            <p className="text-[13.5px] text-muted-foreground">No leads found matching current filters.</p>
+          </div>
+          <div className="block md:hidden">
+            <MobileEmptyState
+              icon={Users}
+              title="No Leads Found"
+              description="You have no leads in this category or matching your search."
+              actionText="Add New Lead"
+              onAction={() => setShowModal(true)}
+            />
+          </div>
+        </>
       ) : (
         <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-soft">
           <div className="overflow-x-auto">
@@ -311,6 +341,76 @@ export default function Enquiry() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Cards View (CRM Style) */}
+          <div className="block md:hidden space-y-3 pb-8 mt-4">
+            {filtered.map(l => {
+              const mappedStatus = getEnquiryStatusGroup(l.status);
+              const phoneClean = (l.studentPhone || "").replace(/[^0-9]/g, "");
+
+              return (
+                <div key={`mob-${l._id}`} className="bg-white rounded-[20px] p-4 border border-slate-100 shadow-sm relative overflow-hidden">
+                  {/* Status Badges Row */}
+                  <div className="flex items-center justify-between mb-3">
+                    <span className={`inline-flex px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${
+                      mappedStatus === "new" ? "bg-blue-50 text-blue-600 border-blue-100" :
+                      mappedStatus === "site-visit" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                      mappedStatus === "bookings" ? "bg-purple-50 text-purple-600 border-purple-100" :
+                      "bg-amber-50 text-amber-600 border-amber-100"
+                    }`}>
+                      {l.status || "New"}
+                    </span>
+                    <span className="text-[10px] font-semibold text-slate-400">
+                      {l.ts ? new Date(l.ts).toLocaleDateString("en-IN") : "Recent"}
+                    </span>
+                  </div>
+
+                  {/* Profile Row */}
+                  <div className="flex items-center gap-3 border-b border-slate-50 pb-3 mb-3">
+                    <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-[18px] font-black shrink-0 border border-blue-100 uppercase">
+                      {(l.studentName || "N")[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-[16px] font-black text-slate-900 truncate">{l.studentName || "N/A"}</h3>
+                      <p className="text-[11.5px] font-semibold text-slate-500 flex items-center gap-1.5 mt-0.5 truncate">
+                        <MapPin className="w-3.5 h-3.5" /> {l.propertyName || "Any"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Details Row */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Budget</p>
+                       <p className="text-[14px] font-black text-slate-800 leading-none">₹{(l.budget || 0).toLocaleString("en-IN")}</p>
+                    </div>
+                    <div className="text-right">
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Interest</p>
+                       <p className="text-[12px] font-bold text-indigo-600 mt-0.5">{l.interest || "PG"}</p>
+                    </div>
+                  </div>
+
+                  {/* CRM Action Buttons */}
+                  <div className="flex gap-2">
+                    <a href={`tel:${l.studentPhone}`} className="flex-1 py-3 rounded-xl bg-slate-50 text-slate-600 text-[11px] font-black uppercase tracking-wider flex flex-col items-center justify-center gap-1 hover:bg-slate-100 transition-colors border border-slate-100 shadow-sm">
+                      <Phone className="w-4 h-4 text-blue-500 mb-0.5" />
+                      Call
+                    </a>
+                    {phoneClean && (
+                      <a href={`https://wa.me/${phoneClean}?text=Hi%20${l.studentName}`} target="_blank" rel="noopener noreferrer" className="flex-1 py-3 rounded-xl bg-slate-50 text-slate-600 text-[11px] font-black uppercase tracking-wider flex flex-col items-center justify-center gap-1 hover:bg-slate-100 transition-colors border border-slate-100 shadow-sm">
+                        <MessageCircle className="w-4 h-4 text-emerald-500 mb-0.5" />
+                        WhatsApp
+                      </a>
+                    )}
+                    <button onClick={() => handleDelete(l._id)} className="w-12 py-3 rounded-xl bg-rose-50 text-rose-600 text-[11px] font-black uppercase tracking-wider flex flex-col items-center justify-center gap-1 hover:bg-rose-100 transition-colors border border-rose-100 shadow-sm shrink-0">
+                      <Trash2 className="w-4 h-4 text-rose-500 mb-0.5" />
+                      Drop
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

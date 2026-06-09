@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { X, Plus, Building2, ChevronDown, UploadCloud, Wind, Table as TableIcon, Tv, Bath, LayoutTemplate, Refrigerator, DoorClosed, Armchair, Utensils, Microwave, Flame, Shirt, Video, Fan, Check, Edit2, Trash2 } from "lucide-react";
+import { X, Plus, Building2, ChevronDown, UploadCloud, Loader2, Wind, Table as TableIcon, Tv, Bath, LayoutTemplate, Refrigerator, DoorClosed, Armchair, Utensils, Microwave, Flame, Shirt, Video, Fan, Check, Edit2, Trash2 } from "lucide-react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getApiBase, getAuthHeader } from "../../utils/api";
 import {
@@ -89,6 +89,9 @@ export default function Rooms() {
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
 
   const [showFilter, setShowFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalRooms, setTotalRooms] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [floorFilter, setFloorFilter] = useState("all");
   const [sharingFilter, setSharingFilter] = useState("all");
 
@@ -114,21 +117,28 @@ export default function Rooms() {
       });
   };
 
-  const load = async (session) => {
-    setLoading(true);
-    try {
-      const [props, roomData, tList] = await Promise.all([
-        fetchOwnerProperties(session.loginId),
-        fetchOwnerRooms(session.loginId),
-        fetchOwnerTenants(session.loginId),
-      ]);
-      setProperties(props);
-      setRooms(mergeRooms(session.loginId, roomData.rooms || []));
-      setTenants(tList || []);
-    } catch (e) {
-      setErrorMsg(e?.body || e?.message || "Failed to load.");
-    } finally { setLoading(false); }
-  };
+  const load = async (session, page = 1, limit = 3) => {
+  setLoading(true);
+  try {
+    const [props, roomData, tList] = await Promise.all([
+      fetchOwnerProperties(session.loginId),
+      fetchOwnerRooms(session.loginId, page, limit),
+      fetchOwnerTenants(session.loginId),
+    ]);
+    setProperties(props);
+    setRooms(mergeRooms(session.loginId, roomData.rooms || []));
+    setTenants(tList);
+    const total = roomData.total || (roomData.rooms ? roomData.rooms.length : 0);
+    setTotalRooms(total);
+    setCurrentPage(page);
+    setTotalPages(Math.ceil(total / limit));
+  } catch (e) {
+    setErrorMsg(e?.body || e?.message || "Failed to load.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   useEffect(() => {
     const s = getOwnerRuntimeSession();
@@ -301,7 +311,7 @@ export default function Rooms() {
   }, [rooms, showFilter, floorFilter, sharingFilter]);
 
   return (
-    <PropertyOwnerLayout owner={owner} title="Rooms & Beds" onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }} contentClassName="max-w-7xl mx-auto">
+    <PropertyOwnerLayout owner={owner} title="Rooms & Beds" rooms={rooms} loading={loading} onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }} contentClassName="max-w-7xl mx-auto">
 
       {/* Header */}
       {/* Stats Panel */}
@@ -407,14 +417,33 @@ export default function Rooms() {
       </div>
 
       {errorMsg && <div className="text-sm text-destructive mb-6 bg-destructive/10 p-4 rounded-xl">{errorMsg}</div>}
+{totalPages > 1 && (
+  <div className="flex justify-center items-center gap-4 mt-6">
+    <button
+      disabled={currentPage <= 1}
+      onClick={() => load(owner, currentPage - 1)}
+      className="px-3 py-1 rounded bg-card border border-border text-sm disabled:opacity-50"
+    >
+      Prev
+    </button>
+    <span className="text-sm">Page {currentPage} of {totalPages}</span>
+    <button
+      disabled={currentPage >= totalPages}
+      onClick={() => load(owner, currentPage + 1)}
+      className="px-3 py-1 rounded bg-card border border-border text-sm disabled:opacity-50"
+    >
+      Next
+    </button>
+  </div>
+)}
 
       <div className="space-y-7">
         {loading ? (
-          <div className="rounded-2xl border border-border bg-card p-8 shadow-soft animate-pulse">
-            <div className="h-6 w-48 bg-muted rounded mb-4" />
-            <div className="grid grid-cols-3 lg:grid-cols-5 gap-3">{[1,2,3,4,5].map(i=><div key={i} className="h-28 bg-muted rounded-xl"/>)}</div>
-          </div>
-        ) : rooms.length === 0 ? (
+        <div className="flex flex-col items-center py-20">
+          <Loader2 className="animate-spin text-primary mb-2" size={48} />
+          <span className="text-sm text-muted-foreground">Loading rooms...</span>
+        </div>
+      ) : rooms.length === 0 ? (
           <div className="rounded-2xl border border-border bg-card p-16 shadow-soft flex flex-col items-center text-center">
             <div className="w-14 h-14 bg-muted/60 rounded-full flex items-center justify-center mb-3"><Building2 className="size-7 text-muted-foreground" /></div>
             <h3 className="font-serif text-[22px] text-foreground mb-1">No rooms yet</h3>
@@ -436,7 +465,7 @@ export default function Rooms() {
                 <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11.5px] font-medium", pct>90?"bg-success/15 text-success-foreground":"bg-info/15 text-foreground")}>{pct}% full</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                {propRooms.slice(0,10).map(room => {
+                {propRooms.map(room => {
                   const beds = toLegacyBeds(room);
                   const occupiedCount = beds.filter(b => b.status === "occupied" || b.tenantId).length;
                   const totalBeds = beds.length;
@@ -533,14 +562,32 @@ export default function Rooms() {
                     </div>
                   );
                 })}
-                <button type="button" onClick={() => { setRoomForm(defaultRoomForm); setRoomModalOpen(true); }} className="rounded-xl border-2 border-dashed border-border p-3 flex flex-col items-center justify-center gap-1.5 text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors min-h-[8rem]">
-                  <Plus size={20}/><span className="text-[11px] font-medium">Add room</span>
-                </button>
               </div>
             </section>
           );
         })}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-4 mt-6">
+          <button
+            disabled={currentPage <= 1}
+            onClick={() => load(owner, currentPage - 1)}
+            className="px-3 py-1 rounded bg-card border border-border text-sm disabled:opacity-50"
+          >
+            Prev
+          </button>
+          <span className="text-sm">Page {currentPage} of {totalPages}</span>
+          <button
+            disabled={currentPage >= totalPages}
+            onClick={() => load(owner, currentPage + 1)}
+            className="px-3 py-1 rounded bg-card border border-border text-sm disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       {/* Add Room Modal */}
       <div className={cn("fixed inset-0 z-[100] flex items-center justify-center bg-black/70 transition-all", roomModalOpen?"opacity-100 pointer-events-auto":"opacity-0 pointer-events-none")}>

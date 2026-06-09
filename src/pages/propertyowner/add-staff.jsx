@@ -160,11 +160,11 @@ export default function AddStaffPage() {
                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                 className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-[11.5px] font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-200 transition-all cursor-pointer"
               >
-                <option value="Warden">Property Warden</option>
-                <option value="Electrician">Electrician</option>
-                <option value="Plumber">Plumber</option>
-                <option value="Security Guard">Security Guard</option>
-                <option value="Housekeeping">Housekeeping Supervisor</option>
+                <option value="Owner">Owner</option>
+                <option value="Warden">Warden</option>
+                <option value="Accountant">Accountant</option>
+                <option value="Reception">Reception</option>
+                <option value="Housekeeping">Housekeeping</option>
               </select>
             </div>
           </div>

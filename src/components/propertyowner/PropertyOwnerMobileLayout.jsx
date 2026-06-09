@@ -7,10 +7,9 @@ import {
   Lock, ChevronRight, Crown, Zap, Users, BookOpen, FileText, Smartphone, 
   Wallet, PieChart, Shield, Target, Navigation, Megaphone, Coffee, 
   Receipt, Sparkles, LinkIcon, UserPlus, AlertCircle, Calendar, HelpCircle, Building2,
-  IndianRupee, Headset, Briefcase, Globe, BarChart3, Database
+  IndianRupee, Headset, Briefcase, Globe, BarChart3, Database, History
 } from "lucide-react";
 import { SILVER_NAV, GOLD_NAV } from './navConfig';
-import { fetchOwnerProperties } from "../../utils/propertyowner";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -24,7 +23,14 @@ export default function PropertyOwnerMobileLayout({
   notificationCount = 0,
   notifications = [],
   onLogout,
-  disableSubmenuStrip = false
+  disableSubmenuStrip = false,
+  // Props passed from PropertyOwnerLayout to avoid duplicate fetches
+  properties: propsProperies = null,
+  activePropertyId: propsActivePropertyId = null,
+  handlePropertySwitch: propsHandlePropertySwitch = null,
+  // New props for rooms page
+  rooms = [],
+  loading = false,
 }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -45,69 +51,40 @@ export default function PropertyOwnerMobileLayout({
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
 
-  // Property Switcher state
-  const [properties, setProperties] = useState([]);
-  const [activePropertyId, setActivePropertyId] = useState('all');
+  // Property Switcher state — use props from parent if provided, else fall back to local state
+  const [localProperties, setLocalProperties] = useState([]);
+  const [localActivePropertyId, setLocalActivePropertyId] = useState('all');
+
+  const properties = propsProperies !== null ? propsProperies : localProperties;
+  const activePropertyId = propsActivePropertyId !== null ? propsActivePropertyId : localActivePropertyId;
 
   useEffect(() => {
+    // Only run local fetch if parent didn't supply properties
+    if (propsProperies !== null) return;
     const storedActive = localStorage.getItem('owner_active_property');
-    if (storedActive) {
-      setActivePropertyId(storedActive);
-    }
-  }, []);
+    if (storedActive) setLocalActivePropertyId(storedActive);
+  }, [propsProperies]);
 
-  useEffect(() => {
-    if (owner?.loginId) {
-      fetchOwnerProperties(owner.loginId, true).then(props => {
-        setProperties(props || []);
-      }).catch(err => console.error("Failed to fetch properties in mobile switcher", err));
-    }
-  }, [owner?.loginId]);
-
-  const handlePropertySwitch = (propId) => {
-    localStorage.setItem('owner_active_property', propId);
-    setActivePropertyId(propId);
-    setSwitcherOpen(false);
-    window.location.reload();
-  };
-
-  // Notification caching / fetching
-  const [globalNotifications, setGlobalNotifications] = useState([]);
-  const _NOTIF_TTL = 30_000;
-
-  useEffect(() => {
-    if (owner?.loginId) {
-      const fetchNotifs = async () => {
-        try {
-          const { fetchJson } = await import("../../utils/api");
-          const res = await fetchJson(`/api/notifications?toLoginId=${encodeURIComponent(owner.loginId)}`);
-          if (Array.isArray(res)) {
-            const formatted = res.map(n => {
-              const meta = typeof n.meta === 'string' ? JSON.parse(n.meta) : (n.meta || {});
-              return {
-                ...n,
-                title: meta.title || n.title || "Notification",
-                message: meta.message || n.message || "",
-                type: n.type || "system",
-                meta: meta
-              };
-            });
-            setGlobalNotifications(formatted);
-          }
-        } catch (e) {
-          console.error("Failed to fetch mobile notifications", e);
-        }
+  const handlePropertySwitch = propsHandlePropertySwitch 
+    ? (propId) => { setSwitcherOpen(false); propsHandlePropertySwitch(propId); }
+    : (propId) => {
+        localStorage.setItem('owner_active_property', propId);
+        setLocalActivePropertyId(propId);
+        setSwitcherOpen(false);
+        window.location.reload();
       };
-      fetchNotifs();
-      const interval = setInterval(fetchNotifs, _NOTIF_TTL);
-      return () => clearInterval(interval);
-    }
-  }, [owner?.loginId]);
 
-  const displayNotifications = globalNotifications.length > 0 ? globalNotifications : notifications;
-  const displayNotificationCount = globalNotifications.length > 0 
-    ? globalNotifications.filter(n => !n.read).length 
-    : notificationCount;
+  // Notifications — use props passed from parent (no duplicate fetch)
+  const [localClearedNotifications, setLocalClearedNotifications] = useState(false);
+  const [displayNotifications, setDisplayNotifications] = useState(notifications);
+
+  useEffect(() => {
+    if (!localClearedNotifications) {
+      setDisplayNotifications(notifications);
+    }
+  }, [notifications, localClearedNotifications]);
+
+  const displayNotificationCount = displayNotifications.filter(n => !n.read).length || notificationCount;
 
   const displayName = useMemo(() => owner?.name || owner?.ownerName || "Owner", [owner]);
   const ownerInitial = useMemo(() => String(displayName).charAt(0).toUpperCase() || "O", [displayName]);
@@ -135,6 +112,9 @@ export default function PropertyOwnerMobileLayout({
 
   // Quick Action handler
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 3;
+  const [totalRooms, setTotalRooms] = useState(0);
 
   // Close drawers on route change
   useEffect(() => {
@@ -146,7 +126,7 @@ export default function PropertyOwnerMobileLayout({
   }, [pathname]);
 
   return (
-    <div className="flex flex-col h-screen w-full bg-white font-['Plus_Jakarta_Sans'] overflow-hidden text-slate-800">
+    <div className="flex flex-col h-[100dvh] w-full bg-slate-50 font-sans relative overflow-hidden">
       
       {/* 1. PREMIUM HEADER */}
       <header className="sticky top-0 z-40 bg-white text-slate-800 px-4 py-3 flex flex-col justify-between shadow-sm shrink-0 border-b border-slate-100">
@@ -164,31 +144,6 @@ export default function PropertyOwnerMobileLayout({
             <span className="text-lg font-black tracking-tight text-slate-900 font-sans flex items-center shrink-0">
               Roomhy<span className="text-blue-600">.com</span>
             </span>
-          </div>
-
-          {/* Quick Header Icon Shortcuts for Mobile (Middle Space) */}
-          <div className="flex items-center gap-1.5 mx-2 bg-slate-50 p-1 rounded-xl border border-slate-200/50">
-            <Link 
-              to="/propertyowner/ownerchat" 
-              title="Chat" 
-              className={cn("p-1.5 rounded-lg text-slate-500 hover:text-blue-600 transition-colors", pathname.startsWith("/propertyowner/ownerchat") && "text-blue-600 bg-white shadow-sm")}
-            >
-              <MessageSquare size={15} className="stroke-[2.5]" />
-            </Link>
-            <Link 
-              to="/propertyowner/payment" 
-              title="Payments" 
-              className={cn("p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 transition-colors", pathname.startsWith("/propertyowner/payment") && "text-emerald-600 bg-white shadow-sm")}
-            >
-              <IndianRupee size={15} className="stroke-[2.5]" />
-            </Link>
-            <Link 
-              to="/propertyowner/complaints" 
-              title="Complaints" 
-              className={cn("p-1.5 rounded-lg text-slate-500 hover:text-rose-600 transition-colors", pathname.startsWith("/propertyowner/complaints") && "text-rose-600 bg-white shadow-sm")}
-            >
-              <Headset size={15} className="stroke-[2.5]" />
-            </Link>
           </div>
 
           {/* Right Header Controls */}
@@ -235,53 +190,35 @@ export default function PropertyOwnerMobileLayout({
           </div>
         </div>
 
-        {/* Horizontal Submenus Strip */}
-        {!disableSubmenuStrip && activeParent && activeParent.submenus && activeParent.submenus.length > 0 && (
-          <>
-            <style dangerouslySetInnerHTML={{__html: `
-              .no-scrollbar::-webkit-scrollbar {
-                display: none;
-              }
-              .no-scrollbar {
-                -ms-overflow-style: none;
-                scrollbar-width: none;
-              }
-            `}} />
-            <div className="mt-2 pt-2 border-t border-slate-100 overflow-x-auto no-scrollbar">
-              <div className="flex items-center gap-1.5 pb-1 whitespace-nowrap">
-                {activeParent.submenus.map((sub, index) => {
-                  const isActive = pathname === sub.href || pathname.startsWith(sub.href + '/');
-                  return (
-                    <Link
-                      key={index}
-                      to={sub.href}
-                      className={cn(
-                        "text-[10px] px-2.5 py-1 rounded-full font-bold transition-all inline-block",
-                        isActive 
-                          ? "bg-blue-600 text-white shadow-sm shadow-blue-600/20" 
-                          : "bg-slate-100 text-slate-650 hover:text-slate-800 hover:bg-slate-200"
-                      )}
-                    >
-                      {sub.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          </>
-        )}
       </header>
 
       {/* 2. BODY CONTENT */}
-      <main className={cn("flex-1 overflow-y-auto bg-white custom-scrollbar", mainClassName)}>
+      <main className={cn("flex-1 overflow-y-auto bg-slate-50 custom-scrollbar", mainClassName)}>
+
         {title && (
-          <div className="px-2.5 pt-4 pb-2">
-            <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">{title}</h2>
-          </div>
-        )}
-        <div className={cn("w-full px-2.5 py-2", contentClassName)}>
+  <div className="px-4 pt-5 pb-2 text-center">
+    <h2 className="text-[24px] font-black text-slate-900 tracking-tight font-sans">{title}</h2>
+    <div className="w-10 h-1 bg-blue-600 rounded-full mx-auto mt-2 opacity-80" />
+  </div>
+)}
+<div className={cn("w-full px-2.5 py-2 mobile-page-container", contentClassName)}>
           {children}
         </div>
+        
+        {/* Pagination Controls */}
+   <div className="flex justify-center gap-4 mt-4">
+     <button
+       disabled={currentPage === 1 || loading}
+       onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+       className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
+     >Prev</button>
+     <span className="px-2 py-1">Page {currentPage}</span>
+     <button
+       disabled={totalRooms < pageSize || loading}
+       onClick={() => setCurrentPage(p => p + 1)}
+       className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
+     >Next</button>
+   </div>
       </main>
 
       {/* 3. PREMIUM BOTTOM NAVBAR */}
@@ -315,21 +252,7 @@ export default function PropertyOwnerMobileLayout({
           <span className="text-[9px] mt-1 font-bold">Properties</span>
         </Link>
 
-        {/* Tab 3: Chat */}
-        <Link 
-          to="/propertyowner/ownerchat"
-          className={cn(
-            "flex flex-col items-center justify-center w-14 py-1.5 transition-all rounded-xl",
-            isTabActive(["/propertyowner/ownerchat", "/propertyowner/announcements", "/propertyowner/whatsapp"]) 
-              ? "text-blue-600 scale-105 font-bold" 
-              : "hover:text-slate-800"
-          )}
-        >
-          <MessageSquare size={18} />
-          <span className="text-[9px] mt-1 font-bold">Chat</span>
-        </Link>
-
-        {/* Tab 4: Tenants */}
+        {/* Tab 3: Tenants */}
         <Link 
           to="/propertyowner/tenants"
           className={cn(
@@ -341,6 +264,20 @@ export default function PropertyOwnerMobileLayout({
         >
           <Users size={18} />
           <span className="text-[9px] mt-1 font-bold">Tenants</span>
+        </Link>
+
+        {/* Tab 4: Leads */}
+        <Link 
+          to="/propertyowner/booking"
+          className={cn(
+            "flex flex-col items-center justify-center w-14 py-1.5 transition-all rounded-xl",
+            isTabActive(["/propertyowner/booking", "/propertyowner/booking_request", "/propertyowner/enquiry"]) 
+              ? "text-blue-600 scale-105 font-bold" 
+              : "hover:text-slate-800"
+          )}
+        >
+          <CalendarCheck size={18} />
+          <span className="text-[9px] mt-1 font-bold">Leads</span>
         </Link>
 
         {/* Tab 5: More Trigger */}
@@ -359,7 +296,18 @@ export default function PropertyOwnerMobileLayout({
       </nav>
 
       {/* ======================================================== */}
-      {/* 4. MODALS & SLIDE-UP DRAWER OVERLAYS (GLASSMORPHISM)      */}
+      {/* 4. GLOBAL FLOATING ACTION BUTTON (FAB)                    */}
+      {/* ======================================================== */}
+      <button 
+        onClick={() => setQuickActionsOpen(true)}
+        className="fixed bottom-[80px] right-4 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-xl flex items-center justify-center z-30 hover:scale-105 active:scale-95 transition-all"
+        aria-label="Add Action"
+      >
+        <Plus size={28} className="stroke-[2.5]" />
+      </button>
+
+      {/* ======================================================== */}
+      {/* 5. MODALS & SLIDE-UP DRAWER OVERLAYS (GLASSMORPHISM)      */}
       {/* ======================================================== */}
 
       {/* BACKDROP SHIELD */}
@@ -376,29 +324,51 @@ export default function PropertyOwnerMobileLayout({
         />
       )}
 
-      {/* QUICK ACTIONS OVERLAY */}
+      {/* GLOBAL FAB ACTION MENU (BOTTOM SHEET) */}
       <div className={cn(
-        "fixed right-4 top-16 bg-[#1E293B] border border-white/10 rounded-2xl p-2.5 w-52 shadow-2xl z-50 transition-all duration-300 origin-top-right transform",
-        quickActionsOpen ? "scale-100 opacity-100 translate-y-0" : "scale-95 opacity-0 -translate-y-2 pointer-events-none"
+        "fixed bottom-0 left-0 right-0 bg-white rounded-t-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-50 p-6 transition-transform duration-300 ease-out transform",
+        quickActionsOpen ? "translate-y-0" : "translate-y-full"
       )}>
-        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 py-1.5 border-b border-white/5 mb-1">Add Quick</h4>
-        <div className="space-y-1">
-          <Link to="/propertyowner/tenantrec" className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:bg-white/5 transition-colors">
-            <UserPlus size={14} className="text-blue-400" /> Add Tenant
+        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 cursor-pointer" onClick={() => setQuickActionsOpen(false)} />
+        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider mb-5 text-center">What would you like to add?</h3>
+        
+        <div className="space-y-3">
+          <Link to="/propertyowner/add-property" onClick={() => setQuickActionsOpen(false)} className="w-full flex items-center gap-4 p-4 rounded-2xl bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-colors">
+            <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
+              <Building2 size={24} className="text-indigo-600" />
+            </div>
+            <div className="flex-1 text-left">
+              <h4 className="text-[15px] font-black text-indigo-900 leading-tight">Add Property</h4>
+              <p className="text-[11px] font-semibold text-indigo-600/70 mt-0.5">List a new PG, Hostel or Flat</p>
+            </div>
+            <ChevronRight size={20} className="text-indigo-300" />
           </Link>
-          <Link to="/propertyowner/payment" className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:bg-white/5 transition-colors">
-            <Wallet size={14} className="text-emerald-400" /> Collect Rent
+
+          <Link to="/propertyowner/tenantrec" onClick={() => setQuickActionsOpen(false)} className="w-full flex items-center gap-4 p-4 rounded-2xl bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 transition-colors">
+            <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+              <UserPlus size={24} className="text-emerald-600" />
+            </div>
+            <div className="flex-1 text-left">
+              <h4 className="text-[15px] font-black text-emerald-900 leading-tight">Add Tenant</h4>
+              <p className="text-[11px] font-semibold text-emerald-600/70 mt-0.5">Onboard a new resident</p>
+            </div>
+            <ChevronRight size={20} className="text-emerald-300" />
           </Link>
-          <Link to="/propertyowner/complaints" className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:bg-white/5 transition-colors">
-            <AlertCircle size={14} className="text-rose-400" /> Add Complaint
-          </Link>
-          <Link to="/propertyowner/expense-tracking" className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:bg-white/5 transition-colors">
-            <Receipt size={14} className="text-amber-400" /> Add Expense
-          </Link>
-          <Link to="/propertyowner/add-property" className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:bg-white/5 transition-colors">
-            <Building2 size={14} className="text-indigo-400" /> Add Property
+
+          <Link to="/propertyowner/booking" onClick={() => setQuickActionsOpen(false)} className="w-full flex items-center gap-4 p-4 rounded-2xl bg-amber-50 border border-amber-100 hover:bg-amber-100 transition-colors">
+            <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+              <CalendarCheck size={24} className="text-amber-600" />
+            </div>
+            <div className="flex-1 text-left">
+              <h4 className="text-[15px] font-black text-amber-900 leading-tight">Add Lead</h4>
+              <p className="text-[11px] font-semibold text-amber-600/70 mt-0.5">Record a new inquiry or booking</p>
+            </div>
+            <ChevronRight size={20} className="text-amber-300" />
           </Link>
         </div>
+        <button onClick={() => setQuickActionsOpen(false)} className="w-full mt-6 py-3.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs uppercase tracking-wider hover:bg-slate-200 transition-colors">
+          Cancel
+        </button>
       </div>
 
       {/* PROPERTY SWITCHER DRAWER (BOTTOM SHEET) */}
@@ -579,30 +549,71 @@ export default function PropertyOwnerMobileLayout({
           </button>
         </div>
 
-        {/* SERVICES GRID */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 grid grid-cols-3 gap-3 mb-6">
-          <GridItem to="/propertyowner/payment" icon={IndianRupee} label="Payments" active={pathname.startsWith("/propertyowner/payment")} />
-          <GridItem to="/propertyowner/booking" icon={Calendar} label="Leads & Bookings" active={pathname.startsWith("/propertyowner/booking") || pathname.startsWith("/propertyowner/enquiry")} />
-          <GridItem to="/propertyowner/collection-report" icon={Wallet} label="Accounting" active={pathname.startsWith("/propertyowner/collection-report")} />
-          <GridItem to="/propertyowner/complaints" icon={Headset} label="Complaints" active={pathname.startsWith("/propertyowner/complaints")} />
-          <GridItem to="/propertyowner/all-staff" icon={Briefcase} label="Staff Mgmt" active={pathname.startsWith("/propertyowner/all-staff")} />
-          <GridItem to="/propertyowner/tenant-attendance" icon={ClipboardList} label="Attendance" active={pathname.startsWith("/propertyowner/tenant-attendance")} />
-          <GridItem to="/propertyowner/vacancy-promotion" icon={Globe} label="Marketing" active={pathname.startsWith("/propertyowner/vacancy-promotion")} />
-          <GridItem to="/propertyowner/reports" icon={BarChart3} label="Reports" active={pathname.startsWith("/propertyowner/reports")} />
-          <GridItem to="/propertyowner/agreement" icon={FileText} label="Documents" active={pathname.startsWith("/propertyowner/agreement")} />
-          <GridItem to="/propertyowner/settings" icon={Settings} label="Settings" active={pathname.startsWith("/propertyowner/settings") && window.location.hash !== "#backup"} />
-          <GridItem to="/propertyowner/settings#backup" icon={Database} label="Data Backup" active={pathname.startsWith("/propertyowner/settings") && window.location.hash === "#backup"} />
+        {/* GROUPED SERVICES */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 pb-4 space-y-6">
           
-          <button 
-            onClick={() => {
-              setMoreDrawerOpen(false);
-              setSwitcherOpen(true);
-            }}
-            className="flex flex-col items-center justify-center p-3 rounded-2xl border border-white/5 hover:border-white/10 bg-white/5 hover:bg-white/10 transition-all text-slate-350 col-span-3 sm:col-span-1"
-          >
-            <Building2 size={20} className="text-blue-400 mb-1.5" />
-            <span className="text-[10px] font-bold tracking-tight text-center leading-tight">Switch Property</span>
-          </button>
+          {/* TENANTS GROUP */}
+          <div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <GridItem to="/propertyowner/tenants" icon={Users} label="All Tenants" active={pathname.startsWith("/propertyowner/tenants")} />
+              <GridItem to="/propertyowner/tenantrec" icon={UserPlus} label="Add Tenant" active={pathname.startsWith("/propertyowner/tenantrec")} />
+              <GridItem to="/propertyowner/tenant-docs" icon={FileText} label="Tenant Docs" active={pathname.startsWith("/propertyowner/tenant-docs")} />
+              <GridItem to="/propertyowner/upcoming-moveins" icon={CalendarCheck} label="Upcoming Move-ins" active={pathname.startsWith("/propertyowner/upcoming-moveins")} />
+
+              <GridItem to="/propertyowner/ex-tenants" icon={History} label="Ex-Tenants" active={pathname.startsWith("/propertyowner/ex-tenants")} />
+            </div>
+          </div>
+
+          {/* BUSINESS GROUP */}
+          <div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <GridItem to="/propertyowner/payment" icon={IndianRupee} label="Rent & Payments" active={pathname.startsWith("/propertyowner/payment")} />
+              <GridItem to="/propertyowner/collection-report" icon={Wallet} label="Accounting" active={pathname.startsWith("/propertyowner/collection-report")} />
+              <GridItem to="/propertyowner/reports" icon={BarChart3} label="Reports" active={pathname.startsWith("/propertyowner/reports")} />
+            </div>
+          </div>
+
+          {/* OPERATIONS GROUP */}
+          <div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <GridItem to="/propertyowner/complaints" icon={Headset} label="Complaints" active={pathname.startsWith("/propertyowner/complaints")} />
+              <GridItem to="/propertyowner/all-staff" icon={Briefcase} label="Staff Mgmt" active={pathname.startsWith("/propertyowner/all-staff")} />
+              <GridItem to="/propertyowner/tenant-attendance" icon={ClipboardList} label="Attendance" active={pathname.startsWith("/propertyowner/tenant-attendance")} />
+            </div>
+          </div>
+
+          {/* MARKETING GROUP */}
+          <div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <GridItem to="/propertyowner/ownerchat" icon={MessageCircle} label="Chat & Msgs" active={pathname.startsWith("/propertyowner/ownerchat")} />
+              <GridItem to="/propertyowner/vacancy-promotion" icon={Megaphone} label="Marketing" active={pathname.startsWith("/propertyowner/vacancy-promotion")} />
+            </div>
+          </div>
+
+          {/* SYSTEM GROUP */}
+          <div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <GridItem to="/propertyowner/agreement" icon={FileText} label="Documents" active={pathname.startsWith("/propertyowner/agreement")} />
+              <GridItem to="/propertyowner/settings" icon={Settings} label="Settings" active={pathname.startsWith("/propertyowner/settings") && window.location.hash !== "#backup"} />
+              <GridItem to="/propertyowner/settings#backup" icon={Database} label="Data Backup" active={window.location.hash === "#backup"} />
+              <button 
+                onClick={() => {
+                  setMoreDrawerOpen(false);
+                  setSwitcherOpen(true);
+                }}
+                className="flex flex-col items-center justify-center p-3.5 rounded-2xl border border-white/5 hover:border-white/10 bg-white/5 hover:bg-white/10 transition-all text-slate-350"
+              >
+                <Building2 size={20} className="text-blue-400 mb-1.5" />
+                <span className="text-[10px] font-bold tracking-tight text-center leading-tight">Switch Prop.</span>
+              </button>
+            </div>
+          </div>
+
         </div>
 
         {/* FOOTER */}

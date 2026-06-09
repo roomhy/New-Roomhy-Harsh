@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
-import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
+import { getOwnerRuntimeSession, clearOwnerRuntimeSession, fetchOwnerTenants } from "../../utils/propertyowner";
 import { 
   Users, Search, ShieldCheck, MapPin, 
   Clock, CheckCircle2, PlayCircle, LogIn, LogOut
@@ -27,10 +27,10 @@ export default function TenantAttendancePage() {
       setLoading(true);
       
       // 1. Fetch active tenants
-      const tenantsData = await apiFetch(`/api/tenants/propertyowner/${owner.loginId}`);
+      const tenantsData = await fetchOwnerTenants(owner.loginId);
       
-      if (tenantsData.success && tenantsData.data) {
-          const activeTenants = tenantsData.data.map(t => ({
+      if (Array.isArray(tenantsData)) {
+          const activeTenants = tenantsData.map(t => ({
              id: t._id,
              name: t.name,
              room: t.roomNo || "N/A"

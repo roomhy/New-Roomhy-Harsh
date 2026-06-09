@@ -49,6 +49,8 @@ export default function Ownerlogin() {
   const [forgotNewPassword, setForgotNewPassword] = useState("");
   const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
   const [forgotError, setForgotError] = useState("");
+  const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
+  const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
 
   useEffect(() => {
     // Icons are now rendered via lucide-react components
@@ -411,24 +413,44 @@ export default function Ownerlogin() {
             {forgotStep === "reset" && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
-                  <input
-                    type="password"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 transition-colors"
-                    placeholder="Min 6 characters"
-                    value={forgotNewPassword}
-                    onChange={(event) => setForgotNewPassword(event.target.value)}
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-left">New Password</label>
+                  <div className="relative">
+                    <input
+                      type={showForgotNewPassword ? "text" : "password"}
+                      className="w-full p-3 pr-10 border border-gray-300 rounded-lg focus:ring-blue-500 transition-colors"
+                      placeholder="Min 6 characters"
+                      value={forgotNewPassword}
+                      onChange={(event) => setForgotNewPassword(event.target.value)}
+                    />
+                    <button
+                      type="button"
+                      aria-label="Toggle password visibility"
+                      onClick={() => setShowForgotNewPassword(!showForgotNewPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                    >
+                      {showForgotNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
-                  <input
-                    type="password"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 transition-colors"
-                    placeholder="Re-enter password"
-                    value={forgotConfirmPassword}
-                    onChange={(event) => setForgotConfirmPassword(event.target.value)}
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-left">Confirm Password</label>
+                  <div className="relative">
+                    <input
+                      type={showForgotConfirmPassword ? "text" : "password"}
+                      className="w-full p-3 pr-10 border border-gray-300 rounded-lg focus:ring-blue-500 transition-colors"
+                      placeholder="Re-enter password"
+                      value={forgotConfirmPassword}
+                      onChange={(event) => setForgotConfirmPassword(event.target.value)}
+                    />
+                    <button
+                      type="button"
+                      aria-label="Toggle password visibility"
+                      onClick={() => setShowForgotConfirmPassword(!showForgotConfirmPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                    >
+                      {showForgotConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                 </div>
                 {forgotError && <div className="error-msg">{forgotError}</div>}
                 <button type="button" onClick={resetOwnerPassword} className="w-full bg-green-600 text-white font-semibold py-3 rounded-lg hover:bg-green-700 transition-colors">

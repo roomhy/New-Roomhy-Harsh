@@ -43,11 +43,21 @@ export default function Settings() {
     return null;
   }
 
-  const [settings, setSettings] = useState({
-    automaticRentReminders: true,
-    maintenanceNotifications: true,
-    emailNotifications: "all",
-    language: "en",
+  const [settings, setSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem("owner_settings");
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error("Failed to load settings:", e);
+    }
+    return {
+      automaticRentReminders: true,
+      maintenanceNotifications: true,
+      emailNotifications: "all",
+      language: "en",
+    };
   });
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -186,6 +196,11 @@ export default function Settings() {
   }, []);
 
   const handleSave = () => {
+    try {
+      localStorage.setItem("owner_settings", JSON.stringify(settings));
+    } catch (e) {
+      console.error("Failed to save settings:", e);
+    }
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2000);
   };
@@ -200,21 +215,22 @@ export default function Settings() {
       title="Settings"
       onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
     >
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Settings</h1>
-            <p className="mt-1.5 text-[13.5px] text-muted-foreground">App preferences and configuration parameters.</p>
-          </div>
-          <button
-            onClick={handleSave}
-            className="px-5 h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 text-xs self-start sm:self-center"
-          >
-            {saveSuccess ? <><Check className="w-4 h-4" /> Saved!</> : "Save Changes"}
-          </button>
+      {/* Header Container (gets hidden on mobile view by first-child:has(h1) CSS rule) */}
+      <div className="max-w-4xl mx-auto mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Settings</h1>
+          <p className="mt-1.5 text-[13.5px] text-muted-foreground">App preferences and configuration parameters.</p>
         </div>
+        <button
+          onClick={handleSave}
+          className="px-5 h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 text-xs self-start sm:self-center"
+        >
+          {saveSuccess ? <><Check className="w-4 h-4" /> Saved!</> : "Save Changes"}
+        </button>
+      </div>
 
-        <div className="space-y-6">
+      {/* Main Content Container (remains visible on mobile view) */}
+      <div className="max-w-4xl mx-auto space-y-6">
 
           {/* Property Settings */}
           <div className="border border-border bg-card rounded-2xl p-6 shadow-soft">
@@ -357,8 +373,17 @@ export default function Settings() {
               </button>
             </div>
           </div>
+
+          {/* Mobile Save Changes Button */}
+          <div className="lg:hidden mt-6">
+            <button
+              onClick={handleSave}
+              className="w-full px-5 h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 text-xs shadow-md"
+            >
+              {saveSuccess ? <><Check className="w-4 h-4" /> Saved!</> : "Save Changes"}
+            </button>
+          </div>
         </div>
-      </div>
     </PropertyOwnerLayout>
   );
 }

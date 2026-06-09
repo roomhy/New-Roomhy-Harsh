@@ -109,7 +109,7 @@ export default function AllStaffPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredStaff.map((s) => (
-            <div key={s.id} className={`rounded-2xl border ${s.status === 'Active' ? 'border-border bg-card' : 'border-rose-100 bg-rose-50/30'} p-6 shadow-soft hover:shadow-md transition-all flex flex-col justify-between`}>
+            <div key={s.id} className={`rounded-[20px] border ${s.status === 'Active' ? 'border-border bg-card' : 'border-rose-100 bg-rose-50/30'} p-6 shadow-[0_4px_16px_rgba(0,0,0,0.02)] hover:shadow-md transition-all flex flex-col justify-between`}>
               <div className="space-y-4">
                 <div className="flex justify-between items-start">
                   <div className={`size-10 rounded-xl flex items-center justify-center ${s.status === 'Active' ? 'bg-blue-500/10 text-blue-600' : 'bg-slate-500/10 text-slate-500'}`}>
@@ -159,6 +159,16 @@ export default function AllStaffPage() {
           ))}
         </div>
       )}
+
+      {/* Floating Action Button (Mobile First) */}
+      <div className="fixed bottom-24 right-5 md:bottom-10 md:right-10 z-50">
+        <button 
+          onClick={() => window.location.href = "/propertyowner/add-staff"}
+          className="flex items-center justify-center size-14 bg-indigo-600 text-white rounded-full shadow-xl hover:bg-indigo-700 transition-all hover:scale-105 active:scale-95"
+        >
+          <Plus className="size-6" />
+        </button>
+      </div>
     </PropertyOwnerLayout>
   );
 }

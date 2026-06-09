@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
-import { Send, Plus, Search, Wallet, CheckCircle2, Clock, AlertTriangle, Phone, MessageCircle, RefreshCw, X, Receipt, Smartphone, CreditCard, Banknote } from "lucide-react";
+import { Send, Plus, Search, Wallet, CheckCircle2, Clock, AlertTriangle, Phone, MessageCircle, RefreshCw, X, Receipt, Smartphone, CreditCard, Banknote, FileText } from "lucide-react";
+import { MobileTabs, MobileEmptyState } from "../../components/propertyowner/MobileComponents";
 import {
   clearOwnerRuntimeSession,
   fetchOwnerTenants,
@@ -109,7 +110,7 @@ export default function Payment() {
   const [penaltyConfig, setPenaltyConfig] = useState(null);
   const [missingContacts, setMissingContacts] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("all");
+  const [tab, setTab] = useState("Collection");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [remindingId, setRemindingId] = useState(null);
@@ -221,7 +222,13 @@ export default function Payment() {
     overdue: rows.filter(r => r.payStatus === "overdue").length,
   };
 
-  const filtered = (tab === "all" ? rows : rows.filter(r => r.payStatus === tab))
+  const filtered = (
+    tab === "Collection" ? rows :
+    tab === "Pending" ? rows.filter(r => r.payStatus === "due" || r.payStatus === "partial" || r.payStatus === "overdue") :
+    tab === "History" ? rows.filter(r => r.payStatus === "paid") :
+    tab === "Receipts" ? rows.filter(r => r.payStatus === "paid") :
+    rows
+  )
     .filter(t =>
       !debouncedSearch ||
       (t.name || "").toLowerCase().includes(debouncedSearch.toLowerCase()) ||
@@ -368,9 +375,9 @@ export default function Payment() {
       )}
 
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6 hidden md:flex">
         <div>
-          <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Rent collection</h1>
+          <h1 className="text-[20px] md:text-[44px] font-bold md:font-serif leading-[1.05] text-foreground">Rent collection</h1>
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">Phase-based tracking — reminders, penalties, and payments in one place.</p>
         </div>
         <div className="flex items-center gap-2 md:mt-2 flex-wrap">
@@ -452,21 +459,39 @@ export default function Payment() {
         </div>
       )}
 
+
       {/* Filter tabs + search */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {(["all", "due", "partial", "paid", "overdue"]).map((k) => (
-            <button
-              key={k}
-              onClick={() => setTab(k)}
-              className={[
-                "h-9 px-3.5 rounded-lg text-[12.5px] font-medium capitalize transition-colors",
-                tab === k ? "bg-foreground text-background" : "bg-card border border-border hover:border-primary/40 text-muted-foreground"
-              ].join(" ")}
-            >
-              {k} <span className="opacity-60 ml-0.5">{counts[k]}</span>
-            </button>
-          ))}
+        <div className="hidden md:flex items-center gap-1.5 flex-wrap">
+          {(["Collection", "Pending", "History", "Receipts"]).map((k) => {
+            const count = k === "Collection" ? counts.all :
+                          k === "Pending" ? (counts.due + counts.partial + counts.overdue) :
+                          k === "History" || k === "Receipts" ? counts.paid : 0;
+            return (
+              <button
+                key={k}
+                onClick={() => setTab(k)}
+                className={[
+                  "h-9 px-3.5 rounded-lg text-[12.5px] font-medium transition-colors whitespace-nowrap",
+                  tab === k ? "bg-foreground text-background" : "bg-card border border-border hover:border-primary/40 text-muted-foreground"
+                ].join(" ")}
+              >
+                {k} <span className="opacity-60 ml-0.5">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="block md:hidden w-full">
+          <MobileTabs 
+            tabs={[
+              { id: "Collection", label: `Collection (${counts.all})` },
+              { id: "Pending", label: `Pending (${counts.due + counts.partial + counts.overdue})` },
+              { id: "History", label: `History (${counts.paid})` },
+              { id: "Receipts", label: `Receipts (${counts.paid})` }
+            ]} 
+            activeTab={tab} 
+            onTabChange={setTab} 
+          />
         </div>
         <div className="relative">
           <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -479,8 +504,10 @@ export default function Payment() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-soft">
+      {/* List Container */}
+      <div className="w-full">
+        {/* Desktop Table */}
+        <div className="hidden md:block rounded-2xl border border-border bg-card overflow-hidden shadow-soft">
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
             <thead className="text-[11.5px] uppercase tracking-wider text-muted-foreground bg-muted/50">
@@ -575,6 +602,100 @@ export default function Payment() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobile Cards */}
+      <div className="block md:hidden space-y-3 pb-12">
+        {loading ? (
+          <div className="text-center py-10 text-[13px] text-muted-foreground">Loading...</div>
+        ) : filtered.length === 0 ? (
+          <MobileEmptyState
+            icon={FileText}
+            title="No Payment Records"
+            description="You don't have any payment records matching this category."
+            actionText={toGenerateCount > 0 ? "Generate Invoices" : "Refresh"}
+            onAction={toGenerateCount > 0 ? () => setGenConfirmOpen(true) : () => loadData(owner)}
+          />
+        ) : filtered.map(t => {
+          const cfg = statusConfig[t.payStatus] || statusConfig.due;
+          const phCfg = PHASE_CONFIG[t.phase];
+          return (
+            <div key={`mob-${t._id || t.id}`} className="bg-white rounded-[20px] p-4 border border-slate-100 shadow-[0_4px_16px_rgba(0,0,0,0.02)] relative overflow-hidden">
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg font-black shrink-0">
+                    {(t.name || "T").charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 className="text-[16px] font-black text-slate-900">{t.name || "—"}</h3>
+                    <p className="text-[11.5px] font-semibold text-slate-500 mt-0.5">Room {t.roomNo || "—"}</p>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1.5">
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${
+                    cfg.tone === "success" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                    cfg.tone === "warning" ? "bg-amber-50 text-amber-600 border-amber-100" :
+                    cfg.tone === "danger" ? "bg-rose-50 text-rose-600 border-rose-100" :
+                    "bg-slate-50 text-slate-600 border-slate-200"
+                  }`}>
+                    <cfg.Icon className="w-3 h-3" /> {t.payStatus}
+                  </span>
+                  {phCfg && (
+                    <span className={`inline-flex px-2 py-0.5 rounded text-[8.5px] font-bold uppercase ${
+                      phCfg.tone === "info" ? "text-blue-600 bg-blue-50" :
+                      phCfg.tone === "warning" ? "text-amber-600 bg-amber-50" :
+                      phCfg.tone === "danger" ? "text-rose-600 bg-rose-50" : ""
+                    }`}>{phCfg.label}</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Monthly Rent</p>
+                  <p className="text-[15px] font-black text-slate-800">{fmt(t.agreedRent || t.rent || 0)}</p>
+                  <p className="text-[9.5px] font-semibold text-slate-500 mt-0.5 truncate">{t.propertyName || (t.property && typeof t.property === "object" ? t.property.title || t.property.name : t.property) || "—"}</p>
+                </div>
+                <div className={`rounded-xl p-3 border ${t.outstandingAmount > 0 ? "bg-rose-50 border-rose-100" : "bg-emerald-50 border-emerald-100"}`}>
+                  <p className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${t.outstandingAmount > 0 ? "text-rose-400" : "text-emerald-500"}`}>Outstanding</p>
+                  <p className={`text-[16px] font-black ${t.outstandingAmount > 0 ? "text-rose-700" : "text-emerald-700"}`}>{fmt(t.outstandingAmount)}</p>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                {t.payStatus === "no-invoice" ? (
+                  <div className="w-full text-center py-2 text-[11px] text-slate-400 italic font-semibold">No invoice generated</div>
+                ) : t.payStatus !== "paid" ? (
+                  <>
+                    <button
+                      title="Send reminder"
+                      disabled={remindingId === (t._id || t.id)}
+                      onClick={() => handleSendReminder(t)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-black uppercase tracking-wider hover:bg-blue-100 transition-colors disabled:opacity-50"
+                    >
+                      {remindingId === (t._id || t.id) ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5" />}
+                      Remind
+                    </button>
+                    <button
+                      onClick={() => openPayModal(t)}
+                      className="flex-[2] flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider hover:bg-slate-800 transition-colors shadow-md"
+                    >
+                      <Banknote className="w-3.5 h-3.5" /> Mark Paid
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => handleViewHistory(t)}
+                    className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 text-[10px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-colors"
+                  >
+                    <Receipt className="w-3.5 h-3.5" /> View Receipt
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
       </div>
       {/* Gen Invoice confirmation modal */}
       {genConfirmOpen && (

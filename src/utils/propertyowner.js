@@ -274,12 +274,12 @@ export const fetchOwnerProperties = async (loginId, bypassFilter = false) => {
   return properties;
 };
 
-export const fetchOwnerRooms = async (loginId) => {
-  const _cacheKey = `rooms_${loginId}`;
+export const fetchOwnerRooms = async (loginId, page = 1, limit = 50) => {
+  const _cacheKey = `rooms_${loginId}_${page}_${limit}`;
   const _hit = _getCached(_cacheKey);
   if (_hit) return _hit;
   try {
-    const response = await fetchJson(`/api/owners/${encodeURIComponent(loginId)}/rooms`);
+    const response = await fetchJson(`/api/owners/${encodeURIComponent(loginId)}/rooms?page=${page}&limit=${limit}`);
     let backendRooms = response?.rooms || response?.data || [];
     
     backendRooms = filterByActiveProperty(backendRooms);
@@ -302,7 +302,7 @@ export const fetchOwnerRooms = async (loginId) => {
     }));
     
     writeJson("roomhy_rooms", rooms);
-    const _result = { rooms };
+    const _result = { ...response, rooms };
     _setCached(_cacheKey, _result);
     return _result;
   } catch (_) {

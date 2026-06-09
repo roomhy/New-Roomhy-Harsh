@@ -104,7 +104,9 @@ export default function PropertyOwnerLayout({
   showNotificationSettings = false,
   onNotificationSettingsClick,
   onLogout,
-  disableSubmenuStrip = false
+  disableSubmenuStrip = false,
+  rooms,
+  loading,
 }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -513,6 +515,11 @@ export default function PropertyOwnerLayout({
         notifications={displayNotifications}
         onLogout={onLogout || handleLogout}
         disableSubmenuStrip={disableSubmenuStrip}
+        properties={properties}
+        activePropertyId={activePropertyId}
+        handlePropertySwitch={handlePropertySwitch}
+        rooms={rooms}
+        loading={loading}
       >
         {children}
       </PropertyOwnerMobileLayout>
