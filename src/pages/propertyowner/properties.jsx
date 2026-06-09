@@ -442,6 +442,7 @@ function PropertyEditModal({ property, owner, apiBase, onClose, onSuccess }) {
     const files = Array.from(e.target.files);
     if (!files.length) return;
     setUploadingImgs(true);
+    const uploadedUrls = [];
     for (const file of files) {
       const fd = new FormData();
       fd.append("image", file);
@@ -449,10 +450,9 @@ function PropertyEditModal({ property, owner, apiBase, onClose, onSuccess }) {
         const base = getApiBase();
         const res = await fetch(`${base}/api/upload`, {
           method: "POST",
-          body: data,
+          body: fd,
           headers: getAuthHeader()
         });
-
         let json;
         const contentType = res.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
@@ -461,7 +461,6 @@ function PropertyEditModal({ property, owner, apiBase, onClose, onSuccess }) {
           const text = await res.text();
           throw new Error(text || `HTTP error ${res.status}`);
         }
-
         if (res.ok && json.url) {
           uploadedUrls.push(json.url);
         } else {
@@ -469,21 +468,82 @@ function PropertyEditModal({ property, owner, apiBase, onClose, onSuccess }) {
         }
       } catch (err) { console.error(err); }
     }
-    setEditFormData(prev => {
-      const newViews = [...(prev.propertyViews || [])];
-      newViews[viewIndex] = {
-        ...newViews[viewIndex],
-        images: [...(newViews[viewIndex].images || []), ...uploadedUrls]
-      };
-      return { ...prev, propertyViews: newViews };
-    });
+    // Append newly uploaded URLs directly to the images state
+    if (uploadedUrls.length > 0) {
+      setImages(prev => [...prev, ...uploadedUrls]);
+    }
+    setUploadingImgs(false);
   };
 
-  const addCustomView = () => {
-    setEditFormData(prev => ({
-      ...prev,
-      propertyViews: [...(prev.propertyViews || []), { label: "New Category", images: [] }]
-    }));
+  const handleSubmit = async () => {
+    if (!property) return;
+    setSending(true);
+    setResult(null);
+    try {
+      const payload = {
+        title:            form.title,
+        description:      form.description,
+        address:          form.address,
+        locality:         form.locality,
+        city:             form.city,
+        state:            form.state,
+        pincode:          form.pincode,
+        landmark:         form.landmark,
+        monthlyRent:      form.monthlyRent,
+        contact: {
+          name:   form.contactName,
+          number: form.contactNumber,
+          email:  form.email,
+        },
+        propertyType:     form.propertyType,
+        propertyCategory: form.propertyCategory,
+        propertyDetails: {
+          totalArea:       form.totalArea,
+          yearBuilt:       form.yearBuilt,
+          propertyAge:     form.propertyAge,
+          floors:          form.floors,
+          liftAvailable:   form.liftAvailable,
+          parkingAvailable:form.parkingAvailable,
+          noticePeriod:    form.noticePeriod,
+          genderPref:      form.genderPref,
+          preferredFor,
+        },
+        pricing: {
+          rentType:           form.rentType,
+          securityDeposit:    form.securityDeposit,
+          advanceRent:        form.advanceRent,
+          noticePeriod:       form.pricingNoticePeriod,
+          lockInPeriod:       form.lockInPeriod,
+          discountPercent:    form.discountPercent,
+          cancellationPolicy: form.cancellationPolicy,
+          includedInRent,
+          additionalCharges,
+        },
+        policies:          houseRules,
+        amenities:         Array.from(selectedAmenities).map(name => ({ name })),
+        images,
+        roomTypes,
+        tenantDescription: form.tenantDescription,
+      };
+
+      const base = typeof getApiBase === "function" ? getApiBase() : apiBase;
+      const res = await fetch(`${base}/api/properties/${property._id}/owner-edit-request`, {
+        method:  "PUT",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ updatedData: payload, reason: form.reason, ownerLoginId: owner?.loginId }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setResult({ success: true, message: "✅ Edit request submitted! Changes will go live after Superadmin approval." });
+        setTimeout(() => { if (onSuccess) onSuccess(); onClose(); }, 2500);
+      } else {
+        setResult({ success: false, message: json.message || "Submission failed. Please try again." });
+      }
+    } catch (err) {
+      setResult({ success: false, message: err?.message || "Network error. Please try again." });
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleEditRequest = async () => {
