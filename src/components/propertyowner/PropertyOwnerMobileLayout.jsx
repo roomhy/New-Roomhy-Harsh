@@ -598,9 +598,7 @@ export default function PropertyOwnerMobileLayout({
           {/* SYSTEM GROUP */}
           <div>
             <div className="grid grid-cols-3 gap-3">
-              <GridItem to="/propertyowner/agreement" icon={FileText} label="Documents" active={pathname.startsWith("/propertyowner/agreement")} />
-              <GridItem to="/propertyowner/settings" icon={Settings} label="Settings" active={pathname.startsWith("/propertyowner/settings") && window.location.hash !== "#backup"} />
-              <GridItem to="/propertyowner/settings#backup" icon={Database} label="Data Backup" active={window.location.hash === "#backup"} />
+              <GridItem to="/propertyowner/ownerprofile" icon={Settings} label="Settings" active={pathname.startsWith("/propertyowner/ownerprofile") || pathname.startsWith("/propertyowner/bank-accounts")} />
               <button 
                 onClick={() => {
                   setMoreDrawerOpen(false);

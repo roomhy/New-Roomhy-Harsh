@@ -33,7 +33,7 @@ export default function StaffDashboard() {
 
   const [todayAtt, setTodayAtt]   = useState(null);
   const [tasks, setTasks]         = useState({ pending: 0, inProgress: 0, total: 0 });
-  const [complaints, setComplaints] = useState({ open: 0, total: 0 });
+  const [stats, setStats]         = useState({ tenants: 0, rooms: 0, complaints: 0 });
   const [loading, setLoading]     = useState(true);
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [checkOutLoading, setCheckOutLoading] = useState(false);
@@ -49,15 +49,24 @@ export default function StaffDashboard() {
       const today = new Date();
       const month = today.getMonth() + 1;
       const year = today.getFullYear();
+      const parentId = staff?.parentLoginId || "";
 
-      const [attRes, tasksRes] = await Promise.allSettled([
-        fetch(`/api/hr/my-attendance/${staffLoginId}?month=${month}&year=${year}`),
-        fetch(`/api/tasks?assignedStaffLoginId=${staffLoginId}`),
-      ]);
+      const reqs = [
+        fetch(`/api/hr/my-attendance/${staffLoginId}?month=${month}&year=${year}`).catch(() => null),
+        fetch(`/api/tasks?assignedStaffLoginId=${staffLoginId}`).catch(() => null)
+      ];
+
+      if (parentId) {
+        reqs.push(fetch(`/api/tenants/owner/${parentId}`).catch(() => null));
+        reqs.push(fetch(`/api/rooms/owner/${parentId}`).catch(() => null));
+        reqs.push(fetch(`/api/complaints/owner/${parentId}`).catch(() => null));
+      }
+
+      const results = await Promise.all(reqs);
 
       // Attendance
-      if (attRes.status === "fulfilled") {
-        const data = await attRes.value.json();
+      if (results[0] && results[0].ok) {
+        const data = await results[0].json();
         const records = data?.data || [];
         const todayStr = today.toISOString().split("T")[0];
         const rec = records.find(r => r.date && new Date(r.date).toISOString().split("T")[0] === todayStr);
@@ -65,8 +74,8 @@ export default function StaffDashboard() {
       }
 
       // Tasks
-      if (tasksRes.status === "fulfilled") {
-        const data = await tasksRes.value.json();
+      if (results[1] && results[1].ok) {
+        const data = await results[1].json();
         const allTasks = data?.data || [];
         setTasks({
           total: allTasks.length,
@@ -75,6 +84,28 @@ export default function StaffDashboard() {
         });
         setRecentTasks(allTasks.slice(0, 3));
       }
+
+      // Stats
+      let tCount = 0, rCount = 0, cCount = 0;
+      if (parentId) {
+        if (results[2] && results[2].ok) {
+           const d = await results[2].json();
+           const arr = Array.isArray(d) ? d : (d?.tenants || d?.data || []);
+           tCount = arr.filter(t => !t.isDeleted && t.status !== 'inactive').length;
+        }
+        if (results[3] && results[3].ok) {
+           const d = await results[3].json();
+           const arr = Array.isArray(d) ? d : (d?.rooms || d?.data || []);
+           rCount = arr.length;
+        }
+        if (results[4] && results[4].ok) {
+           const d = await results[4].json();
+           const arr = Array.isArray(d) ? d : (d?.complaints || d?.data || []);
+           cCount = arr.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length;
+        }
+      }
+      setStats({ tenants: tCount, rooms: rCount, complaints: cCount });
+
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }, [staffLoginId]);
@@ -202,12 +233,14 @@ export default function StaffDashboard() {
         </div>
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {[
+            { label: "Tenants", value: stats.tenants, sub: "Active Tenants", icon: Users, color: "from-blue-500 to-indigo-500", href: "/staff/tenants" },
+            { label: "Rooms", value: stats.rooms, sub: "Total Rooms", icon: Building2, color: "from-emerald-500 to-teal-500", href: "/staff/rooms" },
+            { label: "Complaints", value: stats.complaints, sub: "Active Complaints", icon: AlertCircle, color: "from-rose-500 to-pink-500", href: "/staff/complaints" },
             { label: "Pending Tasks", value: tasks.pending, sub: `${tasks.total} total`, icon: ClipboardList, color: "from-amber-400 to-orange-500", href: "/staff/tasks" },
-            { label: "In Progress", value: tasks.inProgress, sub: "tasks active now", icon: Activity, color: "from-blue-500 to-indigo-500", href: "/staff/tasks" },
-            { label: "Today's Status", value: todayAtt?.status || "Not Marked", sub: todayAtt?.checkIn ? `In: ${todayAtt.checkIn}` : "Tap to check in", icon: UserCheck, color: "from-emerald-500 to-teal-500", href: "/staff/attendance" },
-            { label: "This Month", value: `${now.toLocaleDateString("en-IN", { month: "short", year: "numeric" })}`, sub: "Attendance month", icon: Calendar, color: "from-violet-500 to-purple-600", href: "/staff/attendance" },
+            { label: "Today's Status", value: todayAtt?.status || "Not Marked", sub: todayAtt?.checkIn ? `In: ${todayAtt.checkIn}` : "Tap to check in", icon: UserCheck, color: "from-violet-500 to-purple-600", href: "/staff/attendance" },
+            { label: "This Month", value: `${now.toLocaleDateString("en-IN", { month: "short", year: "numeric" })}`, sub: "Attendance month", icon: Calendar, color: "from-cyan-500 to-blue-500", href: "/staff/attendance" },
           ].map(({ label, value, sub, icon: Icon, color, href }) => (
             <a key={label} href={href}
               className="bg-white rounded-2xl border border-slate-100 p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all group shadow-sm block">

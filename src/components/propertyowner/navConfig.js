@@ -167,35 +167,12 @@ export const PROPERTY_OWNER_NAV = [
     href: "/propertyowner/reports",
   },
   {
-    label: "Documents",
-    icon: FileText,
-    href: "/propertyowner/agreement",
-    submenus: [
-      { label: "Agreements", href: "/propertyowner/agreement", goldOnly: false },
-      { label: "Tenant Documents", href: "/propertyowner/tenant-docs", goldOnly: false },
-      { label: "Staff Documents", href: "/propertyowner/staff-documents", goldOnly: false },
-      { label: "Property Documents", href: "/propertyowner/property-documents", goldOnly: false },
-      { label: "Uploaded Files", href: "/propertyowner/uploaded-files", goldOnly: false },
-      { label: "Digital Signatures", href: "/propertyowner/digital-signatures", goldOnly: false },
-    ]
-  },
-  {
     label: "Settings",
     icon: Settings,
     href: "/propertyowner/settings",
     submenus: [
-      { label: "General Settings", href: "/propertyowner/settings", goldOnly: false },
       { label: "Profile Settings", href: "/propertyowner/ownerprofile", goldOnly: false },
-      { label: "Company Settings", href: "/propertyowner/company-settings", goldOnly: false },
-      { label: "Property Settings", href: "/propertyowner/property-settings-global", goldOnly: false },
-      { label: "Notification Settings", href: "/propertyowner/notification-settings", goldOnly: false },
-      { label: "Payment Gateway", href: "/propertyowner/payment-gateway", goldOnly: false },
       { label: "Bank Accounts", href: "/propertyowner/bank-accounts", goldOnly: false },
-      { label: "Integrations", href: "/propertyowner/integrations", goldOnly: false },
-      { label: "Role Permissions", href: "/propertyowner/role-permissions", goldOnly: false },
-      { label: "Language Settings", href: "/propertyowner/language-settings", goldOnly: false },
-      { label: "Theme Settings", href: "/propertyowner/theme-settings", goldOnly: false },
-      { label: "Data Backup", href: "/propertyowner/settings#backup", goldOnly: false },
     ]
   }
 ];
