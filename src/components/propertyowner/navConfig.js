@@ -115,7 +115,6 @@ export const PROPERTY_OWNER_NAV = [
     icon: Briefcase,
     href: "/propertyowner/all-staff",
     submenus: [
-      { label: "Property Managers", href: "/propertyowner/property-managers", goldOnly: false },
       { label: "All Staff", href: "/propertyowner/all-staff", goldOnly: false },
       { label: "Add Staff", href: "/propertyowner/add-staff", goldOnly: false },
       { label: "Roles & Permissions", href: "/propertyowner/roles-permissions", goldOnly: false },

@@ -212,7 +212,7 @@ const DomainGuard = () => {
         window.location.replace(resolveHostHome());
         return;
       }
-      const isAllowed = path.startsWith("/propertyowner") || path.startsWith("/tenant") || path.startsWith("/digital-checkin") || path.startsWith("/manager");
+      const isAllowed = path.startsWith("/propertyowner") || path.startsWith("/tenant") || path.startsWith("/digital-checkin") || path.startsWith("/manager") || path.startsWith("/staff");
       if (!isAllowed) {
         window.location.replace("/propertyowner/index");
       }
