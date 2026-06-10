@@ -126,9 +126,9 @@ export default function ElectricityReadings() {
 
   return (
     <PropertyOwnerLayout owner={owner} title="Electricity Readings" onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}>
-      <div className="max-w-6xl mx-auto">
+      <>
         {/* Desktop Header - hidden on mobile */}
-        <div className="hidden md:flex mb-6 items-start justify-between">
+        <div className="hidden md:flex mb-6 items-start justify-between max-w-6xl mx-auto">
           <div>
             <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground mb-2">Electricity Readings</h1>
             <p className="text-[13.5px] text-muted-foreground">Log monthly meter readings for rooms automatically.</p>
@@ -138,6 +138,7 @@ export default function ElectricityReadings() {
           </button>
         </div>
 
+      <div className="max-w-6xl mx-auto">
         {/* Mobile Stat Strip - hidden on desktop */}
         <div className="flex md:hidden overflow-x-auto gap-3 pb-2 mb-5" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {[
@@ -201,11 +202,40 @@ export default function ElectricityReadings() {
                 <p className="text-[11px] text-slate-400 mt-2">No readings yet — tap to add</p>
               )}
               {selectedRoom?.roomId === room.roomId && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setModalOpen(true); }}
-                  className="w-full mt-3 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-[13px] flex items-center justify-center gap-2">
-                  <Plus size={16} /> Log Reading
-                </button>
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                  <h4 className="text-[12px] font-bold text-slate-800 mb-3">Reading History</h4>
+                  {!selectedRoom.history || selectedRoom.history.length === 0 ? (
+                    <p className="text-[11px] text-slate-500 mb-3 text-center py-2 bg-slate-50 rounded-lg">No readings recorded yet</p>
+                  ) : (
+                    <div className="space-y-2 mb-3 max-h-[250px] overflow-y-auto">
+                      {selectedRoom.history.map((reading) => (
+                        <div key={reading._id} className="bg-slate-50 p-3 rounded-xl border border-slate-100 relative">
+                          <div className="flex justify-between items-start mb-1.5">
+                            <span className="text-[12px] font-bold text-slate-800 flex items-center gap-1.5">
+                              <Calendar size={12} className="text-blue-500" /> {reading.billingMonth}
+                            </span>
+                            <span className="text-[13px] font-bold text-red-500">
+                              ₹{(reading.totalBill || (reading.unitsConsumed * (reading.unitCost || selectedRoom.roomUnitCost || 0))).toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="text-[10.5px] text-slate-500 flex justify-between items-center bg-white p-1.5 rounded border border-slate-100">
+                            <span>{reading.previousReading} → <span className="font-bold text-slate-700">{reading.currentReading}</span></span>
+                            <span className="font-medium">{reading.unitsConsumed} Units <span className="opacity-60">@ ₹{reading.unitCost || selectedRoom.roomUnitCost || 0}</span></span>
+                          </div>
+                          <div className="flex justify-end gap-3 mt-2 pt-2 border-t border-slate-200">
+                            <button onClick={(e) => { e.stopPropagation(); handleEditReading(reading); }} className="text-[11px] text-slate-500 hover:text-blue-600 font-semibold flex items-center gap-1 transition-colors"><Edit2 size={12} /> Edit</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteReading(reading); }} className="text-[11px] text-slate-500 hover:text-red-600 font-semibold flex items-center gap-1 transition-colors"><Trash2 size={12} /> Delete</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setModalOpen(true); }}
+                    className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-[13px] flex items-center justify-center gap-2 transition-colors">
+                    <Plus size={16} /> Log New Reading
+                  </button>
+                </div>
               )}
             </div>
           ))}
@@ -334,6 +364,7 @@ export default function ElectricityReadings() {
           </form>
         </div>
       </div>
+      </>
     </PropertyOwnerLayout>
   );
 }
