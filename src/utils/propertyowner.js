@@ -31,9 +31,13 @@ const _setCached = (key, data) => { _fetchCache[key] = { data, ts: Date.now() };
 export const clearOwnerFetchCache = (loginId) => {
   delete _fetchCache[`props_${loginId}_false`];
   delete _fetchCache[`props_${loginId}_true`];
-  delete _fetchCache[`rooms_${loginId}`];
   delete _fetchCache[`tenants_${loginId}`];
   delete _fetchCache[`active_tenants_${loginId}`];
+  Object.keys(_fetchCache).forEach(k => {
+    if (k.startsWith(`rooms_${loginId}`)) {
+      delete _fetchCache[k];
+    }
+  });
 };
 
 export const clearTenantDocCache = (tenantId) => {
