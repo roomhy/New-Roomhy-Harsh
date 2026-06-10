@@ -176,6 +176,50 @@ const RouteRoleGuard = () => {
   return null;
 };
 
+const DomainGuard = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const host = (window.location.hostname || "").toLowerCase();
+    
+    // Allow all paths on localhost/127.0.0.1 for local development ease
+    const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || !host.includes(".");
+    if (isLocalhost) return;
+
+    const path = location.pathname || "";
+
+    // 1. Admin / Superadmin Domain
+    const isAdminDomain = host === "admin.roomhy.com" || host === "www.admin.roomhy.com";
+    if (isAdminDomain) {
+      const isAllowed = path.startsWith("/superadmin") || path.startsWith("/employee") || path.startsWith("/staff");
+      if (!isAllowed && path !== "/") {
+        window.location.replace("/superadmin/index");
+      }
+      return;
+    }
+
+    // 2. Property Owner / Tenant App Domain
+    const isAppDomain = host === "app.roomhy.com" || host === "www.app.roomhy.com";
+    if (isAppDomain) {
+      const isAllowed = path.startsWith("/propertyowner") || path.startsWith("/tenant") || path.startsWith("/digital-checkin") || path.startsWith("/manager");
+      if (!isAllowed && path !== "/") {
+        window.location.replace("/propertyowner/index");
+      }
+      return;
+    }
+
+    // 3. Fallback for main website domain (roomhy.com) and others
+    // Show only coming-soon page
+    if (path !== "/coming-soon") {
+      window.location.replace("/coming-soon");
+    }
+  }, [location.pathname]);
+
+  return null;
+};
+
 const RouteChromeCleanup = () => {
   const location = useLocation();
 
@@ -231,6 +275,7 @@ export default function App() {
         <ThemeProvider>
           <Router>
             <Toaster position="top-right" reverseOrder={false} />
+            <DomainGuard />
             <InstallPWA />
             <ManagerRouteGuard />
             <RouteRoleGuard />
