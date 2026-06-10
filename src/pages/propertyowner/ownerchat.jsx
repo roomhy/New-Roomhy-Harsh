@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
-import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
+import { getOwnerRuntimeSession, clearOwnerRuntimeSession, fetchOwnerTenants } from "../../utils/propertyowner";
 import { apiFetch } from "../../services/api";
 import { Search, Send, User, MoreVertical, Phone, Video, Loader2, MessageSquare } from "lucide-react";
 
@@ -22,10 +22,36 @@ export default function OwnerChat() {
 
   const fetchInbox = async () => {
     try {
-      const res = await apiFetch(`/api/chat/inbox/${owner.loginId}?search=${search}`);
-      if (res && res.conversations) {
-        setInbox(res.conversations);
+      const [res, tenants] = await Promise.all([
+        apiFetch(`/api/chat/inbox/${owner.loginId}?search=${search}`).catch(() => ({ conversations: [] })),
+        fetchOwnerTenants(owner.loginId).catch(() => [])
+      ]);
+      
+      let conversations = res?.conversations || [];
+      
+      if (tenants && Array.isArray(tenants)) {
+        const existingLoginIds = new Set(conversations.map(c => c.participant_login_id));
+        const newConversations = tenants
+          .filter(t => {
+            const tLoginId = t.loginId || t.tenantLoginId || t.email;
+            if (!tLoginId || existingLoginIds.has(tLoginId)) return false;
+            if (search) {
+              const term = search.toLowerCase();
+              const name = (t.name || t.fullName || "").toLowerCase();
+              if (!name.includes(term)) return false;
+            }
+            return true;
+          })
+          .map(t => ({
+            participant_login_id: t.loginId || t.tenantLoginId || t.email,
+            participant_name: t.name || t.fullName || "Tenant",
+            unread_count: 0,
+            last_message: "Start a conversation"
+          }));
+        conversations = [...conversations, ...newConversations];
       }
+      
+      setInbox(conversations);
     } catch (err) {
       console.error(err);
     } finally {
