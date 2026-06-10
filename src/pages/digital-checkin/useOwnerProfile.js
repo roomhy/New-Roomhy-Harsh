@@ -314,7 +314,7 @@ export const useOwnerProfile = () => {
     hydrateFromOwner();
   }, [apiBases, form.loginId]);
 
-  const showAutoInfo = Boolean(autoInfo.email || autoInfo.area || autoInfo.password);
+  const showAutoInfo = Boolean(autoInfo.email || autoInfo.area);
 
   const handleAadhaarChange = useCallback((value) => {
     setAadhaarNumber(formatAadhaarWithSpaces(value));

@@ -196,7 +196,6 @@ export default function DigitalCheckinOwnerprofile() {
             <div className="info-panel-grid">
               <p><strong>Email:</strong> <span>{autoInfo.email || "-"}</span></p>
               <p><strong>Area:</strong> <span>{autoInfo.area || "-"}</span></p>
-              <p><strong>Password:</strong> <span className="mono">{autoInfo.password || "-"}</span></p>
             </div>
           </div>
         )}
