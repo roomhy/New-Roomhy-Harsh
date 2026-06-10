@@ -133,9 +133,13 @@ class SuperAdminNotificationManager {
         }
     }
 
+
     async fetchNotifications() {
         try {
-            const res = await fetch(`${this.API_URL}/api/notifications?unread=true&toLoginId=superadmin`);
+            const token = sessionStorage.getItem('token') || localStorage.getItem('token') || '';
+            const res = await fetch(`${this.API_URL}/api/notifications?unread=true&toLoginId=superadmin`, {
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            });
             const payload = await res.json();
             const list = Array.isArray(payload)
                 ? payload
@@ -274,9 +278,13 @@ class SuperAdminNotificationManager {
 
     async markAllAsRead() {
         try {
+            const token = sessionStorage.getItem('token') || localStorage.getItem('token') || '';
             await fetch(`${this.API_URL}/api/notifications/mark-all-read`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify({ toLoginId: 'superadmin', toRole: 'superadmin' })
             });
             this.unreadCount = 0;
@@ -300,7 +308,11 @@ class SuperAdminNotificationManager {
 
     async clearAll() {
         try {
-            await fetch(`${this.API_URL}/api/notifications/delete-read?toLoginId=superadmin`, { method: 'DELETE' });
+            const token = sessionStorage.getItem('token') || localStorage.getItem('token') || '';
+            await fetch(`${this.API_URL}/api/notifications/delete-read?toLoginId=superadmin`, { 
+                method: 'DELETE',
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            });
             this.unreadCount = 0;
             this.notifications = [];
             this.updateBellBadge();

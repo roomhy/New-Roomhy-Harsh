@@ -198,7 +198,7 @@ const DomainGuard = () => {
         window.location.replace(resolveHostHome());
         return;
       }
-      const isAllowed = path.startsWith("/superadmin") || path.startsWith("/employee") || path.startsWith("/staff");
+      const isAllowed = path.startsWith("/superadmin") || path.startsWith("/employee") || path.startsWith("/staff") || path.startsWith("/digital-checkin");
       if (!isAllowed) {
         window.location.replace("/superadmin/index");
       }

@@ -3,6 +3,7 @@ import { NavLink, useLocation, Outlet, useNavigate } from "react-router-dom";
 import { resolveSectionFromPath, sharedNavConfig } from "./sharedNavConfig";
 import { Menu, Search, Bell, ChevronRight, X, MessageSquare, Building2, HelpCircle, Plus, ChevronDown, UserPlus, Wallet, AlertCircle, Calendar, Receipt } from "lucide-react";
 import { Sidebar } from "./Sidebar";
+import { fetchJson } from "../utils/api";
 
 export default function SharedShell() {
   const location = useLocation();
@@ -52,24 +53,21 @@ export default function SharedShell() {
   const fetchRecentNotifications = async () => {
     try {
       const loginId = user?.loginId || "superadmin";
-      const response = await fetch(`/api/notifications?toLoginId=${encodeURIComponent(loginId)}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          const formatted = data.map(n => {
-            const meta = typeof n.meta === 'string' ? JSON.parse(n.meta) : (n.meta || {});
-            return {
-              id: n._id,
-              type: n.type || "system",
-              title: meta.title || n.title || "System Alert",
-              msg: meta.message || n.message || "You have a new notification",
-              time: new Date(n.createdAt).toLocaleDateString(),
-              read: n.read
-            };
-          });
-          setNotifications(formatted.slice(0, 4));
-          setUnreadCount(formatted.filter(n => !n.read).length);
-        }
+      const data = await fetchJson(`/api/notifications?toLoginId=${encodeURIComponent(loginId)}`);
+      if (Array.isArray(data)) {
+        const formatted = data.map(n => {
+          const meta = typeof n.meta === 'string' ? JSON.parse(n.meta) : (n.meta || {});
+          return {
+            id: n._id,
+            type: n.type || "system",
+            title: meta.title || n.title || "System Alert",
+            msg: meta.message || n.message || "You have a new notification",
+            time: new Date(n.createdAt).toLocaleDateString(),
+            read: n.read
+          };
+        });
+        setNotifications(formatted.slice(0, 4));
+        setUnreadCount(formatted.filter(n => !n.read).length);
       }
     } catch (err) {
       console.error("Error fetching notifications in header:", err);

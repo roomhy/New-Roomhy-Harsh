@@ -4,7 +4,7 @@ import { User, Lock, ArrowRight, X, Mail, Eye, EyeOff } from "lucide-react";
 import { useHeadAssets } from "../../utils/useHeadAssets.js";
 import { getApiBase } from "../../utils/api";
 
-const title = "RoomHy - Staff Login";
+const title = "RoomHy - Superadmin Login";
 
 export default function SuperadminIndexPage() {
     const navigate = useNavigate();
@@ -123,7 +123,7 @@ export default function SuperadminIndexPage() {
                             Roomhy<span className="text-purple-600">.com</span>
                         </span>
                     </div>
-                    <h1 className="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">Staff Login</h1>
+                    <h1 className="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">Superadmin Login</h1>
                     <p className="text-slate-500 text-sm">Enter your credentials to access Roomhy</p>
                 </div>
 

@@ -679,9 +679,13 @@ function AddPropertyView({ onBack, apiUrl, editId }) {
       const url = editId ? `${apiUrl}/api/properties/${editId}` : `${apiUrl}/api/properties/add`;
       const method = editId ? "PUT" : "POST";
 
+      const token = localStorage.getItem("token") || sessionStorage.getItem("token") || "";
       const res = await fetch(url, {
         method: method,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify(payload)
       });
       const data = await res.json();

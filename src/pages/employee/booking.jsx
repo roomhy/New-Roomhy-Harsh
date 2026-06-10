@@ -157,7 +157,10 @@ export default function SuperadminBooking() {
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch(`${apiUrl}/api/notifications?unread=true&toLoginId=superadmin`);
+      const token = sessionStorage.getItem("token") || localStorage.getItem("token") || "";
+      const res = await fetch(`${apiUrl}/api/notifications?unread=true&toLoginId=superadmin`, {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
       const payload = await res.json();
       const list = Array.isArray(payload) ? payload : (Array.isArray(payload.notifications) ? payload.notifications : []);
       setNotifications(list);
@@ -169,9 +172,13 @@ export default function SuperadminBooking() {
 
   const markAllRead = async () => {
     try {
+      const token = sessionStorage.getItem("token") || localStorage.getItem("token") || "";
       await fetch(`${apiUrl}/api/notifications/mark-all-read`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ toLoginId: "superadmin", toRole: "superadmin" })
       });
       setNotifications([]);
@@ -183,7 +190,11 @@ export default function SuperadminBooking() {
 
   const clearAll = async () => {
     try {
-      await fetch(`${apiUrl}/api/notifications/delete-read?toLoginId=superadmin`, { method: "DELETE" });
+      const token = sessionStorage.getItem("token") || localStorage.getItem("token") || "";
+      await fetch(`${apiUrl}/api/notifications/delete-read?toLoginId=superadmin`, { 
+        method: "DELETE",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
       setNotifications([]);
       setUnreadCount(0);
     } catch (err) {

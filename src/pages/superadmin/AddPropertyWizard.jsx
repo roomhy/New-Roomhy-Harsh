@@ -514,9 +514,13 @@ export default function AddPropertyWizard() {
         status: "active",
       };
 
+      const token = localStorage.getItem("token") || sessionStorage.getItem("token") || "";
       const res = await fetch(editId ? `${apiUrl}/api/properties/${editId}` : `${apiUrl}/api/properties/add`, {
         method: editId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify(payload),
       });
       if (res.ok) {
