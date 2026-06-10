@@ -189,12 +189,17 @@ const DomainGuard = () => {
     if (isLocalhost) return;
 
     const path = location.pathname || "";
+    console.log("DomainGuard: host =", host, "path =", path);
 
     // 1. Admin / Superadmin Domain
     const isAdminDomain = host === "admin.roomhy.com" || host === "www.admin.roomhy.com";
     if (isAdminDomain) {
+      if (path === "/") {
+        window.location.replace(resolveHostHome());
+        return;
+      }
       const isAllowed = path.startsWith("/superadmin") || path.startsWith("/employee") || path.startsWith("/staff");
-      if (!isAllowed && path !== "/") {
+      if (!isAllowed) {
         window.location.replace("/superadmin/index");
       }
       return;
@@ -203,8 +208,12 @@ const DomainGuard = () => {
     // 2. Property Owner / Tenant App Domain
     const isAppDomain = host === "app.roomhy.com" || host === "www.app.roomhy.com";
     if (isAppDomain) {
+      if (path === "/") {
+        window.location.replace(resolveHostHome());
+        return;
+      }
       const isAllowed = path.startsWith("/propertyowner") || path.startsWith("/tenant") || path.startsWith("/digital-checkin") || path.startsWith("/manager");
-      if (!isAllowed && path !== "/") {
+      if (!isAllowed) {
         window.location.replace("/propertyowner/index");
       }
       return;
