@@ -35,21 +35,17 @@ export const getApiBase = () => {
   if (typeof window === "undefined") return "";
   const host = window.location.hostname;
   
-  // Production Vercel deployment
-  if (host.includes('vercel.app') || host.includes('roomhy.com')) {
-    return "https://roohmy-backend-xwa9.vercel.app";
-  }
-  
-  // Local development (support localhost, 127.0.0.1, LAN IPs, and local domains)
+  // Local development
   const isLocal = host === "localhost" || 
                   host === "127.0.0.1" || 
                   host.startsWith("192.168.") || 
                   host.startsWith("10.") || 
                   host.startsWith("172.") || 
                   host.endsWith(".local");
-  return isLocal
-    ? `http://${host}:5001`
-    : "https://roohmy-backend-xwa9.vercel.app";
+  if (isLocal) return `http://${host}:5001`;
+
+  // Production — use same server's backend (avoid Vercel rate limits)
+  return "https://roohmy-backend-xwa9.vercel.app";
 };
 
 export const getAuthHeader = () => {
