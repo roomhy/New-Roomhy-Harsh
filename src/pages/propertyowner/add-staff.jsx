@@ -15,10 +15,10 @@ const SHIFTS = [
   { label: "Night Shift (10:00 PM – 06:00 AM)", start: "10:00 PM", end: "06:00 AM" },
   { label: "Flexible Hours", start: "09:00 AM", end: "06:00 PM" },
 ];
-const DEFAULT_PERMISSIONS = ["Dashboard", "Rooms", "Tenants", "Complaints", "Attendance", "Tasks"];
+const DEFAULT_PERMISSIONS = ["Dashboard", "Rooms", "Tenants", "Complaints", "Attendance", "Tasks", "Electricity Readings"];
 
 // ── Defined OUTSIDE component — never recreated on re-render ──
-const ALL_MODULES = ["Dashboard", "Properties", "Rooms", "Tenants", "Leads", "Bookings", "Rent Collection", "Payments", "Complaints", "Attendance", "Tasks", "Reports", "Documents"];
+const ALL_MODULES = ["Dashboard", "Properties", "Rooms", "Tenants", "Leads", "Bookings", "Rent Collection", "Payments", "Complaints", "Attendance", "Tasks", "Reports", "Documents", "Electricity Readings"];
 
 const inputCls = "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-[13px] font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:text-slate-400";
 
@@ -131,7 +131,7 @@ export default function AddStaffPage() {
           role: roleFinal,
           parentLoginId: owner.loginId,
           photoDataUrl: formData.photoDataUrl,
-          permissions: formData.permissions,
+          permissions: formData.role === "Warden" ? DEFAULT_PERMISSIONS : formData.permissions,
           isActive: formData.status === "Active",
           requirePasswordReset: true,
           joiningDate: formData.joiningDate,
@@ -216,7 +216,7 @@ export default function AddStaffPage() {
 
         {/* Step Tabs */}
         <div className="flex gap-1 mb-8 bg-slate-100 p-1 rounded-2xl w-fit">
-          {[{ n: 1, label: "Profile" }, { n: 2, label: "Work Details" }, { n: 3, label: "Permissions" }].map(s => (
+          {[{ n: 1, label: "Profile" }, { n: 2, label: "Work Details" }, ...(formData.role === "Warden" ? [] : [{ n: 3, label: "Permissions" }])].map(s => (
             <button
               key={s.n}
               onClick={() => setStep(s.n)}
@@ -399,10 +399,21 @@ export default function AddStaffPage() {
                   className="px-6 h-11 border border-slate-200 text-slate-600 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-slate-50 transition-all">
                   ← Back
                 </button>
-                <button type="button" onClick={() => setStep(3)}
-                  className="px-8 h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-600/20">
-                  Next: Permissions →
-                </button>
+                {formData.role === "Warden" ? (
+                  <button type="submit" disabled={loading}
+                    className="px-10 h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-600/20 disabled:opacity-60 flex items-center gap-2">
+                    {loading ? (
+                      <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Creating...</>
+                    ) : (
+                      <><UserPlus size={15} />Create Staff Member</>
+                    )}
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => setStep(3)}
+                    className="px-8 h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-600/20">
+                    Next: Permissions →
+                  </button>
+                )}
               </div>
             </div>
           )}

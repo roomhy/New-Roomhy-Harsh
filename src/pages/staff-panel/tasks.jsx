@@ -4,6 +4,7 @@ import {
   ClipboardList, CheckCircle, PlayCircle, Circle, XCircle,
   Clock, Calendar, Building2, Flag, AlertCircle, ChevronDown
 } from "lucide-react";
+import { getApiBase } from "../../utils/api";
 
 const STATUS_CONFIG = {
   Pending:       { color: "bg-amber-100 text-amber-700 border-amber-200",     icon: Circle },
@@ -46,7 +47,7 @@ export default function StaffTasksPage() {
     if (!staffLoginId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/tasks?assignedStaffLoginId=${staffLoginId}`);
+      const res = await fetch(`${getApiBase()}/api/tasks?assignedStaffLoginId=${staffLoginId}`);
       const data = await res.json();
       const allTasks = data?.data || [];
       setTasks(allTasks);
@@ -65,7 +66,7 @@ export default function StaffTasksPage() {
   const handleStatusUpdate = async (taskId, newStatus) => {
     setUpdating(taskId);
     try {
-      const res = await fetch(`/api/tasks/${taskId}/status`, {
+      const res = await fetch(`${getApiBase()}/api/tasks/${taskId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),

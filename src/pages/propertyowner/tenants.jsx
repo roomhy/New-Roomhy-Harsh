@@ -928,24 +928,54 @@ export default function Tenants() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Room Number</label>
-                    <input
-                      type="text"
-                      required
+                    <select
                       value={editForm.roomNo}
-                      onChange={e => setEditForm(prev => ({ ...prev, roomNo: e.target.value }))}
-                      placeholder="e.g. 101"
-                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    />
+                      onChange={e => {
+                        const targetRoomNo = e.target.value;
+                        setEditForm(prev => ({ ...prev, roomNo: targetRoomNo, bedNo: "" }));
+                      }}
+                      required
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
+                    >
+                      <option value="">Select room...</option>
+                      {(() => {
+                        const tenantPropId = editingTenant.property?._id || editingTenant.property || editingTenant.propertyId;
+                        return rooms.filter(r => String(r.property?._id || r.property || r.propertyId) === String(tenantPropId)).map(room => (
+                          <option key={room._id || room.id} value={room.roomNo || room.number}>
+                            Room {room.roomNo || room.number}
+                          </option>
+                        ));
+                      })()}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Bed Number</label>
-                    <input
-                      type="text"
+                    <select
                       value={editForm.bedNo}
                       onChange={e => setEditForm(prev => ({ ...prev, bedNo: e.target.value }))}
-                      placeholder="e.g. 1, A, or B"
-                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    />
+                      required
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
+                    >
+                      <option value="">Select bed...</option>
+                      {(() => {
+                        const tenantPropId = editingTenant.property?._id || editingTenant.property || editingTenant.propertyId;
+                        const propRooms = rooms.filter(r => String(r.property?._id || r.property || r.propertyId) === String(tenantPropId));
+                        const selRoom = propRooms.find(r => r.roomNo === editForm.roomNo || r.number === editForm.roomNo);
+                        if (!selRoom) return null;
+                        const capacity = selRoom.capacity || selRoom.totalBeds || 1;
+                        const bedAssignments = selRoom.bedAssignments || [];
+                        return Array.from({ length: capacity }, (_, idx) => {
+                          const bedNum = String(idx + 1);
+                          const assignment = bedAssignments[idx];
+                          const isOccupied = assignment && assignment.tenantId && String(assignment.tenantId) !== String(editingTenant._id);
+                          return (
+                            <option key={bedNum} value={bedNum} disabled={isOccupied}>
+                              Bed {bedNum} {isOccupied ? `(Occupied by ${assignment.tenantName || "Another tenant"})` : "(Vacant)"}
+                            </option>
+                          );
+                        });
+                      })()}
+                    </select>
                   </div>
                 </div>
 

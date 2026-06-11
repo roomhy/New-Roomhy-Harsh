@@ -5,6 +5,9 @@ import {
   CheckCircle2, Clock, Building2, LogIn, LogOut,
   Bell, ChevronRight, Loader2, Users, Home, Activity
 } from "lucide-react";
+import { getApiBase } from "../../utils/api";
+
+const apiBase = getApiBase();
 
 function getStaffSession() {
   try {
@@ -52,14 +55,14 @@ export default function StaffDashboard() {
       const parentId = staff?.parentLoginId || "";
 
       const reqs = [
-        fetch(`/api/hr/my-attendance/${staffLoginId}?month=${month}&year=${year}`).catch(() => null),
-        fetch(`/api/tasks?assignedStaffLoginId=${staffLoginId}`).catch(() => null)
+        fetch(`${apiBase}/api/hr/my-attendance/${staffLoginId}?month=${month}&year=${year}`).catch(() => null),
+        fetch(`${apiBase}/api/tasks?assignedStaffLoginId=${staffLoginId}`).catch(() => null)
       ];
 
       if (parentId) {
-        reqs.push(fetch(`/api/tenants/owner/${parentId}`).catch(() => null));
-        reqs.push(fetch(`/api/rooms/owner/${parentId}`).catch(() => null));
-        reqs.push(fetch(`/api/complaints/owner/${parentId}`).catch(() => null));
+        reqs.push(fetch(`${apiBase}/api/tenants/owner/${parentId}`).catch(() => null));
+        reqs.push(fetch(`${apiBase}/api/rooms/owner/${parentId}`).catch(() => null));
+        reqs.push(fetch(`${apiBase}/api/complaints/owner/${parentId}`).catch(() => null));
       }
 
       const results = await Promise.all(reqs);
@@ -116,7 +119,7 @@ export default function StaffDashboard() {
     if (!staffLoginId) return;
     setCheckInLoading(true);
     try {
-      const res = await fetch("/api/hr/checkin", {
+      const res = await fetch(`${apiBase}/api/hr/checkin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ staffLoginId }),
@@ -134,7 +137,7 @@ export default function StaffDashboard() {
     if (!staffLoginId) return;
     setCheckOutLoading(true);
     try {
-      const res = await fetch("/api/hr/checkout", {
+      const res = await fetch(`${apiBase}/api/hr/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ staffLoginId }),

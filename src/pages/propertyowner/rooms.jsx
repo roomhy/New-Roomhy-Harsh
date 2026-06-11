@@ -128,6 +128,37 @@ export default function Rooms() {
       });
   };
 
+  const handlePropertyPageChange = async (propTitle, propId, newPage) => {
+    setPropPages(prev => ({ ...prev, [propTitle]: newPage }));
+    
+    const currentPropRoomsCount = rooms.filter(r => r.propertyId === propId).length;
+    const expectedRoomsCount = newPage * ROOMS_PER_PAGE;
+    const totalPropRooms = propertyTotals[propId] || currentPropRoomsCount;
+    
+    if (currentPropRoomsCount < expectedRoomsCount && currentPropRoomsCount < totalPropRooms) {
+      try {
+        const { fetchRoomsByPropertyId } = require("../../utils/propertyowner");
+        const res = await fetchRoomsByPropertyId(propId, newPage, ROOMS_PER_PAGE);
+        if (res.rooms && res.rooms.length > 0) {
+          const normalizedNewRooms = res.rooms.map(r => normalizeRoom(r, owner?.loginId));
+          setRooms(prev => {
+            const newRooms = [...prev];
+            normalizedNewRooms.forEach(nr => {
+              if (!newRooms.find(x => (x._id || x.id) === (nr._id || nr.id))) {
+                newRooms.push(nr);
+              }
+            });
+            return newRooms;
+          });
+        }
+      } catch (e) {
+        console.error("Failed to fetch more rooms", e);
+      }
+    }
+  };
+
+  const [propertyTotals, setPropertyTotals] = useState({});
+
   const load = async (session, page = 1, limit = 5) => {
     setLoading(true);
     try {
@@ -139,10 +170,7 @@ export default function Rooms() {
       setProperties(props);
       setRooms(mergeRooms(session.loginId, roomData.rooms || []));
       setTenants(tList);
-      const total = roomData.total || (roomData.rooms ? roomData.rooms.length : 0);
-      setTotalRooms(total);
-      setCurrentPage(page);
-      setTotalPages(Math.ceil(total / limit));
+      setPropertyTotals(roomData.propertyTotals || {});
     } catch (e) {
       setErrorMsg(e?.body || e?.message || "Failed to load.");
     } finally {
@@ -155,10 +183,8 @@ export default function Rooms() {
     const s = getOwnerRuntimeSession();
     if (!s?.loginId) { window.location.href = "/propertyowner/ownerlogin"; return; }
     setOwner(s);
-    // Always bypass cache on mount so occupancy reflects the latest DB state
     clearOwnerFetchCache(s.loginId);
-    const isMob = window.innerWidth < 1024;
-    load(s, 1, isMob ? 100 : 5);
+    load(s, 1, ROOMS_PER_PAGE);
   }, []);
 
   useEffect(() => {
@@ -312,6 +338,11 @@ export default function Rooms() {
   // Group rooms by property
   const grouped = useMemo(() => {
     const g = {};
+    // Pre-fill properties so even properties with 0 rooms show up
+    properties.forEach(p => {
+      g[p.title || p.name || "Your Property"] = [];
+    });
+
     const filteredRooms = rooms.filter(r => {
       // Show filter (vacant means has at least one vacant bed, occupied means has at least one occupied bed)
       if (showFilter === "vacant" && !r.beds.some(b => b.status === 'available')) return false;
@@ -329,7 +360,7 @@ export default function Rooms() {
       g[k].push(r);
     });
     return g;
-  }, [rooms, showFilter, floorFilter, sharingFilter]);
+  }, [rooms, showFilter, floorFilter, sharingFilter, properties]);
 
   return (
     <PropertyOwnerLayout owner={owner} title="Rooms & Beds" rooms={rooms} loading={loading} onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }} contentClassName="max-w-7xl mx-auto">
@@ -457,17 +488,16 @@ export default function Rooms() {
       {errorMsg && <div className="text-sm text-destructive mb-6 bg-destructive/10 p-4 rounded-xl">{errorMsg}</div>}
 
       <div className="space-y-7">
-        {loading ? (
+      {loading ? (
         <div className="flex flex-col items-center py-20">
           <Loader2 className="animate-spin text-primary mb-2" size={48} />
           <span className="text-sm text-muted-foreground">Loading rooms...</span>
         </div>
-      ) : rooms.length === 0 ? (
+      ) : properties.length === 0 && rooms.length === 0 ? (
           <div className="rounded-2xl border border-border bg-card p-16 shadow-soft flex flex-col items-center text-center">
             <div className="w-14 h-14 bg-muted/60 rounded-full flex items-center justify-center mb-3"><Building2 className="size-7 text-muted-foreground" /></div>
-            <h3 className="font-serif text-[22px] text-foreground mb-1">No rooms yet</h3>
-            <p className="text-[13.5px] text-muted-foreground mb-4">Add your first room to manage beds and tenants.</p>
-            <button type="button" onClick={() => { setRoomForm(defaultRoomForm); setRoomModalOpen(true); }} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg bg-blue-600 text-white text-[13px] font-medium hover:bg-blue-700"><Plus size={16}/> Add Room</button>
+            <h3 className="font-serif text-[22px] text-foreground mb-1">No properties or rooms</h3>
+            <p className="text-[13.5px] text-muted-foreground mb-4">Add a property first, then you can add rooms to it.</p>
           </div>
           ) : (
             <>
@@ -477,13 +507,13 @@ export default function Rooms() {
                 const pTotal = allBeds.length;
                 const pct = pTotal ? Math.round((pOcc/pTotal)*100) : 0;
                 // Per-property pagination
+                const propId = allPropRooms[0]?.propertyId || "";
+                const totalPropRooms = propertyTotals[propId] || allPropRooms.length;
                 const propPage = propPages[propTitle] || 1;
-                const propTotalPages = Math.max(1, Math.ceil(allPropRooms.length / ROOMS_PER_PAGE));
+                const propTotalPages = Math.max(1, Math.ceil(totalPropRooms / ROOMS_PER_PAGE));
                 const safePropPage = Math.min(propPage, propTotalPages);
-                const propRooms = isMobile
-                  ? allPropRooms
-                  : allPropRooms.slice((safePropPage - 1) * ROOMS_PER_PAGE, safePropPage * ROOMS_PER_PAGE);
-                const setPropertyPage = (p) => setPropPages(prev => ({ ...prev, [propTitle]: p }));
+                const propRooms = allPropRooms.slice((safePropPage - 1) * ROOMS_PER_PAGE, safePropPage * ROOMS_PER_PAGE);
+                const setPropertyPage = (p) => handlePropertyPageChange(propTitle, propId, p);
                 return (
                   <section key={propTitle} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     {/* Property Header */}
@@ -501,7 +531,22 @@ export default function Rooms() {
                     </div>
 
                     {/* Room Cards Grid */}
-                    <div className="flex overflow-x-auto snap-x gap-3 pb-3 no-scrollbar scroll-smooth md:grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                    {allPropRooms.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-10 px-4 bg-slate-50/70 rounded-xl border border-dashed border-slate-200 text-center">
+                        <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-100 mb-3">
+                          <LayoutTemplate className="w-6 h-6 text-slate-400" />
+                        </div>
+                        <h3 className="text-[15px] font-semibold text-slate-800 mb-1">No Rooms Added Yet</h3>
+                        <p className="text-[13px] text-slate-500 mb-5 max-w-sm">Manage beds and track tenants easily by adding rooms to {propTitle}.</p>
+                        <button type="button" onClick={() => { 
+                          setRoomForm({...defaultRoomForm, propertyId: propId || (properties.find(p => p.title === propTitle || p.name === propTitle)?._id)}); 
+                          setRoomModalOpen(true); 
+                        }} className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-blue-600 text-white text-[13px] font-bold shadow-sm shadow-blue-600/20 hover:bg-blue-700 transition-colors">
+                          <Plus size={16}/> Add First Room
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex overflow-x-auto snap-x gap-3 pb-3 no-scrollbar scroll-smooth md:grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                       {propRooms.map(room => {
                         const beds = toLegacyBeds(room);
                         const occupiedCount = beds.filter(b => b.status === "occupied" || b.tenantId).length;
@@ -606,13 +651,14 @@ export default function Rooms() {
                           </div>
                         );
                       })}
-                    </div>
+                      </div>
+                  )}
 
-                    {/* Per-Property Pagination */}
-                    {!isMobile && propTotalPages > 1 && (
-                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+                  {/* Per-Property Pagination */}
+                  {propTotalPages > 1 && (
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
                         <span className="text-[12px] text-slate-400 font-medium">
-                          Showing {(safePropPage-1)*ROOMS_PER_PAGE+1}–{Math.min(safePropPage*ROOMS_PER_PAGE, allPropRooms.length)} of {allPropRooms.length} rooms
+                          Showing {(safePropPage-1)*ROOMS_PER_PAGE+1}–{Math.min(safePropPage*ROOMS_PER_PAGE, totalPropRooms)} of {totalPropRooms} rooms
                         </span>
                         <div className="flex items-center gap-1.5">
                           <button

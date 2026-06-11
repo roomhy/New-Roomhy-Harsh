@@ -4,6 +4,9 @@ import {
   CheckCircle2, Clock, LogIn, LogOut, Calendar, AlertCircle,
   ChevronLeft, ChevronRight, Loader2, History, Users, UserCheck, UserX
 } from "lucide-react";
+import { getApiBase } from "../../utils/api";
+
+const apiBase = getApiBase();
 
 const STATUS_STYLES = {
   Present:    { bg: "bg-emerald-100 text-emerald-700 border-emerald-200" },
@@ -60,7 +63,7 @@ export default function StaffAttendancePage() {
     if (!staffLoginId) return;
     setLoadingToday(true);
     try {
-      const res = await fetch(`/api/hr/my-attendance/${staffLoginId}?month=${new Date().getMonth() + 1}&year=${new Date().getFullYear()}`);
+      const res = await fetch(`${apiBase}/api/hr/my-attendance/${staffLoginId}?month=${new Date().getMonth() + 1}&year=${new Date().getFullYear()}`);
       const data = await res.json();
       const records = data?.data || [];
       const todayStr = new Date().toISOString().split("T")[0];
@@ -74,7 +77,7 @@ export default function StaffAttendancePage() {
   const fetchHistory = useCallback(async () => {
     if (!staffLoginId) return;
     try {
-      const res = await fetch(`/api/hr/my-attendance/${staffLoginId}?month=${historyMonth}&year=${historyYear}`);
+      const res = await fetch(`${apiBase}/api/hr/my-attendance/${staffLoginId}?month=${historyMonth}&year=${historyYear}`);
       const data = await res.json();
       setHistory(data?.data || []);
     } catch (_) {}
@@ -89,7 +92,7 @@ export default function StaffAttendancePage() {
     setLoadingTenants(true);
     try {
       // Use the correct owner-scoped endpoint
-      const res = await fetch(`/api/tenants/owner/${parentLoginId}`);
+      const res = await fetch(`${apiBase}/api/tenants/owner/${parentLoginId}`);
       const data = await res.json();
       // Response: array or { tenants: [...] } or { data: [...] }
       const list = Array.isArray(data) ? data : (data?.tenants || data?.data || []);
@@ -103,7 +106,7 @@ export default function StaffAttendancePage() {
   const fetchTenantAtt = useCallback(async () => {
     if (!parentLoginId || !tenantDate) return;
     try {
-      const res = await fetch(`/api/tenant-attendance?ownerLoginId=${parentLoginId}&date=${tenantDate}`);
+      const res = await fetch(`${apiBase}/api/tenant-attendance?ownerLoginId=${parentLoginId}&date=${tenantDate}`);
       const data = await res.json();
       const records = data?.data || data || [];
       const map = {};
@@ -125,7 +128,7 @@ export default function StaffAttendancePage() {
     const loginId = tenant.loginId || tenant._id;
     setMarkingTenant(m => ({ ...m, [loginId]: true }));
     try {
-      const res = await fetch("/api/tenant-attendance", {
+      const res = await fetch(`${apiBase}/api/tenant-attendance`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -152,7 +155,7 @@ export default function StaffAttendancePage() {
     if (!staffLoginId) { showMsg("Staff session not found. Please login again.", "error"); return; }
     setCheckInLoading(true);
     try {
-      const res = await fetch("/api/hr/checkin", {
+      const res = await fetch(`${apiBase}/api/hr/checkin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ staffLoginId }),
@@ -172,7 +175,7 @@ export default function StaffAttendancePage() {
     if (!staffLoginId) return;
     setCheckOutLoading(true);
     try {
-      const res = await fetch("/api/hr/checkout", {
+      const res = await fetch(`${apiBase}/api/hr/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ staffLoginId }),
@@ -193,7 +196,7 @@ export default function StaffAttendancePage() {
     if (!staffLoginId) return;
     setLeaveSubmitting(true);
     try {
-      await fetch("/api/hr/attendance", {
+      await fetch(`${apiBase}/api/hr/attendance`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

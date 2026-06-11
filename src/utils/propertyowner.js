@@ -34,7 +34,7 @@ export const clearOwnerFetchCache = (loginId) => {
   delete _fetchCache[`tenants_${loginId}`];
   delete _fetchCache[`active_tenants_${loginId}`];
   Object.keys(_fetchCache).forEach(k => {
-    if (k.startsWith(`rooms_${loginId}`)) {
+    if (k.startsWith(`rooms_${loginId}`) || k.startsWith(`rooms_prop_`)) {
       delete _fetchCache[k];
     }
   });
@@ -306,13 +306,44 @@ export const fetchOwnerRooms = async (loginId, page = 1, limit = 50) => {
     }));
     
     writeJson("roomhy_rooms", rooms);
-    const _result = { ...response, rooms };
+    const _result = { ...response, rooms, propertyTotals: response?.propertyTotals || {} };
     _setCached(_cacheKey, _result);
     return _result;
   } catch (_) {
     let rooms = readJson("roomhy_rooms", []);
     rooms = filterByActiveProperty(rooms, false);
-    return { rooms };
+    return { rooms, propertyTotals: {} };
+  }
+};
+
+export const fetchRoomsByPropertyId = async (propertyId, page = 1, limit = 5) => {
+  const _cacheKey = `rooms_prop_${propertyId}_${page}_${limit}`;
+  const _hit = _getCached(_cacheKey);
+  if (_hit) return _hit;
+  try {
+    const response = await fetchJson(`/api/rooms/property/${encodeURIComponent(propertyId)}?page=${page}&limit=${limit}`);
+    let backendRooms = response?.rooms || response?.data || [];
+    
+    const rooms = backendRooms.map(room => ({
+      ...room,
+      number: room.title || room.number || room.roomNo || "Room",
+      roomNo: room.title || room.number || room.roomNo || "Room",
+      rent: room.price || room.rent || 0,
+      roomRent: room.price || room.rent || 0,
+      roomType: room.type || "AC",
+      beds: room.beds,
+      capacity: room.beds || 1,
+      totalBeds: room.beds || 1,
+      bedAssignments: Array.isArray(room.bedAssignments) ? room.bedAssignments : [],
+      propertyId: room.property?._id || room.property || propertyId,
+      propertyTitle: room.property?.title || room.propertyTitle || "",
+    }));
+    
+    const _result = { ...response, rooms, total: response?.total || 0 };
+    _setCached(_cacheKey, _result);
+    return _result;
+  } catch (_) {
+    return { rooms: [], total: 0 };
   }
 };
 
@@ -328,15 +359,8 @@ export const fetchOwnerTenants = async (loginId) => {
   const _hit = _getCached(_cacheKey);
   if (_hit) return _hit;
   try {
-    const response = await fetchJson("/api/tenants");
-    let tenants = (Array.isArray(response) ? response : response?.tenants || response?.data || []).filter((tenant) => {
-      const ownerLogin =
-        tenant.property?.ownerLoginId ||
-        tenant.ownerLoginId ||
-        tenant.property?.owner ||
-        tenant.owner;
-      return ownerLogin ? String(ownerLogin).toUpperCase() === String(loginId).toUpperCase() : false;
-    });
+    const response = await fetchJson(`/api/owners/${loginId}/tenants?nodues=true`);
+    let tenants = response?.tenants || response?.data || [];
     tenants = filterByActiveProperty(tenants);
     writeJson("roomhy_tenants", tenants);
     _setCached(_cacheKey, tenants);

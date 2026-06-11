@@ -4,6 +4,7 @@ import {
   Search, Home, ShieldCheck, AlertCircle, Phone, Mail,
   Loader2, Users, RefreshCw, Calendar
 } from "lucide-react";
+import { getApiBase } from "../../utils/api";
 
 function getStaffSession() {
   try {
@@ -34,7 +35,7 @@ export default function StaffTenants() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/tenants/owner/${parentLoginId}`);
+      const res = await fetch(`${getApiBase()}/api/tenants/owner/${parentLoginId}`);
       const data = await res.json();
       const list = data?.tenants || data?.data || (Array.isArray(data) ? data : []);
       setAllTenants(list.filter(t => !t.isDeleted && t.status !== "inactive"));

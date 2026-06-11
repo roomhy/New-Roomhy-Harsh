@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import StaffLayout from "../../components/StaffLayout";
 import { UserPlus, Search, ChevronRight, LogOut, CheckCircle2, X } from "lucide-react";
+import { getApiBase } from "../../utils/api";
 
 function getStaffSession() {
   try {
@@ -35,7 +36,7 @@ export default function StaffVisitors() {
     }
     setLoading(true);
     try {
-      const res = await fetch(`/api/visitors/owner/${parentLoginId}`);
+      const res = await fetch(`${getApiBase()}/api/visitors/owner/${parentLoginId}`);
       const data = await res.json();
       if (data.success) {
         setVisitors(data.visitors || []);
@@ -56,7 +57,7 @@ export default function StaffVisitors() {
     if (!parentLoginId || !vName || !vPhone || !vHost || !vRoom) return;
     setSubmitting(true);
     try {
-      const res = await fetch('/api/visitors', {
+      const res = await fetch(`${getApiBase()}/api/visitors`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -87,7 +88,7 @@ export default function StaffVisitors() {
   const handleCheckout = async (id) => {
     if (!window.confirm("Check out this visitor?")) return;
     try {
-      const res = await fetch(`/api/visitors/${id}/status`, {
+      const res = await fetch(`${getApiBase()}/api/visitors/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'Exited' })

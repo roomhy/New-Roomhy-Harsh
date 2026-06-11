@@ -54,6 +54,7 @@ export default function StaffLayout({ children, title, subtitle }) {
     { label: "Daily Tasks", icon: ClipboardList, path: "/staff/tasks" },
     { label: "Visitors Log", icon: UserPlus, path: "/staff/visitors" },
     { label: "Attendance", icon: CalendarCheck, path: "/staff/attendance" },
+    { label: "Electricity", icon: Zap, path: "/staff/electricity" },
   ];
 
   return (

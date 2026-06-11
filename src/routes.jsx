@@ -167,6 +167,7 @@ const routeEntries = [
   ["/staff/tasks", "./pages/staff-panel/tasks.jsx"],
   ["/staff/visitors", "./pages/staff-panel/visitors.jsx"],
   ["/staff/attendance", "./pages/staff-panel/attendance.jsx"],
+  ["/staff/electricity", "./pages/staff-panel/electricity.jsx"],
 
   ["/hostelowner", "./pages/owner-panel/dashboard.jsx"],
   ["/hostelowner/properties", "./pages/owner-panel/properties.jsx"],

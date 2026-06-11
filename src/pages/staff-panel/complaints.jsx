@@ -1,6 +1,7 @@
 import React from "react";
 import StaffLayout from "../../components/StaffLayout";
 import { AlertCircle, Clock, CheckCircle2, Home, User, Plus, Search, Filter, ArrowRight, MessageSquare } from "lucide-react";
+import { getApiBase } from "../../utils/api";
 
 export default function StaffComplaints() {
   const [complaints, setComplaints] = React.useState([]);
@@ -11,12 +12,12 @@ export default function StaffComplaints() {
       try {
         setLoading(true);
         // Simulate logged-in staff using the first employee
-        const empRes = await fetch('/api/employees');
+        const empRes = await fetch(`${getApiBase()}/api/employees`);
         const empData = await empRes.json();
         
         if (empData && empData.data && empData.data.length > 0) {
            const staffMember = empData.data[0];
-           const compRes = await fetch(`/api/complaints/owner/${staffMember.parentLoginId}`);
+           const compRes = await fetch(`${getApiBase()}/api/complaints/owner/${staffMember.parentLoginId}`);
            const compData = await compRes.json();
            
            if (compData && compData.complaints) {

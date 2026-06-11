@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import StaffLayout from "../../components/StaffLayout";
 import { Search, Home, Bed, Loader2, RefreshCw, Users, AlertCircle } from "lucide-react";
+import { getApiBase } from "../../utils/api";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -36,7 +37,7 @@ export default function StaffRooms() {
     setError("");
     try {
       // Fetch properties to get property IDs
-      const propRes = await fetch(`/api/properties?ownerLoginId=${parentLoginId}`);
+      const propRes = await fetch(`${getApiBase()}/api/properties?ownerLoginId=${parentLoginId}`);
       const propData = await propRes.json();
       const properties = Array.isArray(propData) ? propData : (propData?.properties || propData?.data || []);
 
@@ -46,7 +47,7 @@ export default function StaffRooms() {
         const propId = prop._id || prop.id;
         if (!propId) continue;
         try {
-          const rRes = await fetch(`/api/rooms?property=${propId}`);
+          const rRes = await fetch(`${getApiBase()}/api/rooms?property=${propId}`);
           const rData = await rRes.json();
           const propRooms = (Array.isArray(rData) ? rData : (rData?.rooms || rData?.data || [])).map(r => ({
             ...r,
@@ -57,7 +58,7 @@ export default function StaffRooms() {
       }
 
       // Also fetch tenants for occupancy info
-      const tRes = await fetch(`/api/tenants/owner/${parentLoginId}`);
+      const tRes = await fetch(`${getApiBase()}/api/tenants/owner/${parentLoginId}`);
       const tData = await tRes.json();
       const tenantList = tData?.tenants || tData?.data || (Array.isArray(tData) ? tData : []);
       setTenants(tenantList.filter(t => !t.isDeleted && t.status !== "inactive"));

@@ -28,7 +28,7 @@ const _fetchCached = (url, ttlMs = _CACHE_TTL_MS) => {
 
 export const getApiBase = () => {
   // Use Vite env variable if available
-  if (import.meta.env?.VITE_API_URL) {
+  if (import.meta.env?.VITE_API_URL && import.meta.env.VITE_API_URL !== 'undefined') {
     return import.meta.env.VITE_API_URL;
   }
   
