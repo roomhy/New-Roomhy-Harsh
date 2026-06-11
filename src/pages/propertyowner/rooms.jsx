@@ -96,7 +96,7 @@ export default function Rooms() {
   const [totalPages, setTotalPages] = useState(0);
   const [floorFilter, setFloorFilter] = useState("all");
   const [sharingFilter, setSharingFilter] = useState("all");
-  const ROOMS_PER_PAGE = 3;
+  const ROOMS_PER_PAGE = 5;
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -128,7 +128,7 @@ export default function Rooms() {
       });
   };
 
-  const load = async (session, page = 1, limit = 3) => {
+  const load = async (session, page = 1, limit = 5) => {
     setLoading(true);
     try {
       const [props, roomData, tList] = await Promise.all([
@@ -158,7 +158,7 @@ export default function Rooms() {
     // Always bypass cache on mount so occupancy reflects the latest DB state
     clearOwnerFetchCache(s.loginId);
     const isMob = window.innerWidth < 1024;
-    load(s, 1, isMob ? 100 : 3);
+    load(s, 1, isMob ? 100 : 5);
   }, []);
 
   useEffect(() => {
