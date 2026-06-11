@@ -80,21 +80,7 @@ export const PROPERTY_OWNER_NAV = [
       { label: "Penalty Settings", href: "/propertyowner/penalty-config", goldOnly: false },
     ]
   },
-  {
-    label: "Accounting",
-    icon: Wallet,
-    href: "/propertyowner/collection-report",
-    submenus: [
-      { label: "Income", href: "/propertyowner/income", goldOnly: false },
-      { label: "Expenses", href: "/propertyowner/expense-tracking", goldOnly: false },
-      { label: "Vendor Payments", href: "/propertyowner/vendor-payments", goldOnly: false },
-      { label: "Transactions", href: "/propertyowner/transactions", goldOnly: false },
-      { label: "Profit & Loss", href: "/propertyowner/profit-loss", goldOnly: false },
-      { label: "Cash Flow", href: "/propertyowner/cash-flow", goldOnly: false },
-      { label: "GST & Tax", href: "/propertyowner/hra-gst", goldOnly: false },
-      { label: "Download Statements", href: "/propertyowner/download-statements", goldOnly: false },
-    ]
-  },
+
   {
     label: "Complaints & Maintenance",
     icon: Headset,
