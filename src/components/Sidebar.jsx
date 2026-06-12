@@ -60,6 +60,7 @@ const NAV = [
         { 
           label: "Property Owners", 
           children: [
+            { label: "View All Property Owners", path: "/superadmin/owner" },
             { label: "Add", path: "/superadmin/owner?view=add" },
             { label: "Approved / Pending", path: "/superadmin/owner?view=pending" },
             { label: "KYC / Documents", path: "/superadmin/owner?view=kyc" },

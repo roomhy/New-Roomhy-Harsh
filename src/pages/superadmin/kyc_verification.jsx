@@ -201,8 +201,34 @@ export default function KycVerification() {
                              >
                                 <X className="w-5 h-5" />
                              </button>
-                             <button className="p-3.5 bg-slate-50 text-slate-400 rounded-2xl hover:text-blue-600 hover:bg-white hover:shadow-xl transition-all border border-slate-100 shadow-md active:scale-95">
+                             <button 
+                                onClick={() => {
+                                  const docUrl = item.kyc?.documentImage || item.checkinAadhaarImage || item.tenantKyc?.documentImage || item.kyc?.aadharImage || item.kyc?.aadhaarFront || item.checkinAadhaarFront;
+                                  if (docUrl) window.open(docUrl, "_blank");
+                                  else alert("No KYC document found for this user.");
+                                }}
+                                title="View Document"
+                                className="p-3.5 bg-slate-50 text-slate-400 rounded-2xl hover:text-blue-600 hover:bg-white hover:shadow-xl transition-all border border-slate-100 shadow-md active:scale-95"
+                             >
                                 <Eye className="w-5 h-5" />
+                             </button>
+                             <button 
+                                onClick={() => {
+                                  const docUrl = item.kyc?.documentImage || item.checkinAadhaarImage || item.tenantKyc?.documentImage || item.kyc?.aadharImage || item.kyc?.aadhaarFront || item.checkinAadhaarFront;
+                                  if (docUrl) {
+                                     const a = document.createElement("a");
+                                     a.href = docUrl;
+                                     a.download = `KYC_${item.loginId || "Document"}.jpg`;
+                                     a.target = "_blank";
+                                     a.click();
+                                  } else {
+                                     alert("No KYC document found for this user.");
+                                  }
+                                }}
+                                title="Download Document"
+                                className="p-3.5 bg-slate-50 text-slate-400 rounded-2xl hover:text-emerald-600 hover:bg-white hover:shadow-xl transition-all border border-slate-100 shadow-md active:scale-95"
+                             >
+                                <Download className="w-5 h-5" />
                              </button>
                           </div>
                        </td>

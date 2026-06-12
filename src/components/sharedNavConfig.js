@@ -13,7 +13,8 @@ export const sharedNavConfig = {
         label: "MANAGEMENT",
         links: [
           { label: "Teams", to: "/superadmin/manager", icon: "users" },
-          { label: "Property Owners", to: "/superadmin/owner", icon: "briefcase" },
+          { label: "All Property Owners", to: "/superadmin/owner", icon: "briefcase" },
+          { label: "Add Property Owner", to: "/superadmin/owner?view=add", icon: "user-plus" },
           { label: "Owner Requests", to: "/superadmin/owner-requests", icon: "user-check" },
           { label: "Properties", to: "/superadmin/properties", icon: "home" },
           { label: "Tenants", to: "/superadmin/tenant", icon: "users" },
@@ -150,7 +151,8 @@ export const sharedNavConfig = {
         label: "Management",
         links: [
           { label: "Teams", to: "/employee/manager", icon: "map-pin" },
-          { label: "Property Owners", to: "/employee/owner", icon: "briefcase" },
+          { label: "All Property Owners", to: "/employee/owner", icon: "briefcase" },
+          { label: "Add Property Owner", to: "/employee/owner?view=add", icon: "user-plus" },
           { label: "Properties", to: "/employee/properties", icon: "home" },
           { label: "Tenants", to: "/employee/tenant", icon: "users" },
           { label: "New Signups", to: "/employee/new_signups", icon: "file-badge" }

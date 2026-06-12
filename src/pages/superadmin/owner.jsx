@@ -500,12 +500,15 @@ export default function Owner() {
                               </div>
                            </td>
                            <td className="px-6 py-8 text-center">
-                              {currentView === "kyc" ? (
-                                <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100">
-                                   {o.checkinAadhaarNumber ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : <AlertCircle className="w-3 h-3 text-amber-500" />}
-                                   <span className="text-[9px] font-bold uppercase text-slate-600">{o.checkinAadhaarNumber ? "Document Attached" : "Awaiting Upload"}</span>
-                                </div>
-                              ) : (
+                              {currentView === "kyc" ? (() => {
+                                 const hasDoc = o.checkinAadhaarImage || o.kyc?.documentImage || o.checkinAadhaarNumber;
+                                 return (
+                                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100">
+                                    {hasDoc ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : <AlertCircle className="w-3 h-3 text-amber-500" />}
+                                    <span className="text-[9px] font-bold uppercase text-slate-600">{hasDoc ? "Document Attached" : "Awaiting Upload"}</span>
+                                 </div>
+                                 );
+                               })() : (
                                 <div className="inline-flex flex-col items-center gap-2 bg-slate-50 px-4 py-3 rounded-2xl border border-slate-100 shadow-sm group-hover:bg-white transition-colors">
                                    <p className="text-[10px] font-bold text-slate-800 leading-none">{o.bankName || o.checkinBankName || "Not Linked"}</p>
                                    <span className="text-[8px] font-black text-blue-600 uppercase tracking-widest opacity-60">Verified Settlement</span>
@@ -625,6 +628,66 @@ export default function Owner() {
                        <DetailItem icon={FileText} label="Aadhaar ID" value={selectedOwner.aadharNumber || selectedOwner.checkinAadhaarNumber} />
                        <DetailItem icon={Phone} label="KYC Linked Phone" value={selectedOwner.checkinAadhaarLinkedPhone} />
                        <DetailItem icon={Shield} label="Audit Status" value={(selectedOwner.kycStatus || selectedOwner.kyc?.status || "PENDING").toUpperCase()} highlight />
+                       
+                       <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-slate-400">
+                             <FileText size={12} />
+                             <span className="text-[9px] font-bold uppercase tracking-widest">KYC Document</span>
+                          </div>
+                          {(() => {
+                             const singleDocUrl = selectedOwner.kyc?.documentImage || selectedOwner.checkinAadhaarImage || selectedOwner.tenantKyc?.documentImage || selectedOwner.kyc?.aadharImage;
+                             const frontUrl = selectedOwner.kyc?.aadhaarFront || selectedOwner.checkinAadhaarFront;
+                             const backUrl = selectedOwner.kyc?.aadhaarBack || selectedOwner.checkinAadhaarBack;
+                             const ownerPhoto = selectedOwner.checkinOwnerPhoto;
+                             const bankProof = selectedOwner.checkinBankProof;
+                             
+                             const hasAnyDoc = singleDocUrl || frontUrl || backUrl || ownerPhoto || bankProof;
+                             
+                             if (!hasAnyDoc) {
+                                return <p className="text-sm font-bold text-slate-300 italic font-medium">No Document</p>;
+                             }
+                             
+                             return (
+                               <div className="flex flex-col gap-2">
+                                 {ownerPhoto && (
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-xs font-medium text-slate-500 w-24">Profile Photo:</span>
+                                      <button onClick={() => window.open(ownerPhoto, "_blank")} className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"><Eye size={12} /> View</button>
+                                      <button onClick={() => { const a = document.createElement("a"); a.href = ownerPhoto; a.download = `Profile_${selectedOwner.loginId || selectedOwner._id}.jpg`; a.target = "_blank"; a.click(); }} className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1"><Download size={12} /> Download</button>
+                                    </div>
+                                 )}
+                                 {bankProof && (
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-xs font-medium text-slate-500 w-24">Bank Proof:</span>
+                                      <button onClick={() => window.open(bankProof, "_blank")} className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"><Eye size={12} /> View</button>
+                                      <button onClick={() => { const a = document.createElement("a"); a.href = bankProof; a.download = `Bank_${selectedOwner.loginId || selectedOwner._id}.jpg`; a.target = "_blank"; a.click(); }} className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1"><Download size={12} /> Download</button>
+                                    </div>
+                                 )}
+                                 {singleDocUrl && (
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-xs font-medium text-slate-500 w-24">Aadhaar Doc:</span>
+                                      <button onClick={() => window.open(singleDocUrl, "_blank")} className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"><Eye size={12} /> View</button>
+                                      <button onClick={() => { const a = document.createElement("a"); a.href = singleDocUrl; a.download = `Aadhaar_${selectedOwner.loginId || selectedOwner._id}.jpg`; a.target = "_blank"; a.click(); }} className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1"><Download size={12} /> Download</button>
+                                    </div>
+                                 )}
+                                 {frontUrl && (
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-xs font-medium text-slate-500 w-24">Aadhaar Front:</span>
+                                      <button onClick={() => window.open(frontUrl, "_blank")} className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"><Eye size={12} /> View</button>
+                                      <button onClick={() => { const a = document.createElement("a"); a.href = frontUrl; a.download = `Aadhaar_Front_${selectedOwner.loginId || selectedOwner._id}.jpg`; a.target = "_blank"; a.click(); }} className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1"><Download size={12} /> Download</button>
+                                    </div>
+                                 )}
+                                 {backUrl && (
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-xs font-medium text-slate-500 w-24">Aadhaar Back:</span>
+                                      <button onClick={() => window.open(backUrl, "_blank")} className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"><Eye size={12} /> View</button>
+                                      <button onClick={() => { const a = document.createElement("a"); a.href = backUrl; a.download = `Aadhaar_Back_${selectedOwner.loginId || selectedOwner._id}.jpg`; a.target = "_blank"; a.click(); }} className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1"><Download size={12} /> Download</button>
+                                    </div>
+                                 )}
+                               </div>
+                             );
+                          })()}
+                       </div>
                     </div>
                  </section>
 

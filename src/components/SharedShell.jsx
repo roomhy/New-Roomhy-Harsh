@@ -141,6 +141,9 @@ export default function SharedShell() {
                 </button>
                 <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all -translate-y-2 group-hover:translate-y-0 z-50 overflow-hidden">
                   <div className="p-2 space-y-1">
+                    <button onClick={() => navigate("/superadmin/owner?view=add")} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg text-sm text-slate-600 font-medium transition-colors">
+                      <UserPlus size={16} className="text-blue-600" /> Add Property Owner
+                    </button>
                     <button onClick={() => navigate("/superadmin/add-tenant")} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg text-sm text-slate-600 font-medium transition-colors">
                       <UserPlus size={16} className="text-blue-600" /> Add Tenant
                     </button>
