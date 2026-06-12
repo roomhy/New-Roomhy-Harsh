@@ -26,6 +26,9 @@ export default function Owner() {
   const [areaFilter, setAreaFilter] = useState("all");
   const [selectedOwner, setSelectedOwner] = useState(null);
   const [isUpdatingKyc, setIsUpdatingKyc] = useState(false);
+  const [isEditingOwner, setIsEditingOwner] = useState(false);
+  const [editOwnerForm, setEditOwnerForm] = useState({});
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // Add Form State
   const [formName, setFormName] = useState("");
@@ -121,6 +124,45 @@ export default function Owner() {
       loadOwners();
     } catch (err) { alert(err.message || "Failed to add stakeholder"); }
     finally { setSaving(false); }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedOwner) return;
+    setSavingEdit(true);
+    try {
+      const id = selectedOwner.loginId || selectedOwner._id;
+      const payload = {
+        email: editOwnerForm.email,
+        checkinEmail: editOwnerForm.email,
+        phone: editOwnerForm.phone,
+        checkinPhone: editOwnerForm.phone,
+        checkinDob: editOwnerForm.checkinDob,
+        address: editOwnerForm.address,
+        checkinAddress: editOwnerForm.address,
+        bankName: editOwnerForm.bankName,
+        checkinBankName: editOwnerForm.bankName,
+        accountNumber: editOwnerForm.accountNumber,
+        checkinBankAccountNumber: editOwnerForm.accountNumber,
+        ifscCode: editOwnerForm.ifscCode,
+        checkinIfscCode: editOwnerForm.ifscCode,
+        checkinUpiId: editOwnerForm.checkinUpiId
+      };
+      
+      await fetchJson(`/api/owners/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: getAuthHeader(),
+        body: JSON.stringify(payload)
+      });
+      
+      alert("Owner details updated successfully!");
+      setIsEditingOwner(false);
+      loadOwners();
+      setSelectedOwner(prev => ({ ...prev, ...payload }));
+    } catch (err) {
+      alert("Failed to update owner details: " + (err.body?.message || err.message));
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const filteredOwners = useMemo(() => {
@@ -469,7 +511,20 @@ export default function Owner() {
                     ) : filteredOwners.map((o, i) => {
                       const status = (o.kycStatus || o.kyc?.status || "pending").toLowerCase();
                       return (
-                        <tr key={i} className="group hover:bg-slate-50/50 transition-all duration-300 cursor-pointer" onClick={() => setSelectedOwner(o)}>
+                        <tr key={i} className="group hover:bg-slate-50/50 transition-all duration-300 cursor-pointer" onClick={() => {
+                           setSelectedOwner(o);
+                           setIsEditingOwner(false);
+                           setEditOwnerForm({
+                             email: o.email || o.checkinEmail || "",
+                             phone: o.phone || o.checkinPhone || "",
+                             checkinDob: o.checkinDob || "",
+                             address: o.address || o.checkinAddress || "",
+                             bankName: o.bankName || o.checkinBankName || "",
+                             accountNumber: o.accountNumber || o.checkinBankAccountNumber || "",
+                             ifscCode: o.ifscCode || o.checkinIfscCode || "",
+                             checkinUpiId: o.checkinUpiId || ""
+                           });
+                        }}>
                            <td className="px-10 py-8">
                               <div className="flex items-center gap-6">
                                  <div className="w-14 h-14 rounded-2xl bg-white border border-slate-100 text-blue-600 flex items-center justify-center font-bold text-xl shadow-xl shadow-slate-200/40 transition-transform group-hover:scale-110 shrink-0">
@@ -578,9 +633,24 @@ export default function Owner() {
                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-2">ID: {selectedOwner.loginId} | Compliance Hub</p>
                     </div>
                  </div>
-                 <button onClick={() => setSelectedOwner(null)} className="p-4 rounded-3xl bg-white text-slate-400 hover:text-rose-600 transition-all shadow-xl border border-slate-100 active:scale-90">
-                    <X size={24} />
-                 </button>
+                  <div className="flex items-center gap-4">
+                     {isEditingOwner && (
+                        <button 
+                           onClick={handleSaveEdit}
+                           disabled={savingEdit}
+                           className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2"
+                        >
+                          {savingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                          Save Changes
+                        </button>
+                     )}
+                     <button onClick={() => setIsEditingOwner(!isEditingOwner)} className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all border border-slate-200">
+                       {isEditingOwner ? "Cancel Edit" : "Edit Details"}
+                     </button>
+                     <button onClick={() => setSelectedOwner(null)} className="p-4 rounded-3xl bg-white text-slate-400 hover:text-rose-600 transition-all shadow-xl border border-slate-100 active:scale-90">
+                        <X size={24} />
+                     </button>
+                  </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-12 custom-scrollbar space-y-12">
@@ -593,10 +663,10 @@ export default function Owner() {
                        <h4 className="text-lg font-bold text-slate-800 uppercase tracking-widest">Stakeholder Identity</h4>
                     </div>
                     <div className="grid grid-cols-2 gap-8">
-                       <DetailItem icon={Mail} label="Official Email" value={selectedOwner.email || selectedOwner.checkinEmail} />
-                       <DetailItem icon={Phone} label="Pulse Contact" value={selectedOwner.phone || selectedOwner.checkinPhone} />
-                       <DetailItem icon={Calendar} label="Birth Index" value={selectedOwner.checkinDob || "Not Defined"} />
-                       <DetailItem icon={MapPin} label="Home Base" value={selectedOwner.address || selectedOwner.checkinAddress} />
+                       <DetailItem isEditing={isEditingOwner} onChange={e => setEditOwnerForm({...editOwnerForm, email: e.target.value})} type="email" icon={Mail} label="Official Email" value={isEditingOwner ? editOwnerForm.email : (selectedOwner.email || selectedOwner.checkinEmail)} />
+                       <DetailItem isEditing={isEditingOwner} onChange={e => setEditOwnerForm({...editOwnerForm, phone: e.target.value})} type="tel" icon={Phone} label="Pulse Contact" value={isEditingOwner ? editOwnerForm.phone : (selectedOwner.phone || selectedOwner.checkinPhone)} />
+                       <DetailItem isEditing={isEditingOwner} onChange={e => setEditOwnerForm({...editOwnerForm, checkinDob: e.target.value})} type="date" icon={Calendar} label="Birth Index" value={isEditingOwner ? editOwnerForm.checkinDob : (selectedOwner.checkinDob || "Not Defined")} />
+                       <DetailItem isEditing={isEditingOwner} onChange={e => setEditOwnerForm({...editOwnerForm, address: e.target.value})} icon={MapPin} label="Home Base" value={isEditingOwner ? editOwnerForm.address : (selectedOwner.address || selectedOwner.checkinAddress)} />
                     </div>
                  </section>
 
@@ -700,10 +770,10 @@ export default function Owner() {
                        <h4 className="text-lg font-bold text-slate-800 uppercase tracking-widest">Settlement Engine</h4>
                     </div>
                     <div className="grid grid-cols-2 gap-8">
-                       <DetailItem icon={Building2} label="Institution" value={selectedOwner.bankName || selectedOwner.checkinBankName} />
-                       <DetailItem icon={CreditCard} label="Ledger Number" value={selectedOwner.accountNumber || selectedOwner.checkinBankAccountNumber} />
-                       <DetailItem icon={Zap} label="Routing (IFSC)" value={selectedOwner.ifscCode || selectedOwner.checkinIfscCode} />
-                       <DetailItem icon={Wallet} label="UPI Link" value={selectedOwner.checkinUpiId} />
+                       <DetailItem isEditing={isEditingOwner} onChange={e => setEditOwnerForm({...editOwnerForm, bankName: e.target.value})} icon={Building2} label="Institution" value={isEditingOwner ? editOwnerForm.bankName : (selectedOwner.bankName || selectedOwner.checkinBankName)} />
+                       <DetailItem isEditing={isEditingOwner} onChange={e => setEditOwnerForm({...editOwnerForm, accountNumber: e.target.value})} icon={CreditCard} label="Ledger Number" value={isEditingOwner ? editOwnerForm.accountNumber : (selectedOwner.accountNumber || selectedOwner.checkinBankAccountNumber)} />
+                       <DetailItem isEditing={isEditingOwner} onChange={e => setEditOwnerForm({...editOwnerForm, ifscCode: e.target.value})} icon={Zap} label="Routing (IFSC)" value={isEditingOwner ? editOwnerForm.ifscCode : (selectedOwner.ifscCode || selectedOwner.checkinIfscCode)} />
+                       <DetailItem isEditing={isEditingOwner} onChange={e => setEditOwnerForm({...editOwnerForm, checkinUpiId: e.target.value})} icon={Wallet} label="UPI Link" value={isEditingOwner ? editOwnerForm.checkinUpiId : selectedOwner.checkinUpiId} />
                     </div>
                  </section>
               </div>
@@ -769,20 +839,29 @@ export default function Owner() {
   );
 }
 
-function DetailItem({ icon: Icon, label, value, highlight }) {
+function DetailItem({ icon: Icon, label, value, highlight, isEditing, onChange, type = "text" }) {
   return (
     <div className="space-y-2">
        <div className="flex items-center gap-2 text-slate-400">
           <Icon size={12} />
           <span className="text-[9px] font-bold uppercase tracking-widest">{label}</span>
        </div>
-       <p className={cn(
-         "text-sm font-bold tracking-tight",
-         highlight ? "text-blue-600" : "text-slate-700",
-         !value && "text-slate-300 italic font-medium"
-       )}>
-          {value || "Field Null"}
-       </p>
+       {isEditing ? (
+          <input 
+             type={type}
+             value={value || ""}
+             onChange={onChange}
+             className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all outline-none shadow-sm"
+          />
+       ) : (
+          <p className={cn(
+            "text-sm font-bold tracking-tight truncate",
+            highlight ? "text-blue-600" : "text-slate-700",
+            !value && "text-slate-300 italic font-medium"
+          )}>
+             {value || "Field Null"}
+          </p>
+       )}
     </div>
   );
 }
