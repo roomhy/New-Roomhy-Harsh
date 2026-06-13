@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { fetchJson } from "../../utils/api";
 import { 
   Building2, Users, Shield, Clock, Search, 
   ArrowUpRight, ArrowDownRight, MoreVertical, 
@@ -7,8 +8,7 @@ import {
   Activity, Home, CheckCircle2, XCircle, Wallet,
   ArrowUpCircle, ArrowDownCircle, RotateCcw, Plus,
   Download, Eye, Send, FileText, Receipt, LayoutGrid,
-  IndianRupee, Database, TrendingUp, Calendar,
-  Smartphone, BarChart3, PieChart as PieIcon, LineChart as LineIcon
+  IndianRupee, Database, TrendingUp, Calendar, Sliders
 } from "lucide-react";
 import { PageHeader } from "../../components/dashboard/PageHeader";
 import { DateRangePill } from "../../components/dashboard/DateRangePill";
@@ -19,169 +19,541 @@ import {
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
-const perf = Array.from({ length: 7 }, (_, i) => ({
-  name: `${20 + i} May`,
-  listings: 16000 + i * 800,
-  users: 11000 + i * 700,
-  leads: 7000 + i * 800,
-  revenue: 3000 + i * 400,
-}));
-
-const cats = [
-  { name: "Listings", value: 12, color: "#3B82F6", percent: "21.4%" },
-  { name: "Users", value: 8, color: "#10B981", percent: "14.3%" },
-  { name: "Leads", value: 10, color: "#6366F1", percent: "17.8%" },
-  { name: "Revenue", value: 8, color: "#F59E0B", percent: "14.3%" },
-  { name: "Commission", value: 6, color: "#8B5CF6", percent: "10.7%" },
-  { name: "Others", value: 12, color: "#94A3B8", percent: "21.5%" },
-];
-
-const recentReports = [
-  { name: "Revenue Summary Report", category: "Revenue", date: "26 May 2024", time: "10:30 AM", by: "Aman", format: "PDF", color: "blue" },
-  { name: "Listings Performance Report", category: "Listings", date: "26 May 2024", time: "09:15 AM", by: "Aman", format: "Excel", color: "emerald" },
-  { name: "User Growth Report", category: "Users", date: "26 May 2024", time: "08:45 AM", by: "Aman", format: "PDF", color: "indigo" },
-  { name: "Leads & Bookings Report", category: "Leads", date: "25 May 2024", time: "07:30 PM", by: "Aman", format: "Excel", color: "purple" },
-];
-
 export default function ReportsRevenue() {
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    commissionEarned: 0,
+    ownerEarnings: 0,
+    pendingPayouts: 0,
+    paidPayouts: 0,
+    walletBalance: 0,
+    totalTransactions: 0
+  });
+  const [trend, setTrend] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [commissions, setCommissions] = useState([]);
+  const [payouts, setPayouts] = useState([]);
+  const [settings, setSettings] = useState({ commission_percentage: 10 });
+  const [loading, setLoading] = useState(true);
+  const [updatingSettings, setUpdatingSettings] = useState(false);
+  const [newCommPct, setNewCommPct] = useState(10);
+  const [showSettingsEdit, setShowSettingsEdit] = useState(false);
+
+  // Tab State
+  const [activeTab, setActiveTab] = useState("payments");
+
+  // Transfer Modal State
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
+  const [selectedPayout, setSelectedPayout] = useState(null);
+  const [payoutForm, setPayoutForm] = useState({
+    account_holder: "",
+    account_number: "",
+    ifsc_code: "",
+    bank_name: ""
+  });
+  const [transferring, setTransferring] = useState(false);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [statsRes, txRes, settingsRes] = await Promise.all([
+        fetchJson("/api/superadmin/revenue/stats"),
+        fetchJson("/api/superadmin/revenue/transactions"),
+        fetchJson("/api/superadmin/settings")
+      ]);
+
+      if (statsRes && statsRes.success) {
+        setStats(statsRes.stats);
+        setTrend(statsRes.trend || []);
+      }
+      if (txRes && txRes.success) {
+        setPayments(txRes.payments || []);
+        setCommissions(txRes.commissions || []);
+        setPayouts(txRes.payouts || []);
+      }
+      if (settingsRes && settingsRes.success) {
+        setSettings(settingsRes.settings);
+        setNewCommPct(settingsRes.settings.commission_percentage);
+      }
+    } catch (err) {
+      console.error("Failed to load revenue data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleSaveSettings = async () => {
+    try {
+      setUpdatingSettings(true);
+      const res = await fetchJson("/api/superadmin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commission_percentage: Number(newCommPct) })
+      });
+      if (res && res.success) {
+        setSettings(res.settings);
+        setShowSettingsEdit(false);
+        alert(`Global platform commission updated successfully to ${res.settings.commission_percentage}%`);
+        loadData();
+      }
+    } catch (err) {
+      alert("Failed to update settings: " + err.message);
+    } finally {
+      setUpdatingSettings(false);
+    }
+  };
+
+  const handleOpenPayout = (payout) => {
+    setSelectedPayout(payout);
+    setPayoutForm({
+      account_holder: payout.bank_details?.account_holder || payout.owner_name || "",
+      account_number: payout.bank_details?.account_number || "",
+      ifsc_code: payout.bank_details?.ifsc_code || "",
+      bank_name: payout.bank_details?.bank_name || ""
+    });
+    setShowPayoutModal(true);
+  };
+
+  const handleConfirmPayout = async () => {
+    if (!payoutForm.account_number || !payoutForm.ifsc_code) {
+      alert("Please fill in Account Number and IFSC Code.");
+      return;
+    }
+    try {
+      setTransferring(true);
+      const res = await fetchJson(`/api/superadmin/revenue/payout/${selectedPayout.id}/transfer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          account_holder: payoutForm.account_holder,
+          account_number: payoutForm.account_number,
+          ifsc_code: payoutForm.ifsc_code,
+          bank_name: payoutForm.bank_name,
+          initiated_by: "superadmin"
+        })
+      });
+      if (res && res.success) {
+        setShowPayoutModal(false);
+        alert(res.message || "Payout transferred successfully!");
+        loadData();
+      }
+    } catch (err) {
+      alert("Payout transfer failed: " + err.message);
+    } finally {
+      setTransferring(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-8 space-y-10 bg-[#F8FAFC] min-h-full flex flex-col items-center justify-center py-40">
+        <div className="w-16 h-16 border-4 border-blue-600/10 border-t-blue-600 rounded-full animate-spin mb-4" />
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Compiling Platform Ledger...</p>
+      </div>
+    );
+  }
+
+  const formatStat = (val, prefix = "") => {
+    if (val === undefined || val === null || val === 0 || val === "0") {
+      return "No Data Available";
+    }
+    return `${prefix}${val.toLocaleString('en-IN')}`;
+  };
+
+  const hasTrendData = trend.length > 0 && trend.some(t => t.revenue > 0);
+
   return (
-    <div className="p-8 space-y-10 bg-[#F8FAFC] min-h-full">
+    <div className="p-8 space-y-10 bg-[#F8FAFC] min-h-full font-inter text-slate-800">
       {/* Header Area */}
       <div className="flex flex-col gap-2">
-         <h1 className="text-4xl font-bold text-slate-800 tracking-tight leading-none">Revenue Intelligence Dashboard</h1>
+         <h1 className="text-4xl font-bold text-slate-800 tracking-tight leading-none">Revenue Intelligence Command</h1>
          <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase mt-2">
             <span>Reports</span>
             <ChevronRight className="w-3 h-3" />
-            <span className="text-blue-600">Revenue Analytics</span>
+            <span className="text-blue-600">Platform Revenue & Payouts</span>
          </div>
       </div>
 
-      <p className="text-sm font-bold text-slate-400">Comprehensive financial breakdown of platform earnings, growth velocity and fiscal performance.</p>
+      <p className="text-sm font-bold text-slate-400">Dynamic breakdown of gross bookings revenue, platform commission margins, and owner settlement statuses.</p>
+
+      {/* Global Commission Settings Panel */}
+      <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col md:flex-row items-center justify-between gap-8 animate-in fade-in slide-in-from-top-6 duration-500">
+        <div className="flex items-center gap-6">
+          <div className="w-16 h-16 rounded-[1.25rem] bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-inner shrink-0">
+             <Sliders className="w-8 h-8" />
+          </div>
+          <div>
+             <h3 className="text-xl font-bold text-slate-800 tracking-tight">Global Platform Commission settings</h3>
+             <p className="text-xs text-slate-400 font-bold uppercase mt-1">CALIBRATE DYNAMIC PLATFORM SPLITS FOR FUTURE PAYMENTS</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <div className="flex items-center bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4">
+             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-4">Dynamic Margin:</span>
+             {showSettingsEdit ? (
+               <div className="flex items-center gap-2">
+                 <input 
+                   type="number" 
+                   value={newCommPct} 
+                   onChange={e => setNewCommPct(Math.max(0, Math.min(100, Number(e.target.value))))}
+                   className="w-16 bg-white border border-slate-200 rounded-xl px-2 py-1 text-sm font-black text-slate-800 outline-none text-center"
+                 />
+                 <span className="text-sm font-bold text-slate-700">%</span>
+               </div>
+             ) : (
+               <span className="text-lg font-black text-blue-600 bg-blue-50 px-4 py-1 rounded-xl border border-blue-100">{settings.commission_percentage}%</span>
+             )}
+          </div>
+          
+          {showSettingsEdit ? (
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleSaveSettings}
+                disabled={updatingSettings}
+                className="px-6 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-[10px] font-bold uppercase transition-all shadow-md active:scale-95"
+              >
+                {updatingSettings ? "Saving..." : "Save"}
+              </button>
+              <button 
+                onClick={() => { setShowSettingsEdit(false); setNewCommPct(settings.commission_percentage); }}
+                className="px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-2xl text-[10px] font-bold uppercase transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={() => setShowSettingsEdit(true)}
+              className="px-8 py-4 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl text-[10px] font-bold uppercase shadow-lg transition-all active:scale-95"
+            >
+              Adjust split percentage
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Hero Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
-        <StatCardLarge label="Total Revenue" value="₹ 18.7L" trend="+ 15.6%" up icon={IndianRupee} color="blue" />
-        <StatCardLarge label="Commission" value="₹ 2.8L" trend="+ 12.4%" up icon={Database} color="indigo" />
-        <StatCardLarge label="Total Leads" value="6.4k" trend="+ 12.3%" up icon={FileText} color="purple" />
-        <StatCardLarge label="Total Users" value="18.7k" trend="+ 8.6%" up icon={Users} color="green" />
-        <StatCardLarge label="Total Listings" value="2.5k" trend="+ 156" up icon={Home} color="emerald" />
-        <StatCardLarge label="Refunds" value="₹ 45k" trend="- 3.2%" up={false} icon={RotateCcw} color="red" />
+        <StatCardLarge label="Total Revenue" value={formatStat(stats.totalRevenue, "₹ ")} trend="Platform Gross" up icon={IndianRupee} color="blue" source="Payments" />
+        <StatCardLarge label="Commission Earned" value={formatStat(stats.commissionEarned, "₹ ")} trend={`Net Margin (${settings.commission_percentage}%)`} up icon={Database} color="indigo" source="Payments" />
+        <StatCardLarge label="Owner Earnings" value={formatStat(stats.ownerEarnings, "₹ ")} trend="Settlement Target" up icon={Users} color="green" source="Payments" />
+        <StatCardLarge label="Pending Payouts" value={formatStat(stats.pendingPayouts, "₹ ")} trend="Due payouts" up={false} icon={Clock} color="purple" source="Payments" />
+        <StatCardLarge label="Paid Payouts" value={formatStat(stats.paidPayouts, "₹ ")} trend="Settled payout volume" up icon={CheckCircle2} color="emerald" source="Payments" />
+        <StatCardLarge label="Wallet Balance" value={formatStat(stats.walletBalance, "₹ ")} trend="Net Wallet" up icon={Wallet} color="blue" source="Payments" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Performance Chart */}
-        <div className="lg:col-span-8 bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col">
+      {/* Recharts Area Chart */}
+      <div className="grid grid-cols-1 gap-8">
+        <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col">
            <div className="flex items-center justify-between mb-10">
-              <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Financial Growth Velocity</h3>
+              <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Revenue Stream Velocity</h3>
               <div className="flex items-center gap-6">
-                 <LegendPill color="#3B82F6" label="Revenue" />
-                 <LegendPill color="#10B981" label="Users" />
-                 <select className="bg-slate-50 border-none rounded-2xl px-5 py-2.5 text-xs font-bold text-slate-500 outline-none cursor-pointer">
-                    <option>This Week</option>
-                 </select>
+                 <LegendPill color="#3B82F6" label="Booking Revenue" />
+                 <span className="bg-slate-50 border-none rounded-2xl px-5 py-2.5 text-xs font-bold text-slate-500">Last 7 Active Days</span>
               </div>
            </div>
-           <div className="flex-1 min-h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                 <AreaChart data={perf}>
-                    <defs>
-                       <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.1}/>
-                          <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
-                       </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 700}} dy={15} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 700}} dx={-15} tickFormatter={v => `${v/1000}k`} />
-                    <Tooltip contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)'}} />
-                    <Area type="monotone" dataKey="revenue" stroke="#3B82F6" strokeWidth={5} fillOpacity={1} fill="url(#colorRev)" />
-                    <Area type="monotone" dataKey="listings" stroke="#10B981" strokeWidth={5} fill="transparent" />
-                 </AreaChart>
-              </ResponsiveContainer>
-           </div>
-        </div>
-
-        {/* Category Breakdown */}
-        <div className="lg:col-span-4 bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col">
-           <h3 className="text-xl font-bold text-slate-800 tracking-tight mb-10">Reports by Category</h3>
-           <div className="relative h-64 w-full flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                 <PieChart>
-                    <Pie data={cats} dataKey="value" innerRadius={80} outerRadius={110} paddingAngle={8} stroke="none">
-                       {cats.map((c, i) => <Cell key={i} fill={c.color} />)}
-                    </Pie>
-                 </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                 <p className="text-4xl font-bold text-slate-800 tracking-tighter">56</p>
-                 <p className="text-[10px] text-slate-400 font-bold uppercase mt-2">Total Reports</p>
-              </div>
-           </div>
-           <div className="mt-10 space-y-4">
-              {cats.map(c => (
-                <div key={c.name} className="flex items-center justify-between group cursor-default">
-                   <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: c.color}} />
-                      <span className="text-xs font-bold text-slate-500 group-hover:text-slate-800 transition-colors">{c.name}</span>
-                   </div>
-                   <span className="text-xs font-bold text-slate-800">{c.percent}</span>
-                </div>
-              ))}
+           <div className="flex-1 min-h-[350px]">
+              {!hasTrendData ? (
+                <div className="flex items-center justify-center h-full text-slate-400 font-bold uppercase tracking-widest text-xs py-20">No Data Available</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                   <AreaChart data={trend}>
+                      <defs>
+                         <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.1}/>
+                            <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                         </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 700}} dy={15} />
+                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 700}} dx={-15} tickFormatter={v => `₹${v}`} />
+                      <Tooltip contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)'}} />
+                      <Area type="monotone" dataKey="revenue" stroke="#3B82F6" strokeWidth={5} fillOpacity={1} fill="url(#colorRev)" />
+                   </AreaChart>
+                </ResponsiveContainer>
+              )}
            </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-         {/* Recent Reports */}
-         <div className="lg:col-span-8 bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col">
-            <div className="flex items-center justify-between mb-10">
-               <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Generated Intelligence</h3>
-               <button className="text-xs font-bold text-blue-600 hover:underline uppercase">View Full Archive</button>
-            </div>
-            <div className="space-y-6">
-               {recentReports.map((r, i) => (
-                 <div key={i} className="flex items-center gap-6 group cursor-pointer p-2 rounded-3xl transition-all">
-                    <div className={cn(
-                       "w-16 h-16 rounded-[1.25rem] flex items-center justify-center text-white shadow-xl transition-transform group-hover:scale-105",
-                       r.color === "blue" ? "bg-blue-600 shadow-blue-100" :
-                       r.color === "emerald" ? "bg-emerald-600 shadow-emerald-100" :
-                       r.color === "indigo" ? "bg-indigo-600 shadow-indigo-100" : "bg-purple-600 shadow-purple-100"
-                    )}>
-                       <FileText className="w-8 h-8" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                       <p className="text-base font-bold text-slate-800 truncate">{r.name}</p>
-                       <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{r.date} • {r.time}</p>
-                    </div>
-                    <div className="text-center hidden sm:block mr-4">
-                       <span className="text-[9px] font-bold px-3 py-1 rounded-lg bg-slate-50 border border-slate-100 text-slate-500 uppercase">{r.category}</span>
-                    </div>
-                    <button className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-md transition-all">
-                       <Download className="w-5 h-5" />
+      {/* Tab Switcher & Table Ledger */}
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
+         <div className="p-10 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-8">
+            <div className="flex items-center gap-8">
+               <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg">
+                  <Database size={20} />
+               </div>
+               <div className="flex items-center bg-slate-50 p-1.5 rounded-2xl border border-slate-100 shadow-inner">
+                  {[
+                    { id: "payments", label: "Payments Ledger" },
+                    { id: "commission", label: "Commission Breakdown" },
+                    { id: "payouts", label: "Owner Payouts" }
+                  ].map(t => (
+                    <button 
+                      key={t.id} onClick={() => setActiveTab(t.id)}
+                      className={cn(
+                        "px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
+                        activeTab === t.id ? "bg-white text-blue-600 shadow-md border border-slate-100" : "text-slate-400 hover:text-slate-600"
+                      )}
+                    >
+                       {t.label}
                     </button>
-                 </div>
-               ))}
+                  ))}
+               </div>
             </div>
          </div>
 
-         {/* Scheduled Automations */}
-         <div className="lg:col-span-4 bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col">
-            <h3 className="text-xl font-bold text-slate-800 tracking-tight mb-10">Active Schedules</h3>
-            <div className="space-y-6 flex-1">
-               <ScheduleCard title="Weekly Revenue" date="Every Monday" />
-               <ScheduleCard title="Monthly Payouts" date="1st of Month" />
-               <ScheduleCard title="User Growth" date="Bi-Weekly" />
-            </div>
-            <button className="mt-10 w-full py-5 rounded-3xl border-2 border-dashed border-slate-100 text-xs font-bold text-slate-400 hover:border-blue-600 hover:text-blue-600 transition-all uppercase">
-               Create New Schedule
-            </button>
-        </div>
+         <div className="overflow-x-auto">
+            {activeTab === "payments" && (
+               <table className="w-full text-left">
+                  <thead>
+                     <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] border-b border-slate-100">
+                        <th className="px-10 py-8">Transaction ID</th>
+                        <th className="px-6 py-8">Booking ID</th>
+                        <th className="px-6 py-8">Tenant Name</th>
+                        <th className="px-6 py-8">Property Name</th>
+                        <th className="px-6 py-8 text-right">Amount Paid</th>
+                        <th className="px-6 py-8 text-center">Payout Status</th>
+                        <th className="px-10 py-8 text-right">Payment Date</th>
+                     </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                     {payments.length === 0 ? (
+                       <tr><td colSpan="7" className="py-20 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">No Payment Transactions Recorded</td></tr>
+                     ) : payments.map((p, idx) => (
+                       <tr key={p.id || idx} className="group hover:bg-slate-50/50 transition-all duration-300">
+                          <td className="px-10 py-8 font-black text-slate-700 text-xs tracking-wider uppercase">{p.razorpay_payment_id}</td>
+                          <td className="px-6 py-8 text-xs font-bold text-slate-500 truncate max-w-[120px]">{p.booking_id}</td>
+                          <td className="px-6 py-8 font-bold text-slate-800 text-sm">{p.tenant_name}</td>
+                          <td className="px-6 py-8 font-bold text-slate-500 text-sm">{p.property_name}</td>
+                          <td className="px-6 py-8 font-black text-slate-900 text-right text-sm">₹{p.amount?.toLocaleString('en-IN')}</td>
+                          <td className="px-6 py-8 text-center">
+                             <span className={cn(
+                               "text-[9px] font-bold px-3 py-1 rounded-xl border uppercase tracking-wider shadow-sm",
+                               p.payout_status === "Paid" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                               p.payout_status === "Failed" ? "bg-rose-50 text-rose-600 border-rose-100" :
+                               p.payout_status === "Processing" ? "bg-indigo-50 text-indigo-600 border-indigo-100" :
+                               "bg-amber-50 text-amber-600 border-amber-100"
+                             )}>
+                                {p.payout_status}
+                             </span>
+                          </td>
+                          <td className="px-10 py-8 text-right text-xs font-bold text-slate-400">{p.date}</td>
+                       </tr>
+                     ))}
+                  </tbody>
+               </table>
+            )}
+
+            {activeTab === "commission" && (
+               <table className="w-full text-left">
+                  <thead>
+                     <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] border-b border-slate-100">
+                        <th className="px-10 py-8">Transaction ID</th>
+                        <th className="px-6 py-8">Booking ID</th>
+                        <th className="px-6 py-8 text-right">Booking Amount</th>
+                        <th className="px-6 py-8 text-center">Commission %</th>
+                        <th className="px-6 py-8 text-right">Commission Earned</th>
+                        <th className="px-6 py-8 text-right">Owner Share</th>
+                        <th className="px-10 py-8 text-right">Payment Date</th>
+                     </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                     {commissions.length === 0 ? (
+                       <tr><td colSpan="7" className="py-20 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">No Commission Breakdown Data</td></tr>
+                     ) : commissions.map((c, idx) => (
+                       <tr key={c.id || idx} className="group hover:bg-slate-50/50 transition-all duration-300">
+                          <td className="px-10 py-8 font-black text-slate-700 text-xs tracking-wider uppercase">{c.razorpay_payment_id}</td>
+                          <td className="px-6 py-8 text-xs font-bold text-slate-500 truncate max-w-[120px]">{c.booking_id}</td>
+                          <td className="px-6 py-8 font-black text-slate-600 text-right text-sm">₹{c.booking_amount?.toLocaleString('en-IN')}</td>
+                          <td className="px-6 py-8 text-center">
+                             <span className="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">{c.commission_percentage}%</span>
+                          </td>
+                          <td className="px-6 py-8 font-black text-indigo-600 text-right text-sm">₹{c.commission_amount?.toLocaleString('en-IN')}</td>
+                          <td className="px-6 py-8 font-black text-emerald-600 text-right text-sm">₹{c.owner_amount?.toLocaleString('en-IN')}</td>
+                          <td className="px-10 py-8 text-right text-xs font-bold text-slate-400">{c.date}</td>
+                       </tr>
+                     ))}
+                  </tbody>
+               </table>
+            )}
+
+            {activeTab === "payouts" && (
+               <table className="w-full text-left">
+                  <thead>
+                     <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] border-b border-slate-100">
+                        <th className="px-10 py-8">Payout ID / Ref</th>
+                        <th className="px-6 py-8">Owner Name</th>
+                        <th className="px-6 py-8">Bank Destination</th>
+                        <th className="px-6 py-8 text-right">Owner share</th>
+                        <th className="px-6 py-8 text-center">Status</th>
+                        <th className="px-10 py-8 text-right">Settled Date / Action</th>
+                     </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                     {payouts.length === 0 ? (
+                       <tr><td colSpan="6" className="py-20 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">No Owner Payouts Found</td></tr>
+                     ) : payouts.map((p, idx) => (
+                       <tr key={p.id || idx} className="group hover:bg-slate-50/50 transition-all duration-300">
+                          <td className="px-10 py-8 font-black text-slate-700 text-xs tracking-wider uppercase shrink-0">
+                             {p.payout_reference || p.razorpay_payment_id || 'N/A'}
+                          </td>
+                          <td className="px-6 py-8 font-bold text-slate-800 text-sm">{p.owner_name}</td>
+                          <td className="px-6 py-8">
+                             {p.bank_details?.account_number ? (
+                               <div className="text-xs space-y-1">
+                                 <p className="font-bold text-slate-700">{p.bank_details.bank_name || 'Bank'}</p>
+                                 <p className="font-bold text-slate-400 uppercase">A/C: {p.bank_details.account_number}</p>
+                                 <p className="font-bold text-slate-300 uppercase">IFSC: {p.bank_details.ifsc_code}</p>
+                               </div>
+                             ) : (
+                               <span className="text-xs font-bold text-rose-500 bg-rose-50 px-3 py-1 rounded-xl border border-rose-100 uppercase tracking-wider">Details Missing</span>
+                             )}
+                          </td>
+                          <td className="px-6 py-8 font-black text-emerald-600 text-right text-sm">₹{p.owner_amount?.toLocaleString('en-IN')}</td>
+                          <td className="px-6 py-8 text-center">
+                             <span className={cn(
+                               "text-[9px] font-bold px-3 py-1 rounded-xl border uppercase tracking-wider shadow-sm",
+                               p.payout_status === "Paid" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                               "bg-amber-50 text-amber-600 border-amber-100"
+                             )}>
+                                {p.payout_status}
+                             </span>
+                          </td>
+                          <td className="px-10 py-8 text-right font-bold text-xs">
+                             {p.payout_status === "Paid" ? (
+                               <span className="text-slate-400">{p.payout_date || 'N/A'}</span>
+                             ) : (
+                               <button 
+                                 onClick={() => handleOpenPayout(p)}
+                                 className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all shadow-md active:scale-95"
+                               >
+                                  Transfer Payment
+                               </button>
+                             )}
+                          </td>
+                       </tr>
+                     ))}
+                  </tbody>
+               </table>
+            )}
+         </div>
       </div>
+
+      {/* Transfer Payout Modal */}
+      {showPayoutModal && selectedPayout && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-6 transition-all duration-300 animate-in fade-in">
+           <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-300">
+              {/* Header */}
+              <div className="p-8 bg-slate-900 text-white flex items-center justify-between">
+                 <div>
+                    <h3 className="text-xl font-bold tracking-tight">Initiate Payout Transfer</h3>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Platform Settlement Command</p>
+                 </div>
+                 <button 
+                    onClick={() => setShowPayoutModal(false)}
+                    className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all font-bold"
+                 >
+                    ✕
+                 </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-8 space-y-6">
+                 {/* Split details summary */}
+                 <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-3">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Transfer Summary</p>
+                    <div className="flex justify-between items-center text-xs font-bold text-slate-500">
+                       <span>Owner Name:</span>
+                       <span className="text-slate-800">{selectedPayout.owner_name}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs font-bold text-slate-500">
+                       <span>Gross Payout Share:</span>
+                       <span className="text-emerald-600 text-lg font-black">₹{selectedPayout.owner_amount?.toLocaleString('en-IN')}</span>
+                    </div>
+                 </div>
+
+                 {/* Input bank details */}
+                 <div className="space-y-4">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Verify / Enter Owner Bank Account Details</p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       <div className="space-y-1">
+                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider ml-1">Account Holder Name</label>
+                          <input 
+                             type="text"
+                             value={payoutForm.account_holder}
+                             onChange={e => setPayoutForm({ ...payoutForm, account_holder: e.target.value })}
+                             placeholder="Holder Name"
+                             className="w-full bg-slate-50 border border-slate-200/60 rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all"
+                          />
+                       </div>
+                       
+                       <div className="space-y-1">
+                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider ml-1">Bank Name</label>
+                          <input 
+                             type="text"
+                             value={payoutForm.bank_name}
+                             onChange={e => setPayoutForm({ ...payoutForm, bank_name: e.target.value })}
+                             placeholder="SBI, HDFC, etc."
+                             className="w-full bg-slate-50 border border-slate-200/60 rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all"
+                          />
+                       </div>
+                    </div>
+
+                    <div className="space-y-1">
+                       <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider ml-1">Bank Account Number</label>
+                       <input 
+                          type="text"
+                          value={payoutForm.account_number}
+                          onChange={e => setPayoutForm({ ...payoutForm, account_number: e.target.value })}
+                          placeholder="Account Number"
+                          className="w-full bg-slate-50 border border-slate-200/60 rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all"
+                       />
+                    </div>
+
+                    <div className="space-y-1">
+                       <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider ml-1">IFSC Code</label>
+                       <input 
+                          type="text"
+                          value={payoutForm.ifsc_code}
+                          onChange={e => setPayoutForm({ ...payoutForm, ifsc_code: e.target.value.toUpperCase() })}
+                          placeholder="IFSC Code"
+                          className="w-full bg-slate-50 border border-slate-200/60 rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all"
+                       />
+                    </div>
+                 </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-8 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+                 <button 
+                    onClick={() => setShowPayoutModal(false)}
+                    className="px-6 py-4 bg-white text-slate-500 border border-slate-200 rounded-2xl text-[10px] font-bold uppercase hover:bg-slate-50 transition-all active:scale-95"
+                 >
+                    Cancel
+                 </button>
+                 <button 
+                    onClick={handleConfirmPayout}
+                    disabled={transferring}
+                    className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-[10px] font-bold uppercase shadow-xl shadow-blue-200 transition-all active:scale-95 disabled:opacity-50"
+                 >
+                    {transferring ? "Processing Transfer..." : "Confirm & Pay Out"}
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function StatCardLarge({ label, value, trend, up, icon: Icon, color }) {
+function StatCardLarge({ label, value, trend, up, icon: Icon, color, source }) {
   const bgColors = { 
     blue: "bg-blue-600 shadow-blue-200", 
     indigo: "bg-indigo-600 shadow-indigo-200", 
@@ -192,20 +564,26 @@ function StatCardLarge({ label, value, trend, up, icon: Icon, color }) {
   };
   
   return (
-    <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col gap-6 group hover:translate-y-[-8px] transition-all duration-500">
-      <div className={cn("w-16 h-16 rounded-[1.25rem] flex items-center justify-center text-white shadow-2xl transition-transform group-hover:rotate-6", bgColors[color])}>
-         <Icon className="w-8 h-8" />
-      </div>
+    <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col gap-6 group hover:translate-y-[-8px] transition-all duration-500 justify-between min-h-[260px]">
       <div>
-         <p className="text-[10px] font-bold text-slate-400 uppercase mb-3 leading-none truncate">{label}</p>
-         <p className="text-4xl font-bold text-slate-800 tracking-tighter leading-none">{value}</p>
+        <div className={cn("w-16 h-16 rounded-[1.25rem] flex items-center justify-center text-white shadow-2xl transition-transform group-hover:rotate-6 mb-4", bgColors[color])}>
+           <Icon className="w-8 h-8" />
+        </div>
+        <p className="text-[10px] font-bold text-slate-400 uppercase mb-2 leading-none truncate">{label}</p>
+        <p className="text-lg font-black text-slate-800 tracking-tighter leading-none mb-2">{value}</p>
       </div>
-      <div className={cn(
-        "flex items-center gap-2 text-[10px] font-bold px-3 py-1.5 rounded-xl w-fit",
-        up ? "text-emerald-600 bg-emerald-50" : "text-rose-600 bg-rose-50"
-      )}>
-         {up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-         {trend}
+      
+      <div className="w-full border-t border-slate-50 pt-3 flex flex-col items-start gap-1.5 mt-auto">
+        {value !== "No Data Available" && (
+          <div className={cn(
+            "flex items-center gap-2 text-[10px] font-bold px-3 py-1 rounded-xl w-fit",
+            up ? "text-emerald-600 bg-emerald-50" : "text-rose-600 bg-rose-50"
+          )}>
+             {up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+             {trend}
+          </div>
+        )}
+        <span className="text-[8px] font-black text-blue-500/80 uppercase tracking-wider">Data Source: {source}</span>
       </div>
     </div>
   );
@@ -216,22 +594,6 @@ function LegendPill({ color, label }) {
     <div className="flex items-center gap-2">
        <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: color}} />
        <span className="text-[10px] font-bold text-slate-400 uppercase">{label}</span>
-    </div>
-  );
-}
-
-function ScheduleCard({ title, date }) {
-  return (
-    <div className="p-6 rounded-[2rem] bg-slate-50 border border-slate-100 group hover:bg-slate-800 hover:shadow-xl transition-all cursor-pointer">
-       <div className="flex items-center justify-between">
-          <div>
-             <p className="text-sm font-bold text-slate-800 group-hover:text-white transition-colors">{title}</p>
-             <p className="text-[10px] font-bold text-slate-400 uppercase mt-1 group-hover:text-slate-300 transition-colors">{date}</p>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-emerald-500 shadow-sm group-hover:scale-110 transition-transform">
-             <CheckCircle2 className="w-5 h-5" />
-          </div>
-       </div>
     </div>
   );
 }

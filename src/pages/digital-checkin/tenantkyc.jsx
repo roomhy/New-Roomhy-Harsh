@@ -94,6 +94,7 @@ const AadhaarUpload = ({ label, side, value, onChange }) => {
         ref={inputRef}
         type="file"
         accept="image/*"
+        capture={side === "selfie" ? "user" : "environment"}
         onChange={handleFile}
         style={{ display: "none" }}
       />

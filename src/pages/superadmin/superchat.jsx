@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import {
   Search, MoreVertical, User, Send, Paperclip, Smile, Phone, Mail,
-  Star, Globe, ChevronRight, UserCheck, Calendar, ArrowUpRight, ArrowDownRight, Building2, DollarSign, RefreshCw
+  Star, Globe, ChevronRight, UserCheck, Calendar, ArrowUpRight, ArrowDownRight, Building2, DollarSign, RefreshCw, Shield, MessageSquare
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area } from "recharts";
 import { fetchJson, getApiBase } from "../../utils/api";
@@ -402,12 +402,30 @@ export default function SuperChat() {
             </div>
           </div>
           
-          <div className="mt-auto pt-8">
+          <div className="mt-auto pt-8 space-y-3">
+             <button onClick={() => window.open('/superadmin/chat/leads', '_blank')} className="w-full py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-900/10 flex items-center justify-center gap-2">
+                <Building2 size={14} /> Map to Lead
+             </button>
              <button className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-900/10 flex items-center justify-center gap-2">
                 <UserCheck size={14} /> Assign to Manager
              </button>
           </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <a href="/superadmin/chat/settings" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 hover:border-blue-500 hover:shadow-md transition-all text-sm font-bold text-slate-700">
+          <Globe className="text-blue-500" /> Chat Settings
+        </a>
+        <a href="/superadmin/chat/templates" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 hover:border-blue-500 hover:shadow-md transition-all text-sm font-bold text-slate-700">
+          <MessageSquare className="text-purple-500" /> Templates
+        </a>
+        <a href="/superadmin/chat/alerts" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 hover:border-blue-500 hover:shadow-md transition-all text-sm font-bold text-slate-700">
+          <Shield className="text-red-500" /> Moderation & Alerts
+        </a>
+        <a href="/superadmin/chat/leads" className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 hover:border-blue-500 hover:shadow-md transition-all text-sm font-bold text-slate-700">
+          <UserCheck className="text-emerald-500" /> Lead Mapping
+        </a>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">

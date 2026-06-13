@@ -160,9 +160,8 @@ export default function OurPropertyPage() {
         // Store all filtered properties for pagination
         setTotalProperties(filtered);
         
-        // Use the total from API (if available) or fallback to filtered length
-        const apiTotal = allProperties.total || allProperties.length;
-        setTotalCount(apiTotal);
+        // Fix: Use the filtered length for accurate pagination counts
+        setTotalCount(filtered.length);
         
         // Extract colleges from ALL filtered properties (not just current page)
         const collegesByProperty = {};
@@ -249,7 +248,7 @@ export default function OurPropertyPage() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedCity, selectedType, selectedGender, minPrice, maxPrice, selectedRatings]);
+  }, [selectedCity, selectedType, selectedGender, minPrice, maxPrice, selectedRatings, selectedColleges, searchQuery]);
 
   return (
     <div className="min-h-screen bg-white">

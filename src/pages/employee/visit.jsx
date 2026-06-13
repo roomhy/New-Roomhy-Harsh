@@ -201,6 +201,7 @@ export default function Visit() {
   const [resolvedAreaName, setResolvedAreaName] = useState("");
   const [resolvedCityName, setResolvedCityName] = useState("");
   const [editingVisit, setEditingVisit] = useState(null);
+  const [assignedEnquiries, setAssignedEnquiries] = useState([]);
   const [modalAreaName, setModalAreaName] = useState("");
   const [modalCityName, setModalCityName] = useState("");
   const cameraStreamRef = useRef(null);
@@ -241,6 +242,16 @@ export default function Visit() {
         const local = JSON.parse(localStorage.getItem("roomhy_property_enquiries") || "[]");
         setAddedVisitIds(new Set(local.map((e) => e.visitId || e.enquiryId).filter(Boolean)));
       } catch (_) {}
+    }
+  };
+
+  const loadAssignedEnquiries = async () => {
+    try {
+      if (!staffId) return;
+      const data = await fetchJson(`/api/website-enquiry/assigned-to/${encodeURIComponent(staffId)}`);
+      setAssignedEnquiries(data?.enquiries || data || []);
+    } catch (err) {
+      console.error("Failed to load assigned enquiries:", err);
     }
   };
 
@@ -320,9 +331,11 @@ export default function Visit() {
     if (!user) return;
     loadVisits();
     loadAddedVisits();
+    loadAssignedEnquiries();
     const interval = setInterval(() => {
       loadVisits();
       loadAddedVisits();
+      loadAssignedEnquiries();
     }, 15000);
     return () => clearInterval(interval);
   }, [staffId, staffName, user]);
@@ -367,6 +380,34 @@ export default function Visit() {
   const openModal = () => {
     resetModalDefaults();
     setStep(1);
+    setShowModal(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setGeo({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => setGeo({ lat: "", lng: "" }),
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      );
+    }
+  };
+
+  const startVisitFromEnquiry = (enq) => {
+    resetModalDefaults();
+    setStep(1);
+    setEditingVisit({
+      websiteEnquiryId: enq.enquiry_id || enq._id,
+      propertyName: enq.property_name,
+      propertyType: enq.property_type || "PG",
+      address: enq.locality ? `${enq.locality}, ${enq.city}` : enq.city,
+      areaLocality: enq.locality,
+      city: enq.city,
+      ownerName: enq.owner_name,
+      contactPhone: enq.owner_phone,
+      ownerEmail: enq.owner_email,
+      gender: enq.gender_suitability,
+      monthlyRent: enq.rent
+    });
+    setModalAreaName(enq.locality || resolvedAreaName);
+    setModalCityName(enq.city || resolvedCityName);
     setShowModal(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -730,6 +771,15 @@ export default function Visit() {
       } else {
         await fetchJson("/api/visits", { method: "POST", body: JSON.stringify(payload) });
         
+        if (editingVisit?.websiteEnquiryId) {
+          try {
+            await fetchJson(`/api/website-enquiry/${encodeURIComponent(editingVisit.websiteEnquiryId)}`, {
+              method: "PUT",
+              body: JSON.stringify({ status: "visited" })
+            });
+          } catch(err) { console.error("Error updating website enquiry status", err); }
+        }
+        
         // Auto-create owner request
         if (fd.get("createOwnerRequest") === "true") {
           try {
@@ -897,6 +947,52 @@ export default function Visit() {
           </div>
         </div>
       </div>
+
+      {/* Assigned Enquiries Section */}
+      {assignedEnquiries.length > 0 && (
+        <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-lg shadow-slate-200/50 overflow-hidden mb-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-[10px] font-bold text-slate-800 uppercase tracking-widest leading-none">Assigned Web Enquiries</h3>
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">Pending Property Visits</p>
+            </div>
+            <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-xl text-[9px] font-bold uppercase tracking-widest">
+              {assignedEnquiries.filter(e => e.status !== 'visited').length} Active
+            </span>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-4 snap-x">
+            {assignedEnquiries.filter(e => e.status !== 'visited').map((enq, i) => (
+              <div key={i} className="min-w-[280px] bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col snap-center shrink-0 hover:border-blue-200 transition-colors">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="text-[12px] font-bold text-slate-800 leading-tight truncate">{enq.property_name || "Digital Prospect"}</p>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1 opacity-80">{enq.city} • {enq.owner_name}</p>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-[10px]">
+                    {(enq.owner_name || "U")[0].toUpperCase()}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md uppercase border border-emerald-100">
+                    Rent: ₹{enq.rent || 0}
+                  </span>
+                  <span className="text-[8px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md uppercase border border-indigo-100">
+                    {enq.property_type || "PG"}
+                  </span>
+                </div>
+                <button onClick={() => startVisitFromEnquiry(enq)} className="w-full mt-auto bg-white border border-slate-200 text-slate-700 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all shadow-sm">
+                  Start Visit Report
+                </button>
+              </div>
+            ))}
+            {assignedEnquiries.filter(e => e.status !== 'visited').length === 0 && (
+               <div className="w-full py-8 text-center text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                 No pending assigned enquiries
+               </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Ledger Card */}
       <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-lg shadow-slate-200/50 overflow-hidden">

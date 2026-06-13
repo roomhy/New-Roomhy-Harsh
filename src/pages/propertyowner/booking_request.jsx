@@ -18,6 +18,11 @@ export default function BookingRequestPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [approvingItem, setApprovingItem] = useState(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentLink, setPaymentLink] = useState("");
+
   React.useEffect(() => {
     let active = true;
     const fetchRequests = async () => {
@@ -47,6 +52,23 @@ export default function BookingRequestPage() {
       setRequests(prev => prev.filter(r => r._id !== id));
     } catch (err) {
       console.error(`Error performing booking action ${action}:`, err);
+      alert(`Action failed: ${err.message}`);
+    }
+  };
+
+  const confirmApprove = async () => {
+    try {
+      await apiFetch(`/api/booking/requests/${approvingItem._id}/approve`, { 
+        method: "PUT",
+        body: JSON.stringify({ 
+           approved_amount: paymentAmount, 
+           payment_link: paymentLink 
+        })
+      });
+      setRequests(prev => prev.filter(r => r._id !== approvingItem._id));
+      setShowApprovalModal(false);
+      alert(`Bid approved. Payment link sent to tenant for ₹${paymentAmount}.`);
+    } catch(err) {
       alert(`Action failed: ${err.message}`);
     }
   };
@@ -134,12 +156,26 @@ export default function BookingRequestPage() {
               </div>
 
               <div className="border-t border-border/60 mt-6 pt-4 flex gap-2">
-                <button 
-                  onClick={() => handleAction(item._id, "approve")}
-                  className="flex-1 h-11 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all"
-                >
-                  Approve &amp; Assign Bed
-                </button>
+                {item.request_type === 'bid' ? (
+                  <button 
+                    onClick={() => {
+                      setApprovingItem(item);
+                      setPaymentAmount(item.bid_min || item.bid_amount || item.rent_amount || 0);
+                      setPaymentLink(`https://roomhy.com/payment-checkout?booking_id=${item._id}&amount=${item.bid_min || item.bid_amount || item.rent_amount || 0}`);
+                      setShowApprovalModal(true);
+                    }}
+                    className="flex-1 h-11 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all"
+                  >
+                    Accept Bid & Create Payment Link
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => handleAction(item._id, "approve")}
+                    className="flex-1 h-11 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all"
+                  >
+                    Approve &amp; Assign Bed
+                  </button>
+                )}
                 <button 
                   onClick={() => handleAction(item._id, "reject")}
                   className="px-4 h-11 border border-border rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50"
@@ -149,6 +185,55 @@ export default function BookingRequestPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Bid Approval Modal */}
+      {showApprovalModal && approvingItem && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-2xl p-6 w-full max-w-md shadow-xl border border-border">
+            <h3 className="font-serif text-[22px] font-bold text-foreground mb-4">Accept Bid & Generate Link</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Approved Amount (₹)</label>
+                <input 
+                  type="number" 
+                  value={paymentAmount}
+                  onChange={(e) => {
+                    setPaymentAmount(e.target.value);
+                    setPaymentLink(`https://roomhy.com/payment-checkout?booking_id=${approvingItem._id}&amount=${e.target.value}`);
+                  }}
+                  className="w-full h-11 px-3 rounded-xl bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Payment Link</label>
+                <input 
+                  type="text" 
+                  value={paymentLink}
+                  onChange={(e) => setPaymentLink(e.target.value)}
+                  className="w-full h-11 px-3 rounded-xl bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground bg-blue-50 text-blue-800 p-3 rounded-lg">
+                This link will be generated and shared with the tenant so they can pay to secure their booking.
+              </p>
+            </div>
+            <div className="mt-6 flex gap-3">
+              <button 
+                onClick={() => setShowApprovalModal(false)}
+                className="flex-1 h-11 border border-border text-foreground font-bold text-[13px] rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmApprove}
+                className="flex-1 h-11 bg-indigo-600 text-white font-bold text-[13px] rounded-xl hover:bg-indigo-700 transition-colors"
+              >
+                Confirm & Accept
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </PropertyOwnerLayout>

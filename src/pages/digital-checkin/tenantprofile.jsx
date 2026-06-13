@@ -92,8 +92,8 @@ export default function DigitalCheckinTenantprofile() {
               {inp("name", { required: true, placeholder: "As per Aadhaar card" })}
             </Field>
 
-            <Field label="Date of Birth *">
-              {inp("dob", { type: "date", required: true })}
+            <Field label="Date of Birth (DD/MM/YYYY) *">
+              {inp("dob", { type: "text", required: true, placeholder: "DD/MM/YYYY" })}
             </Field>
 
             {/* ── SECTION 2: Contact ── */}

@@ -103,6 +103,22 @@ export default function Tenant() {
     });
   }, [tenants, search]);
 
+  const LIMIT = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalRecords = filteredTenants.length;
+  const totalPages = Math.ceil(totalRecords / LIMIT) || 1;
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
+
+  const paginatedTenants = useMemo(() => {
+    const start = (currentPage - 1) * LIMIT;
+    return filteredTenants.slice(start, start + LIMIT);
+  }, [filteredTenants, currentPage]);
+
   const stats = useMemo(() => {
     const total = tenants.length;
     const verified = tenants.filter(t => t.kyc.status === "verified").length;
@@ -277,7 +293,7 @@ export default function Tenant() {
                        </div>
                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No matching residents found</p>
                     </td></tr>
-                  ) : filteredTenants.map((t, i) => (
+                  ) : paginatedTenants.map((t, i) => (
                     <tr key={i} className="group hover:bg-slate-50/50 transition-all duration-300 cursor-pointer" onClick={() => setSelectedTenant(t)}>
                        <td className="px-10 py-8">
                           <div className="flex items-center gap-6">

@@ -1,16 +1,58 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Settings as SettingsIcon, UserCog, Bell, 
   ShieldCheck, Globe, Moon, Sun, Monitor,
   AlertTriangle, Trash2, ChevronRight, Save,
   RotateCcw, Lock, Eye, Mail, Smartphone,
   Database, Zap, ShieldAlert, Key, Fingerprint,
-  Languages, Palette, Sparkles, Sliders
+  Languages, Palette, Sparkles, Sliders,
+  Percent
 } from "lucide-react";
+import { fetchJson } from "../../utils/api";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
 export default function SuperadminSettings() {
+  const [commissionPercentage, setCommissionPercentage] = useState(10);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const res = await fetchJson("/api/superadmin/settings");
+        if (res.success && res.settings) {
+          setCommissionPercentage(res.settings.commission_percentage ?? 10);
+        }
+      } catch (err) {
+        console.error("Failed to load settings:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadSettings();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetchJson("/api/superadmin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commission_percentage: Number(commissionPercentage) })
+      });
+      if (res.success) {
+        alert("Platform settings saved successfully!");
+      } else {
+        alert(res.message || "Failed to save settings");
+      }
+    } catch (err) {
+      alert("Error saving settings: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="p-8 space-y-10 bg-[#F8FAFC] min-h-full">
       {/* Header Area */}
@@ -29,8 +71,12 @@ export default function SuperadminSettings() {
             <button className="bg-white text-slate-400 border border-slate-100 px-6 py-4 rounded-2xl text-[10px] font-bold uppercase hover:bg-slate-50 transition-all flex items-center gap-2">
                <RotateCcw className="w-4 h-4" /> Reset Defaults
             </button>
-            <button className="bg-slate-800 text-white px-8 py-4 rounded-2xl text-[10px] font-bold uppercase shadow-xl shadow-slate-800/20 hover:bg-slate-900 transition-all flex items-center gap-2">
-               <Save className="w-4 h-4" /> Commit Changes
+            <button 
+              onClick={handleSave}
+              disabled={saving || loading}
+              className="bg-slate-800 text-white px-8 py-4 rounded-2xl text-[10px] font-bold uppercase shadow-xl shadow-slate-800/20 hover:bg-slate-900 transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+               <Save className="w-4 h-4" /> {saving ? "Saving..." : "Commit Changes"}
             </button>
          </div>
       </div>
@@ -108,6 +154,19 @@ export default function SuperadminSettings() {
                     label="Real-time Data Sync" 
                     sub="Keep all dashboard metrics synchronized in real-time" 
                     action={<Toggle active />}
+                  />
+                  <SettingRow 
+                    icon={Percent} 
+                    label="Platform Commission split (%)" 
+                    sub="Set global platform transaction fee cut on payments" 
+                    action={
+                      <input 
+                        type="number" 
+                        value={commissionPercentage} 
+                        onChange={(e) => setCommissionPercentage(Number(e.target.value))}
+                        className="w-24 bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100" 
+                      />
+                    }
                   />
                </div>
             </div>

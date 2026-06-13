@@ -33,7 +33,7 @@ const Pill = ({ tone = "muted", children }) => {
   );
 };
 
-const StatCard = ({ label, value, icon: Icon, tone = "default", hint }) => {
+const StatCard = ({ label, value, icon: Icon, tone = "default", hint, onClick }) => {
   const toneBg = {
     info: "bg-blue-50/50 border border-blue-150/60 text-blue-600 dark:bg-blue-950/10",
     success: "bg-emerald-50/50 border border-emerald-150/60 text-emerald-600 dark:bg-emerald-950/10",
@@ -49,7 +49,7 @@ const StatCard = ({ label, value, icon: Icon, tone = "default", hint }) => {
   };
 
   return (
-    <div className={`w-[38%] md:w-auto shrink-0 snap-start rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${toneBg[tone] || toneBg.default}`}>
+    <div onClick={onClick} className={`w-[38%] md:w-auto shrink-0 snap-start rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${onClick ? 'cursor-pointer' : ''} ${toneBg[tone] || toneBg.default}`}>
       <div className="flex items-center justify-between mb-2">
         <span className="text-[11px] font-bold uppercase tracking-wider">{label}</span>
         {Icon && <Icon className="size-4 shrink-0" />}
@@ -115,6 +115,123 @@ const currentBillingMonth = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 };
 
+const CalculationHistoryModal = ({ isOpen, onClose, rows, totalExpected, totalCollected, totalDue }) => {
+  if (!isOpen) return null;
+
+  const sumPaid = rows.reduce((s, row) => s + (row.invoice?.paidAmount || 0), 0);
+  const sumPending = rows.reduce((s, row) => s + (row.outstandingAmount || 0), 0);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
+        <div className="flex items-center justify-between p-6 border-b border-border bg-slate-50/50">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800">Calculation History</h2>
+            <p className="text-sm text-slate-500 mt-1">Detailed breakdown of rent collections and outstanding amounts.</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+            <X className="size-5 text-slate-500" />
+          </button>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
+              <div className="text-sm font-semibold text-slate-500 mb-1 uppercase tracking-wider">Total Expected</div>
+              <div className="text-3xl font-black text-slate-800">₹{(totalExpected || 0).toLocaleString("en-IN")}</div>
+            </div>
+            <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 text-center">
+              <div className="text-sm font-semibold text-emerald-600 mb-1 uppercase tracking-wider">Total Collected</div>
+              <div className="text-3xl font-black text-emerald-700">₹{(totalCollected || 0).toLocaleString("en-IN")}</div>
+            </div>
+            <div className="bg-rose-50/50 p-4 rounded-2xl border border-rose-100 text-center">
+              <div className="text-sm font-semibold text-rose-600 mb-1 uppercase tracking-wider">Total Outstanding</div>
+              <div className="text-3xl font-black text-rose-700">₹{(totalDue || 0).toLocaleString("en-IN")}</div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-2xl border border-border">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="p-4">Tenant & Room</th>
+                  <th className="p-4">Rent Configuration</th>
+                  <th className="p-4">Paid</th>
+                  <th className="p-4">Pending</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rows.map((row, idx) => {
+                  const baseRent = row.baseRoomRent || row.agreedRent || 0;
+                  const agreedRent = row.agreedRent || 0;
+                  const isReduced = baseRent > agreedRent;
+                  const paid = row.invoice?.paidAmount || 0;
+                  const pending = row.outstandingAmount || 0;
+
+                  return (
+                    <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-4">
+                        <div className="font-bold text-slate-800">{row.name}</div>
+                        <div className="text-xs text-slate-500">Room {row.roomNo || "—"}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-col gap-1">
+                          <div className="text-xs flex items-center justify-between">
+                            <span className="text-slate-500">Base Rent:</span> 
+                            <span className="font-semibold">₹{baseRent.toLocaleString('en-IN')}</span>
+                          </div>
+                          <div className="text-xs flex items-center justify-between">
+                            <span className="text-slate-500">Final Rent:</span> 
+                            <span className="font-bold text-slate-800">₹{agreedRent.toLocaleString('en-IN')}</span>
+                          </div>
+                          <div className="mt-1">
+                            {isReduced ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">
+                                Rent Reduced by ₹{(baseRent - agreedRent).toLocaleString('en-IN')}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700">
+                                Fixed Rent
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-base font-bold text-emerald-600">₹{paid.toLocaleString('en-IN')}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-base font-bold text-rose-600">₹{pending.toLocaleString('en-IN')}</div>
+                        {pending > 0 && row.phase > 1 && (
+                          <div className="text-[10px] text-rose-500 mt-1 font-semibold">Includes penalties</div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan="4" className="p-8 text-center text-slate-500 font-medium">No active tenants found.</td>
+                  </tr>
+                )}
+              </tbody>
+              {rows.length > 0 && (
+                <tfoot className="bg-slate-50 border-t border-slate-200 font-bold text-slate-800 text-sm">
+                  <tr>
+                    <td className="p-4" colSpan={2}>Total Sum</td>
+                    <td className="p-4 text-emerald-700 text-base font-black">₹{sumPaid.toLocaleString('en-IN')}</td>
+                    <td className="p-4 text-rose-700 text-base font-black">₹{sumPending.toLocaleString('en-IN')}</td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function Payment() {
   const [owner, setOwner] = useState(null);
   const [tenants, setTenants] = useState([]);
@@ -136,6 +253,7 @@ export default function Payment() {
   const [payModalMethod, setPayModalMethod] = useState("cash");
   const [payModalAmt, setPayModalAmt] = useState(0);
   const [payModalLoading, setPayModalLoading] = useState(false);
+  const [showCalcHistory, setShowCalcHistory] = useState(false);
   const [toast, setToast] = useState(null);
 
   const showToast = (msg, type = "success") => {
@@ -249,9 +367,9 @@ export default function Payment() {
     );
 
   const fmt = (n) => "₹" + (n || 0).toLocaleString("en-IN");
-  const totalExpected  = dashStats ? dashStats.totalOutstanding + (dashStats.paid ? dashStats.totalOutstanding : 0) : tenants.reduce((s, t) => s + (t.agreedRent || t.rent || 0), 0);
-  const totalCollected = dashStats ? 0 : rows.filter(r => r.payStatus === "paid").reduce((s, t) => s + (t.agreedRent || t.rent || 0), 0);
-  const totalDue       = dashStats?.totalOutstanding || rows.filter(r => r.payStatus === "due").reduce((s, t) => s + (t.outstandingAmount || 0), 0);
+  const totalExpected  = rows.reduce((s, t) => s + ((t.invoice?.rentAmount) || t.agreedRent || t.rent || 0), 0);
+  const totalCollected = rows.reduce((s, t) => s + (t.invoice?.paidAmount || 0), 0);
+  const totalDue       = rows.reduce((s, t) => s + (t.outstandingAmount || 0), 0);
   const totalPenalty   = dashStats?.totalPenalty || 0;
   const pctDone        = dashStats ? Math.round(((dashStats.paid || 0) / Math.max(1, (dashStats.total || 1))) * 100) : 0;
 
@@ -387,6 +505,16 @@ export default function Payment() {
         </div>
       )}
 
+      {/* Calculation History Modal */}
+      <CalculationHistoryModal 
+        isOpen={showCalcHistory} 
+        onClose={() => setShowCalcHistory(false)} 
+        rows={rows} 
+        totalExpected={totalExpected} 
+        totalCollected={totalCollected} 
+        totalDue={totalDue} 
+      />
+
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6 hidden md:flex">
         <div>
@@ -413,6 +541,12 @@ export default function Payment() {
             className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg bg-foreground text-background text-[13px] font-medium hover:opacity-90 transition-opacity"
           >
             Penalty settings
+          </button>
+          <button
+            onClick={() => setShowCalcHistory(true)}
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg bg-blue-600 text-white text-[13px] font-medium hover:bg-blue-700 transition-colors"
+          >
+            Calculation history
           </button>
         </div>
       </div>
@@ -545,9 +679,16 @@ export default function Payment() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {t.propertyName || (t.property && typeof t.property === "object" ? t.property.title || t.property.name : t.property) || "—"}
+                      {t.propertyTitle || t.propertyName || (t.property && typeof t.property === "object" ? t.property.title || t.property.name : t.property) || "—"}
                     </td>
-                    <td className="px-4 py-3 font-medium text-foreground">{fmt(t.agreedRent || t.rent || 0)}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-foreground">{fmt(t.agreedRent || t.rent || 0)}</div>
+                      {t.baseRoomRent && t.baseRoomRent > (t.agreedRent || t.rent || 0) && (
+                        <div className="text-[10px] text-amber-600 font-medium mt-0.5 cursor-help" title={`Original base rent was ${fmt(t.baseRoomRent)}. Discounted by owner.`}>
+                          Base: <span className="line-through opacity-70">{fmt(t.baseRoomRent)}</span>
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3 font-medium text-foreground">{fmt(t.outstandingAmount)}</td>
                     <td className="px-4 py-3">
                       {phCfg ? (

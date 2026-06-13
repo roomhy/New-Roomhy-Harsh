@@ -185,6 +185,22 @@ export default function Owner() {
     });
   }, [owners, search, areaFilter, currentView]);
 
+  const LIMIT = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalRecords = filteredOwners.length;
+  const totalPages = Math.ceil(totalRecords / LIMIT) || 1;
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
+
+  const paginatedOwners = useMemo(() => {
+    const start = (currentPage - 1) * LIMIT;
+    return filteredOwners.slice(start, start + LIMIT);
+  }, [filteredOwners, currentPage]);
+
   const areas = useMemo(() => {
     const set = new Set(owners.map(o => (o.locationCode || o.checkinArea || "").toUpperCase()).filter(Boolean));
     return Array.from(set).sort();
@@ -508,7 +524,7 @@ export default function Owner() {
                          </div>
                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Compliance Queue Clear</p>
                       </td></tr>
-                    ) : filteredOwners.map((o, i) => {
+                    ) : paginatedOwners.map((o, i) => {
                       const status = (o.kycStatus || o.kyc?.status || "pending").toLowerCase();
                       return (
                         <tr key={i} className="group hover:bg-slate-50/50 transition-all duration-300 cursor-pointer" onClick={() => {
@@ -616,6 +632,40 @@ export default function Owner() {
                  </tbody>
               </table>
            </div>
+
+            {/* Pagination */}
+            {totalRecords > 0 && (
+              <div className="flex items-center justify-between px-10 py-6 border-t border-slate-100 bg-white">
+                <p className="text-[11px] font-bold text-slate-400">
+                  Showing {((currentPage-1)*LIMIT)+1} to {Math.min(currentPage*LIMIT,totalRecords)} of{" "}
+                  <span className="text-slate-700">{totalRecords.toLocaleString()}</span> property owners
+                </p>
+                <div className="flex items-center gap-2">
+                  <button disabled={currentPage===1} onClick={()=>setCurrentPage(currentPage-1)}
+                    className="flex items-center gap-1 px-4 py-2.5 rounded-xl border border-slate-200 text-[11px] font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+                    <ChevronLeft className="w-4 h-4"/> Prev
+                  </button>
+                  {Array.from({length:Math.min(totalPages,7)},(_,i)=>{
+                    let n;
+                    if(totalPages<=7) n=i+1;
+                    else if(currentPage<=4) n=i+1;
+                    else if(currentPage>=totalPages-3) n=totalPages-6+i;
+                    else n=currentPage-3+i;
+                    return (
+                      <button key={n} onClick={()=>setCurrentPage(n)}
+                        className={cn("w-10 h-10 rounded-xl text-[11px] font-bold transition-all",
+                          currentPage===n?"bg-blue-600 text-white shadow-lg shadow-blue-200":"text-slate-500 hover:bg-slate-100 border border-slate-200")}>
+                        {n}
+                      </button>
+                    );
+                  })}
+                  <button disabled={currentPage===totalPages} onClick={()=>setCurrentPage(currentPage+1)}
+                    className="flex items-center gap-1 px-4 py-2.5 rounded-xl border border-slate-200 text-[11px] font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+                    Next <ChevronRight className="w-4 h-4"/>
+                  </button>
+                </div>
+              </div>
+            )}
         </div>
       )}
 

@@ -189,6 +189,7 @@ export default function AddTenant() {
   // Section 3: Tenancy Details
   const [tenancyDetails, setTenancyDetails] = useState({
     rentAmount: "",
+    finalRent: "",
     depositAmount: "",
     moveInDate: "",
     minStay: "11",
@@ -271,6 +272,15 @@ export default function AddTenant() {
     loadRooms();
   }, [roomAssignment.propertyId]);
 
+  useEffect(() => {
+    if (roomAssignment.roomUnit && rooms.length > 0) {
+      const selectedRoom = rooms.find(r => r.title === roomAssignment.roomUnit);
+      if (selectedRoom && selectedRoom.price) {
+        setTenancyDetails(prev => ({ ...prev, rentAmount: selectedRoom.price }));
+      }
+    }
+  }, [roomAssignment.roomUnit, rooms]);
+
   const validateForm = () => {
     const newErrors = {};
     if (!basicDetails.fullName) newErrors.fullName = "Name is required";
@@ -323,7 +333,8 @@ export default function AddTenant() {
         roomNo: roomAssignment.roomUnit,
         bedNo: roomAssignment.bed,
         moveInDate: tenancyDetails.moveInDate,
-        agreedRent: tenancyDetails.rentAmount,
+        baseRoomRent: tenancyDetails.rentAmount,
+        agreedRent: tenancyDetails.finalRent ? tenancyDetails.finalRent : tenancyDetails.rentAmount,
         electricityUnitCost: tenancyDetails.electricityUnitCost,
         securityDepositTotal: tenancyDetails.depositAmount,
         securityDepositPaid: 0,
@@ -617,7 +628,7 @@ export default function AddTenant() {
             
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <FormField 
-                label="Rent Amount (₹)" 
+                label="Standard Rent (₹)" 
                 required
                 value={tenancyDetails.rentAmount}
                 onChange={e => setTenancyDetails({...tenancyDetails, rentAmount: e.target.value})}
@@ -625,6 +636,16 @@ export default function AddTenant() {
                 type="number"
                 error={errors.rentAmount}
               />
+              <div className="relative group">
+                 <FormField 
+                   label="Final Agreed Rent" 
+                   value={tenancyDetails.finalRent}
+                   onChange={e => setTenancyDetails({...tenancyDetails, finalRent: e.target.value})}
+                   placeholder="Enter final negotiated rent"
+                   type="number"
+                 />
+                 <span className="absolute -top-2 -right-2 bg-amber-100 text-amber-700 text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm">Optional</span>
+              </div>
               <FormField 
                 label="Deposit Amount (₹)" 
                 required

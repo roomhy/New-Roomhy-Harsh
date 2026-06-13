@@ -223,22 +223,25 @@ const MultiSourceUpload = ({ value, onUpload, error }) => {
   );
 };
 
-const FormField = ({ label, value, onChange, placeholder, type = "text", suffix, prefix, className, list, required, error }) => (
+const FormField = ({ label, value, onChange, placeholder, type = "text", suffix, prefix, className, list, required, error, disabled, readOnly }) => (
   <div className={cn("flex flex-col", className)}>
     <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">
       {label} {required && <span className="text-rose-500">*</span>}
     </label>
     <div className={cn(
       "flex items-center bg-slate-50 border rounded-xl px-4 py-2.5 focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-500/5 transition-all",
-      error ? "border-rose-300 ring-4 ring-rose-500/5 bg-rose-50/30" : "border-slate-100 focus-within:border-blue-200"
+      error ? "border-rose-300 ring-4 ring-rose-500/5 bg-rose-50/30" : "border-slate-100 focus-within:border-blue-200",
+      disabled || readOnly ? "opacity-60 bg-slate-100/70" : ""
     )}>
       {prefix && <span className="text-[10px] font-black text-slate-400 mr-2">{prefix}</span>}
-      <input 
-        type={type} 
-        value={value} 
-        onChange={onChange} 
-        placeholder={placeholder} 
+      <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
         list={list}
+        disabled={disabled}
+        readOnly={readOnly}
         className="w-full bg-transparent text-[11.5px] font-bold text-slate-800 outline-none placeholder:text-slate-300"
       />
       {suffix && <span className="text-[10px] font-black text-slate-400 ml-2 uppercase tracking-tight">{suffix}</span>}
@@ -253,8 +256,8 @@ const FormSelect = ({ label, value, onChange, options, placeholder, className, r
       {label} {required && <span className="text-rose-500">*</span>}
     </label>
     <div className="relative">
-      <select 
-        value={value} 
+      <select
+        value={value}
         onChange={onChange}
         className={cn(
           "w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-[11.5px] font-bold text-slate-800 outline-none transition-all appearance-none cursor-pointer",
@@ -295,7 +298,7 @@ const CustomDatePicker = ({ label, value, onChange, required, error, placeholder
       <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">
         {label} {required && <span className="text-rose-500">*</span>}
       </label>
-      <div 
+      <div
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
           "flex items-center justify-between bg-slate-50 border rounded-xl px-4 py-2.5 cursor-pointer transition-all",
@@ -308,25 +311,25 @@ const CustomDatePicker = ({ label, value, onChange, required, error, placeholder
         </span>
         <Calendar size={14} className="text-slate-400" />
       </div>
-      
+
       {isOpen && (
         <div className="absolute top-full left-0 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl z-[100] p-4 animate-in">
           <div className="flex items-center justify-between mb-4 gap-2">
-            <select 
-              value={selectedDate[0]} 
+            <select
+              value={selectedDate[0]}
               onChange={(e) => handleDateChange('y', e.target.value)}
               className="flex-1 bg-slate-50 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold text-slate-700 outline-none"
             >
               <option value="">Year</option>
               {years.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
-            <select 
-              value={selectedDate[1]} 
+            <select
+              value={selectedDate[1]}
               onChange={(e) => handleDateChange('m', e.target.value)}
               className="flex-1 bg-slate-50 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold text-slate-700 outline-none"
             >
               <option value="">Month</option>
-              {months.map((m, i) => <option key={m} value={(i+1).toString().padStart(2, '0')}>{m}</option>)}
+              {months.map((m, i) => <option key={m} value={(i + 1).toString().padStart(2, '0')}>{m}</option>)}
             </select>
           </div>
           <div className="grid grid-cols-7 gap-1">
@@ -363,9 +366,9 @@ export default function TenantRec() {
   const owner = getOwnerRuntimeSession();
   const apiUrl = getApiBase();
 
-  if (!owner?.loginId && typeof window !== "undefined") { 
-    window.location.href = "/propertyowner/ownerlogin"; 
-    return null; 
+  if (!owner?.loginId && typeof window !== "undefined") {
+    window.location.href = "/propertyowner/ownerlogin";
+    return null;
   }
 
   const [submitting, setSubmitting] = useState(false);
@@ -381,7 +384,7 @@ export default function TenantRec() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-  
+
   // Section 1: Basic Details
   const [basicDetails, setBasicDetails] = useState({
     fullName: "",
@@ -408,6 +411,8 @@ export default function TenantRec() {
 
   // Section 3: Tenancy Details
   const [tenancyDetails, setTenancyDetails] = useState({
+    baseRoomRent: "",
+    discount: "0",
     rentAmount: "",
     depositAmount: "",
     moveInDate: "",
@@ -422,6 +427,7 @@ export default function TenantRec() {
     inclusions: "",
     gstCharges: "0"
   });
+
 
   // Section 4: Additional Details
   const [additionalDetails, setAdditionalDetails] = useState({
@@ -457,7 +463,7 @@ export default function TenantRec() {
       try {
         const props = await fetchOwnerProperties(owner.loginId);
         setProperties(props);
-        
+
         // Auto-select if there's only 1 property and none is selected via URL
         if (props && props.length === 1 && !roomAssignment.propertyId) {
           const urlParams = new URLSearchParams(window.location.search);
@@ -487,7 +493,7 @@ export default function TenantRec() {
         } else if (data && Array.isArray(data.rooms)) {
           roomList = data.rooms;
         }
-        
+
         // Fallback generator
         if (roomList.length === 0) {
           const selectedProp = properties.find(p => p._id === roomAssignment.propertyId);
@@ -495,17 +501,17 @@ export default function TenantRec() {
             selectedProp.roomTypes.forEach(rt => {
               const count = parseInt(rt.totalRooms) || 0;
               for (let i = 1; i <= count; i++) {
-                roomList.push({ 
-                  _id: `${rt.type}-${i}`, 
+                roomList.push({
+                  _id: `${rt.type}-${i}`,
                   title: `${rt.type} - Room ${i}`,
-                  type: rt.type 
+                  type: rt.type
                 });
               }
             });
           }
         }
         setRooms(roomList);
-        
+
         // Auto-fill logic if a room is already selected via URL
         if (roomAssignment.roomUnit) {
           const selectedRoom = roomList.find(r => r.title === roomAssignment.roomUnit);
@@ -518,7 +524,9 @@ export default function TenantRec() {
             if (selectedRoom.price) {
               setTenancyDetails(prev => ({
                 ...prev,
-                rentAmount: selectedRoom.price.toString()
+                baseRoomRent: selectedRoom.price.toString(),
+                rentAmount: selectedRoom.price.toString(),
+                discount: "0"
               }));
             }
           }
@@ -573,7 +581,7 @@ export default function TenantRec() {
     if (!window.confirm("Are you sure you want to onboard this tenant?")) {
       return;
     }
-    
+
     setSubmitting(true);
     try {
       const selectedPropObj = properties.find(p => p._id === roomAssignment.propertyId);
@@ -588,6 +596,7 @@ export default function TenantRec() {
         floor: roomAssignment.floor,
         building: roomAssignment.building,
         moveInDate: tenancyDetails.moveInDate,
+        baseRoomRent: tenancyDetails.baseRoomRent,
         agreedRent: tenancyDetails.rentAmount,
         securityDepositTotal: tenancyDetails.depositAmount,
         securityDepositPaid: 0,
@@ -648,12 +657,12 @@ export default function TenantRec() {
     data.append("image", file);
 
     try {
-      const res = await fetch(`${apiUrl}/api/upload`, { 
-        method: "POST", 
+      const res = await fetch(`${apiUrl}/api/upload`, {
+        method: "POST",
         body: data,
         headers: getAuthHeader()
       });
-      
+
       let json;
       const contentType = res.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
@@ -662,9 +671,9 @@ export default function TenantRec() {
         const text = await res.text();
         throw new Error(text || `HTTP error ${res.status}`);
       }
-      
+
       if (!res.ok) throw new Error(json.error || "Upload failed");
-      
+
       if (json.url) {
         setBasicDetails({ ...basicDetails, idProofFile: json.url });
         toast.success("ID Proof uploaded!");
@@ -678,9 +687,9 @@ export default function TenantRec() {
   };
 
   return (
-    <PropertyOwnerLayout 
-      owner={owner} 
-      title="Add Tenant" 
+    <PropertyOwnerLayout
+      owner={owner}
+      title="Add Tenant"
       onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
     >
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8 pb-4 border-b border-border">
@@ -693,8 +702,8 @@ export default function TenantRec() {
             Cancel
           </button>
           {(!isMobile || activeMobileTab === 4) && (
-            <button 
-              onClick={handleSubmit} 
+            <button
+              onClick={handleSubmit}
               disabled={submitting}
               className="px-4 h-10 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-md shadow-slate-900/10"
             >
@@ -740,63 +749,63 @@ export default function TenantRec() {
                 <User size={18} className="text-primary" />
                 1. Resident Personal Profile
               </h3>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <FormField 
-                  label="Full Name" 
+                <FormField
+                  label="Full Name"
                   required
                   value={basicDetails.fullName}
-                  onChange={e => setBasicDetails({...basicDetails, fullName: e.target.value})}
+                  onChange={e => setBasicDetails({ ...basicDetails, fullName: e.target.value })}
                   placeholder="Enter full name"
                   error={errors.fullName}
                 />
-                <FormField 
-                  label="Email Address" 
+                <FormField
+                  label="Email Address"
                   required
                   value={basicDetails.email}
-                  onChange={e => setBasicDetails({...basicDetails, email: e.target.value})}
+                  onChange={e => setBasicDetails({ ...basicDetails, email: e.target.value })}
                   placeholder="Enter email address"
                   type="email"
                   error={errors.email}
                 />
-                <FormField 
-                  label="Phone Number" 
+                <FormField
+                  label="Phone Number"
                   required
                   value={basicDetails.phone}
-                  onChange={e => setBasicDetails({...basicDetails, phone: e.target.value})}
+                  onChange={e => setBasicDetails({ ...basicDetails, phone: e.target.value })}
                   placeholder="Enter phone number"
                   prefix="+91"
                   error={errors.phone}
                 />
-                <CustomDatePicker 
-                  label="Date of Birth" 
+                <CustomDatePicker
+                  label="Date of Birth"
                   required
                   value={basicDetails.dob}
-                  onChange={val => setBasicDetails({...basicDetails, dob: val})}
+                  onChange={val => setBasicDetails({ ...basicDetails, dob: val })}
                   placeholder="Select date of birth"
                   error={errors.dob}
                 />
-                <FormSelect 
-                  label="Gender" 
+                <FormSelect
+                  label="Gender"
                   required
                   value={basicDetails.gender}
-                  onChange={e => setBasicDetails({...basicDetails, gender: e.target.value})}
+                  onChange={e => setBasicDetails({ ...basicDetails, gender: e.target.value })}
                   options={["Male", "Female", "Other"]}
                   placeholder="Select gender"
                   error={errors.gender}
                 />
-                <FormSelect 
-                  label="ID Proof Type" 
+                <FormSelect
+                  label="ID Proof Type"
                   required
                   value={basicDetails.idProofType}
-                  onChange={e => setBasicDetails({...basicDetails, idProofType: e.target.value})}
+                  onChange={e => setBasicDetails({ ...basicDetails, idProofType: e.target.value })}
                   options={["Aadhaar Card", "PAN Card", "Voter ID", "Driving License", "Passport"]}
                 />
-                <FormField 
-                  label="ID Proof Number" 
+                <FormField
+                  label="ID Proof Number"
                   required
                   value={basicDetails.idProofNumber}
-                  onChange={e => setBasicDetails({...basicDetails, idProofNumber: e.target.value})}
+                  onChange={e => setBasicDetails({ ...basicDetails, idProofNumber: e.target.value })}
                   placeholder="Enter ID proof number"
                   error={errors.idProofNumber}
                 />
@@ -843,7 +852,13 @@ export default function TenantRec() {
                 bed: ""
               }));
               if (room?.rent || room?.price) {
-                setTenancyDetails(prev => ({ ...prev, rentAmount: String(room.rent || room.price || "") }));
+                const p = String(room.rent || room.price || "");
+                setTenancyDetails(prev => ({
+                  ...prev,
+                  baseRoomRent: p,
+                  rentAmount: p,
+                  discount: "0"
+                }));
               }
             };
 
@@ -885,9 +900,9 @@ export default function TenantRec() {
                     options={
                       roomsForFloor.length > 0
                         ? roomsForFloor.map(r => {
-                            const label = r.title || r.number || r.roomNo || r._id;
-                            return { label, value: label };
-                          })
+                          const label = r.title || r.number || r.roomNo || r._id;
+                          return { label, value: label };
+                        })
                         : []
                     }
                     placeholder={roomAssignment.propertyId ? (rooms.length === 0 ? "No rooms found" : "Select room") : "Select property first"}
@@ -945,61 +960,96 @@ export default function TenantRec() {
                 <Clock size={18} className="text-primary" />
                 3. Stay & Billing Details
               </h3>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                <FormField 
-                  label="Rent Amount (₹)" 
+                <FormField
+                  label="Base Room Price (₹)"
+                  value={tenancyDetails.baseRoomRent}
+                  onChange={e => {
+                    const actual = parseFloat(e.target.value) || 0;
+                    const disc = parseFloat(tenancyDetails.discount) || 0;
+                    const finalRent = Math.max(0, actual - disc);
+                    setTenancyDetails({
+                      ...tenancyDetails,
+                      baseRoomRent: e.target.value,
+                      rentAmount: finalRent.toString()
+                    });
+                  }}
+                  placeholder="Base room price"
+                  type="number"
+                />
+
+                <FormField
+                  label="Agreed Rent (₹)"
                   required
                   value={tenancyDetails.rentAmount}
-                  onChange={e => setTenancyDetails({...tenancyDetails, rentAmount: e.target.value})}
-                  placeholder="Enter rent amount"
+                  onChange={e => {
+                    const actual = parseFloat(tenancyDetails.baseRoomRent) || 0;
+                    const finalRent = parseFloat(e.target.value) || 0;
+                    if (actual === 0) {
+                      setTenancyDetails({
+                        ...tenancyDetails,
+                        baseRoomRent: e.target.value,
+                        rentAmount: e.target.value,
+                        discount: "0"
+                      });
+                    } else {
+                      const disc = Math.max(0, actual - finalRent);
+                      setTenancyDetails({
+                        ...tenancyDetails,
+                        rentAmount: e.target.value,
+                        discount: disc.toString()
+                      });
+                    }
+                  }}
+                  placeholder="Rent agreed with tenant"
                   type="number"
                   error={errors.rentAmount}
                 />
-                <FormField 
-                  label="Deposit Amount (₹)" 
+                <FormField
+                  label="Deposit Amount (₹)"
                   required
                   value={tenancyDetails.depositAmount}
-                  onChange={e => setTenancyDetails({...tenancyDetails, depositAmount: e.target.value})}
+                  onChange={e => setTenancyDetails({ ...tenancyDetails, depositAmount: e.target.value })}
                   placeholder="Enter deposit amount"
                   type="number"
                   error={errors.depositAmount}
                 />
-                <FormField 
-                  label="Move-in Date" 
+                <FormField
+                  label="Move-in Date"
                   required
                   value={tenancyDetails.moveInDate}
-                  onChange={e => setTenancyDetails({...tenancyDetails, moveInDate: e.target.value})}
+                  onChange={e => setTenancyDetails({ ...tenancyDetails, moveInDate: e.target.value })}
                   type="date"
                   error={errors.moveInDate}
                 />
-                <FormField 
-                  label="Minimum Stay (Months)" 
+                <FormField
+                  label="Minimum Stay (Months)"
                   required
                   value={tenancyDetails.minStay}
-                  onChange={e => setTenancyDetails({...tenancyDetails, minStay: e.target.value})}
+                  onChange={e => setTenancyDetails({ ...tenancyDetails, minStay: e.target.value })}
                   placeholder="Enter minimum stay"
                   type="number"
                 />
-                <FormField 
-                  label="Notice Period (Days)" 
+                <FormField
+                  label="Notice Period (Days)"
                   required
                   value={tenancyDetails.noticePeriod}
-                  onChange={e => setTenancyDetails({...tenancyDetails, noticePeriod: e.target.value})}
+                  onChange={e => setTenancyDetails({ ...tenancyDetails, noticePeriod: e.target.value })}
                   placeholder="Enter notice period"
                   type="number"
                 />
                 <FormField
                   label="License Fee Due Date (day of month)"
                   value={tenancyDetails.rentDueDate}
-                  onChange={e => setTenancyDetails({...tenancyDetails, rentDueDate: e.target.value})}
+                  onChange={e => setTenancyDetails({ ...tenancyDetails, rentDueDate: e.target.value })}
                   placeholder="e.g. 5"
                   type="number"
                 />
                 <FormField
                   label="License Duration (months)"
                   value={tenancyDetails.licenseDuration}
-                  onChange={e => setTenancyDetails({...tenancyDetails, licenseDuration: e.target.value})}
+                  onChange={e => setTenancyDetails({ ...tenancyDetails, licenseDuration: e.target.value })}
                   placeholder="e.g. 11"
                   type="number"
                 />
@@ -1007,35 +1057,35 @@ export default function TenantRec() {
                   label="Payment Frequency"
                   required
                   value={tenancyDetails.paymentFrequency}
-                  onChange={e => setTenancyDetails({...tenancyDetails, paymentFrequency: e.target.value})}
+                  onChange={e => setTenancyDetails({ ...tenancyDetails, paymentFrequency: e.target.value })}
                   options={["Monthly", "Quarterly", "Semi-Annually", "Annually"]}
                   error={errors.paymentFrequency}
                 />
                 <FormField
                   label="Move Out Charges (₹)"
                   value={tenancyDetails.moveOutCharges}
-                  onChange={e => setTenancyDetails({...tenancyDetails, moveOutCharges: e.target.value})}
+                  onChange={e => setTenancyDetails({ ...tenancyDetails, moveOutCharges: e.target.value })}
                   placeholder="0"
                   type="number"
                 />
                 <FormField
                   label="Notice Period Charges (₹)"
                   value={tenancyDetails.noticePeriodCharges}
-                  onChange={e => setTenancyDetails({...tenancyDetails, noticePeriodCharges: e.target.value})}
+                  onChange={e => setTenancyDetails({ ...tenancyDetails, noticePeriodCharges: e.target.value })}
                   placeholder="0"
                   type="number"
                 />
                 <FormField
                   label="GST Charges (₹)"
                   value={tenancyDetails.gstCharges}
-                  onChange={e => setTenancyDetails({...tenancyDetails, gstCharges: e.target.value})}
+                  onChange={e => setTenancyDetails({ ...tenancyDetails, gstCharges: e.target.value })}
                   placeholder="0"
                   type="number"
                 />
                 <FormField
                   label="Late Fee (₹)"
                   value={tenancyDetails.lateFee}
-                  onChange={e => setTenancyDetails({...tenancyDetails, lateFee: e.target.value})}
+                  onChange={e => setTenancyDetails({ ...tenancyDetails, lateFee: e.target.value })}
                   placeholder="0"
                   type="number"
                 />
@@ -1043,7 +1093,7 @@ export default function TenantRec() {
                   <FormField
                     label="Inclusions (WiFi, meals, etc.)"
                     value={tenancyDetails.inclusions}
-                    onChange={e => setTenancyDetails({...tenancyDetails, inclusions: e.target.value})}
+                    onChange={e => setTenancyDetails({ ...tenancyDetails, inclusions: e.target.value })}
                     placeholder="e.g. WiFi, 2 meals/day, housekeeping"
                   />
                 </div>
@@ -1058,42 +1108,42 @@ export default function TenantRec() {
                 <Briefcase size={18} className="text-primary" />
                 4. Occupation & Emergencies
               </h3>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <FormField 
-                  label="Occupation" 
+                <FormField
+                  label="Occupation"
                   value={additionalDetails.occupation}
-                  onChange={e => setAdditionalDetails({...additionalDetails, occupation: e.target.value})}
+                  onChange={e => setAdditionalDetails({ ...additionalDetails, occupation: e.target.value })}
                   placeholder="Enter occupation"
                 />
-                <FormField 
-                  label="Company / Organization" 
+                <FormField
+                  label="Company / Organization"
                   value={additionalDetails.company}
-                  onChange={e => setAdditionalDetails({...additionalDetails, company: e.target.value})}
+                  onChange={e => setAdditionalDetails({ ...additionalDetails, company: e.target.value })}
                   placeholder="Enter company name"
                 />
-                <FormField 
-                  label="Emergency Contact Name" 
+                <FormField
+                  label="Emergency Contact Name"
                   required
                   value={additionalDetails.emergencyName}
-                  onChange={e => setAdditionalDetails({...additionalDetails, emergencyName: e.target.value})}
+                  onChange={e => setAdditionalDetails({ ...additionalDetails, emergencyName: e.target.value })}
                   placeholder="Enter contact name"
                   error={errors.emergencyName}
                 />
-                <FormField 
-                  label="Emergency Contact Number" 
+                <FormField
+                  label="Emergency Contact Number"
                   required
                   value={additionalDetails.emergencyPhone}
-                  onChange={e => setAdditionalDetails({...additionalDetails, emergencyPhone: e.target.value})}
+                  onChange={e => setAdditionalDetails({ ...additionalDetails, emergencyPhone: e.target.value })}
                   placeholder="Enter phone number"
                   prefix="+91"
                   error={errors.emergencyPhone}
                 />
-                <FormField 
-                  label="Relationship" 
+                <FormField
+                  label="Relationship"
                   required
                   value={additionalDetails.relationship}
-                  onChange={e => setAdditionalDetails({...additionalDetails, relationship: e.target.value})}
+                  onChange={e => setAdditionalDetails({ ...additionalDetails, relationship: e.target.value })}
                   placeholder="Select relationship"
                   error={errors.relationship}
                 />
@@ -1101,7 +1151,7 @@ export default function TenantRec() {
                   <FormField
                     label="Permanent Address (optional — tenant can fill in KYC)"
                     value={additionalDetails.permanentAddress}
-                    onChange={e => setAdditionalDetails({...additionalDetails, permanentAddress: e.target.value})}
+                    onChange={e => setAdditionalDetails({ ...additionalDetails, permanentAddress: e.target.value })}
                     placeholder="House/Flat No., Street, Area, City, State, PIN"
                   />
                 </div>
@@ -1109,7 +1159,7 @@ export default function TenantRec() {
                   <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">Remarks (Optional)</label>
                   <textarea
                     value={additionalDetails.remarks}
-                    onChange={e => setAdditionalDetails({...additionalDetails, remarks: e.target.value})}
+                    onChange={e => setAdditionalDetails({ ...additionalDetails, remarks: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-[11.5px] font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-200 transition-all h-24 resize-none"
                     placeholder="Enter remarks..."
                   />
@@ -1120,16 +1170,16 @@ export default function TenantRec() {
 
           {(!isMobile || activeMobileTab === 4) && (
             <div className="flex items-center gap-3 p-6 bg-blue-50/50 rounded-2xl border border-blue-100">
-               <div 
-                 onClick={() => setConfirmDetails(!confirmDetails)}
-                 className={cn(
-                   "w-5 h-5 rounded border-2 flex items-center justify-center cursor-pointer transition-all",
-                   confirmDetails ? "bg-slate-900 border-slate-900 shadow-md" : "bg-white border-slate-200"
-                 )}
-               >
-                 {confirmDetails && <Check className="w-3.5 h-3.5 text-white" />}
-               </div>
-               <p className="text-[10px] font-black text-slate-700 uppercase tracking-tight">I confirm the above details are correct.</p>
+              <div
+                onClick={() => setConfirmDetails(!confirmDetails)}
+                className={cn(
+                  "w-5 h-5 rounded border-2 flex items-center justify-center cursor-pointer transition-all",
+                  confirmDetails ? "bg-slate-900 border-slate-900 shadow-md" : "bg-white border-slate-200"
+                )}
+              >
+                {confirmDetails && <Check className="w-3.5 h-3.5 text-white" />}
+              </div>
+              <p className="text-[10px] font-black text-slate-700 uppercase tracking-tight">I confirm the above details are correct.</p>
             </div>
           )}
 
@@ -1153,65 +1203,65 @@ export default function TenantRec() {
           <div className="lg:col-span-4">
             <div className="sticky top-24 space-y-6">
 
-            {/* Onboarding Summary */}
-            <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-              <h3 className="font-serif text-[16px] text-foreground">Onboarding Summary</h3>
-              <div className="divide-y divide-border">
-                {(() => {
-                  const propName = properties.find(p => p._id === roomAssignment.propertyId)?.title;
-                  const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-                  const rows = [
-                    { label: "Tenant Name",       val: basicDetails.fullName },
-                    { label: "Email",             val: basicDetails.email },
-                    { label: "Phone",             val: basicDetails.phone },
-                    { label: "Property",          val: propName },
-                    { label: "Floor",             val: roomAssignment.floor },
-                    { label: "Room Number",       val: roomAssignment.roomUnit },
-                    { label: "Accommodation Type",val: roomAssignment.roomType },
-                    { label: "Bed",               val: roomAssignment.bed },
-                    { label: "Monthly Rent (₹)",  val: tenancyDetails.rentAmount ? `₹${tenancyDetails.rentAmount}` : null },
-                    { label: "Security Deposit",  val: tenancyDetails.depositAmount ? `₹${tenancyDetails.depositAmount}` : null },
-                    { label: "Move-in Date",      val: fmtDate(tenancyDetails.moveInDate) !== "—" ? fmtDate(tenancyDetails.moveInDate) : null },
-                    { label: "Minimum Stay",      val: tenancyDetails.minStay ? `${tenancyDetails.minStay} months` : null },
-                    { label: "Notice Period",     val: tenancyDetails.noticePeriod ? `${tenancyDetails.noticePeriod} days` : null },
-                    { label: "Rent Due Date",     val: tenancyDetails.rentDueDate },
-                  ];
-                  return rows.map(({ label, val }) => (
-                    <div key={label} className="flex justify-between items-center py-2 gap-2">
-                      <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-tight shrink-0">{label}</span>
-                      <span className="text-[10.5px] font-black text-slate-700 text-right truncate max-w-[55%]">{val || "—"}</span>
-                    </div>
-                  ));
-                })()}
+              {/* Onboarding Summary */}
+              <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+                <h3 className="font-serif text-[16px] text-foreground">Onboarding Summary</h3>
+                <div className="divide-y divide-border">
+                  {(() => {
+                    const propName = properties.find(p => p._id === roomAssignment.propertyId)?.title;
+                    const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+                    const rows = [
+                      { label: "Tenant Name", val: basicDetails.fullName },
+                      { label: "Email", val: basicDetails.email },
+                      { label: "Phone", val: basicDetails.phone },
+                      { label: "Property", val: propName },
+                      { label: "Floor", val: roomAssignment.floor },
+                      { label: "Room Number", val: roomAssignment.roomUnit },
+                      { label: "Accommodation Type", val: roomAssignment.roomType },
+                      { label: "Bed", val: roomAssignment.bed },
+                      { label: "Agreed Rent (₹)", val: tenancyDetails.rentAmount ? `₹${tenancyDetails.rentAmount}` : null },
+                      { label: "Security Deposit", val: tenancyDetails.depositAmount ? `₹${tenancyDetails.depositAmount}` : null },
+                      { label: "Move-in Date", val: fmtDate(tenancyDetails.moveInDate) !== "—" ? fmtDate(tenancyDetails.moveInDate) : null },
+                      { label: "Minimum Stay", val: tenancyDetails.minStay ? `${tenancyDetails.minStay} months` : null },
+                      { label: "Notice Period", val: tenancyDetails.noticePeriod ? `${tenancyDetails.noticePeriod} days` : null },
+                      { label: "Rent Due Date", val: tenancyDetails.rentDueDate },
+                    ];
+                    return rows.map(({ label, val }) => (
+                      <div key={label} className="flex justify-between items-center py-2 gap-2">
+                        <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-tight shrink-0">{label}</span>
+                        <span className="text-[10.5px] font-black text-slate-700 text-right truncate max-w-[55%]">{val || "—"}</span>
+                      </div>
+                    ));
+                  })()}
+                </div>
               </div>
-            </div>
 
-            {/* Onboarding Timeline */}
-            <div className="bg-card border border-border rounded-2xl p-6 space-y-6">
-              <h3 className="font-serif text-[16px] text-foreground">Onboarding Timeline</h3>
-              <div className="space-y-6">
-                {[
-                  { step: 1, title: "Personal Details & Room", sub: "Add tenant details, assign room and tenancy information.", status: "In Progress" },
-                  { step: 2, title: "E-KYC Verification", sub: "An E-KYC link will be sent to the tenant's email and phone.", status: "Pending" },
-                  { step: 3, title: "E-Sign Agreement", sub: "After successful KYC, rental agreement link will be sent for e-sign.", status: "Pending" },
-                  { step: 4, title: "Tenant Added", sub: "Tenant will be added after agreement is signed successfully.", status: "Pending" }
-                ].map((item, i) => (
-                  <div key={i} className="flex gap-4 relative group">
-                    {i !== 3 && <div className="absolute left-[11px] top-6 bottom-[-20px] w-[2px] bg-slate-100 group-last:hidden" />}
-                    <div className={cn(
-                      "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 relative z-10",
-                      item.status === "In Progress" ? "bg-slate-900 text-white ring-4 ring-slate-100" : "bg-slate-100 text-slate-400"
-                    )}>
-                      {item.step}
+              {/* Onboarding Timeline */}
+              <div className="bg-card border border-border rounded-2xl p-6 space-y-6">
+                <h3 className="font-serif text-[16px] text-foreground">Onboarding Timeline</h3>
+                <div className="space-y-6">
+                  {[
+                    { step: 1, title: "Personal Details & Room", sub: "Add tenant details, assign room and tenancy information.", status: "In Progress" },
+                    { step: 2, title: "E-KYC Verification", sub: "An E-KYC link will be sent to the tenant's email and phone.", status: "Pending" },
+                    { step: 3, title: "E-Sign Agreement", sub: "After successful KYC, rental agreement link will be sent for e-sign.", status: "Pending" },
+                    { step: 4, title: "Tenant Added", sub: "Tenant will be added after agreement is signed successfully.", status: "Pending" }
+                  ].map((item, i) => (
+                    <div key={i} className="flex gap-4 relative group">
+                      {i !== 3 && <div className="absolute left-[11px] top-6 bottom-[-20px] w-[2px] bg-slate-100 group-last:hidden" />}
+                      <div className={cn(
+                        "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 relative z-10",
+                        item.status === "In Progress" ? "bg-slate-900 text-white ring-4 ring-slate-100" : "bg-slate-100 text-slate-400"
+                      )}>
+                        {item.step}
+                      </div>
+                      <div>
+                        <h4 className={cn("text-[10px] font-black uppercase tracking-tight mb-1", item.status === "In Progress" ? "text-slate-800" : "text-slate-400")}>{item.title}</h4>
+                        <p className="text-[9.5px] font-bold text-slate-400 leading-normal max-w-[200px]">{item.sub}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className={cn("text-[10px] font-black uppercase tracking-tight mb-1", item.status === "In Progress" ? "text-slate-800" : "text-slate-400")}>{item.title}</h4>
-                      <p className="text-[9.5px] font-bold text-slate-400 leading-normal max-w-[200px]">{item.sub}</p>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
 
             </div>{/* end scrollable sticky wrapper */}
           </div>
@@ -1229,7 +1279,7 @@ export default function TenantRec() {
               </div>
               <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-2">Tenant Added Successfully!</h2>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-8">Onboarding link and credentials generated</p>
-              
+
               <div className="w-full space-y-4 mb-8">
                 <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 text-left">
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Login Credentials</p>
@@ -1245,8 +1295,8 @@ export default function TenantRec() {
                   </div>
                 </div>
               </div>
-              
-              <button 
+
+              <button
                 onClick={() => navigate("/propertyowner/tenants")}
                 className="w-full py-4 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all"
               >

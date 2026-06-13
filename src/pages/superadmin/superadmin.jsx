@@ -19,27 +19,6 @@ import useSEO from "../../hooks/useSEO";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
-const overviewData = [
-  { name: "Jan", users: 1200, bookings: 800, revenue: 500 },
-  { name: "Feb", users: 1500, bookings: 750, revenue: 450 },
-  { name: "Mar", users: 1400, bookings: 950, revenue: 600 },
-  { name: "Apr", users: 1800, bookings: 1100, revenue: 750 },
-  { name: "May", users: 2200, bookings: 1300, revenue: 850 },
-];
-
-const usersByRole = [
-  { name: "Tenant", value: 7245, color: "hsl(var(--chart-1))", percent: "56.4%" },
-  { name: "Owner", value: 3120, color: "hsl(var(--chart-2))", percent: "24.3%" },
-  { name: "Agent", value: 1850, color: "hsl(var(--chart-3))", percent: "14.4%" },
-  { name: "Others", value: 630, color: "hsl(var(--chart-4))", percent: "4.9%" },
-];
-
-const activities = [
-  { icon: UserCircle, color: "blue", title: "New tenant Sarah Wilson added", sub: "2 BHK Apartment, Green Residency", time: "10:30 AM" },
-  { icon: Building2, color: "green", title: "Property Green Villa updated", sub: "Rent increased to ₹25,000", time: "Yesterday" },
-  { icon: DollarSign, color: "yellow", title: "Payment received from Amit Verma", sub: "₹25,000 for May 2025", time: "Yesterday" },
-];
-
 const colorMap = {
   blue: "bg-info-soft text-info",
   green: "bg-success-soft text-success",
@@ -48,7 +27,16 @@ const colorMap = {
 };
 
 export default function SuperadminDashboard() {
-  const [stats, setStats] = useState({ totalUsers: 0, properties: 0, bookings: 0, revenue: 0 });
+  const [stats, setStats] = useState({ 
+    totalUsers: 0, 
+    tenants: 0, 
+    owners: 0, 
+    properties: 0, 
+    bookings: 0, 
+    revenue: 0,
+    monthlyRevenue: {},
+    recentSignups: []
+  });
   const [loading, setLoading] = useState(true);
 
   useSEO({
@@ -65,9 +53,13 @@ export default function SuperadminDashboard() {
         if (res.success) {
           setStats({
             totalUsers: (res.stats.tenants || 0) + (res.stats.owners || 0),
+            tenants: res.stats.tenants || 0,
+            owners: res.stats.owners || 0,
             properties: res.stats.properties || 0,
             bookings: res.stats.totalBookings || 0,
-            revenue: res.stats.netRevenue || 0
+            revenue: res.stats.netRevenue || 0,
+            monthlyRevenue: res.monthlyRevenue || {},
+            recentSignups: res.recentSignups || []
           });
         }
       } catch (error) {
@@ -78,6 +70,29 @@ export default function SuperadminDashboard() {
     };
     loadStats();
   }, []);
+
+  const totalUsersCount = stats.totalUsers || 1; // avoid divide by zero
+  const usersByRoleData = [
+    { name: "Tenant", value: stats.tenants, color: "hsl(var(--chart-1))", percent: `${((stats.tenants / totalUsersCount) * 100).toFixed(1)}%` },
+    { name: "Owner", value: stats.owners, color: "hsl(var(--chart-2))", percent: `${((stats.owners / totalUsersCount) * 100).toFixed(1)}%` }
+  ];
+
+  const overviewDataDynamic = Object.entries(stats.monthlyRevenue).map(([month, rev]) => ({
+    name: month.substring(0, 3), // short month name
+    revenue: rev
+  }));
+
+  if (overviewDataDynamic.length === 0) {
+    overviewDataDynamic.push({ name: "Current", revenue: stats.revenue || 0 });
+  }
+
+  const activitiesDynamic = stats.recentSignups.map(user => ({
+    icon: UserCircle, 
+    color: "blue", 
+    title: `New signup: ${user.name || 'User'}`, 
+    sub: `Email: ${user.email}`, 
+    time: user.moveInDate || "Recent"
+  }));
 
   const resolveUser = () => {
     try {
@@ -115,39 +130,43 @@ export default function SuperadminDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
         <StatCard 
           label="Total Users" 
-          value={stats.totalUsers.toLocaleString()} 
+          value={(stats.totalUsers || 0).toLocaleString()} 
           delta="+12.5% this month" 
           trend="up" 
           icon={Users} 
           iconColor="blue" 
           loading={loading}
+          source="Bookings"
         />
         <StatCard 
           label="Total Properties" 
-          value={stats.properties.toLocaleString()} 
+          value={(stats.properties || 0).toLocaleString()} 
           delta="+8.3% this month" 
           trend="up" 
           icon={Building2} 
           iconColor="green" 
           loading={loading}
+          source="Bookings"
         />
         <StatCard 
           label="Total Revenue" 
-          value={`₹${stats.revenue.toLocaleString()}`} 
+          value={`₹${(stats.revenue || 0).toLocaleString()}`} 
           delta="+15.6% this month" 
           trend="up" 
           icon={Wallet} 
           iconColor="yellow" 
           loading={loading}
+          source="Payments"
         />
         <StatCard 
           label="Active Bookings" 
-          value={stats.bookings.toLocaleString()} 
+          value={(stats.bookings || 0).toLocaleString()} 
           delta="+5.2% this month" 
           trend="up" 
           icon={ShoppingBag} 
           iconColor="purple" 
           loading={loading}
+          source="Bookings"
         />
       </div>
 
@@ -162,7 +181,7 @@ export default function SuperadminDashboard() {
           </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={overviewData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <AreaChart data={overviewDataDynamic} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.2} />
@@ -171,7 +190,7 @@ export default function SuperadminDashboard() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94A3B8", fontSize: 11, fontWeight: 600 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94A3B8", fontSize: 11, fontWeight: 600 }} tickFormatter={(v) => `${v / 100}K`} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94A3B8", fontSize: 11, fontWeight: 600 }} tickFormatter={(v) => `${v / 1000}K`} />
                 <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
                 <Area type="monotone" dataKey="revenue" stroke="hsl(var(--chart-1))" strokeWidth={3} fill="url(#rev)" dot={{ fill: "hsl(var(--chart-1))", r: 4 }} />
               </AreaChart>
@@ -184,18 +203,18 @@ export default function SuperadminDashboard() {
           <div className="relative h-48">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={usersByRole} dataKey="value" innerRadius={55} outerRadius={80} paddingAngle={5} stroke="none">
-                  {usersByRole.map((e, i) => <Cell key={i} fill={e.color} />)}
+                <Pie data={usersByRoleData} dataKey="value" innerRadius={55} outerRadius={80} paddingAngle={5} stroke="none">
+                  {usersByRoleData.map((e, i) => <Cell key={i} fill={e.color} />)}
                 </Pie>
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <div className="text-2xl font-black text-slate-900">12,845</div>
+              <div className="text-2xl font-black text-slate-900">{stats.totalUsers.toLocaleString()}</div>
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Users</div>
             </div>
           </div>
           <div className="mt-8 space-y-3">
-            {usersByRole.map((s) => (
+            {usersByRoleData.map((s) => (
               <div key={s.name} className="flex items-center justify-between group">
                 <div className="flex items-center gap-3">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
@@ -218,7 +237,7 @@ export default function SuperadminDashboard() {
             <button className="text-xs font-bold text-blue-600 hover:underline">View All</button>
           </div>
           <div className="divide-y divide-slate-50">
-            {activities.map((a, i) => {
+            {activitiesDynamic.map((a, i) => {
               const Icon = a.icon;
               return (
                 <div key={i} className="flex items-center gap-4 py-4 first:pt-0 last:pb-0 group">
@@ -233,6 +252,9 @@ export default function SuperadminDashboard() {
                 </div>
               );
             })}
+            {activitiesDynamic.length === 0 && (
+              <div className="text-sm text-slate-500 py-4 text-center">No recent activity</div>
+            )}
           </div>
         </div>
 
@@ -241,10 +263,10 @@ export default function SuperadminDashboard() {
           <h3 className="font-bold text-lg mb-6">Quick Summary</h3>
           <div className="space-y-6">
             {[
-              { label: "Total Revenue", value: "₹18.7L", trend: "+12%" },
-              { label: "Direct Bookings", value: "842", trend: "+5%" },
-              { label: "New Properties", value: "45", trend: "+8%" },
-              { label: "Pending KYC", value: "128", trend: "-2%" },
+              { label: "Total Revenue", value: `₹${stats.revenue.toLocaleString()}`, trend: "Current" },
+              { label: "Total Bookings", value: stats.bookings.toLocaleString(), trend: "Current" },
+              { label: "Total Properties", value: stats.properties.toLocaleString(), trend: "Current" },
+              { label: "Total Tenants", value: stats.tenants.toLocaleString(), trend: "Current" },
             ].map((item, i) => (
               <div key={i} className="flex items-center justify-between border-b border-white/10 pb-4 last:border-0 last:pb-0">
                 <div>

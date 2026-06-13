@@ -39,7 +39,8 @@ export const sharedNavConfig = {
           { label: "Enquiries", to: "/superadmin/enquiry", icon: "help-circle" },
           { label: "Bookings", to: "/superadmin/booking", icon: "calendar-check" },
           { label: "Reviews", to: "/superadmin/reviews", icon: "star" },
-          { label: "Complaint History", to: "/superadmin/complaint-history", icon: "alert-circle" }
+          { label: "Complaint History", to: "/superadmin/complaint-history", icon: "alert-circle" },
+          { label: "Chat Support", to: "/superadmin/chat-overview", icon: "message-square" }
         ]
       },
       {
@@ -47,8 +48,10 @@ export const sharedNavConfig = {
         links: [
           { label: "Dashboard", to: "/superadmin/accounting", icon: "dollar-sign" },
           { label: "Transactions", to: "/superadmin/accounting/transactions", icon: "credit-card" },
+          { label: "Disbursements", to: "/superadmin/accounting/payouts", icon: "send" },
           { label: "Rent Collections", to: "/superadmin/rentcollection", icon: "wallet" },
-          { label: "Refunds", to: "/superadmin/refund", icon: "rotate-ccw" }
+          { label: "Refunds", to: "/superadmin/refund", icon: "rotate-ccw" },
+          { label: "Settings", to: "/superadmin/accounting/settings", icon: "settings" }
         ]
       },
       {

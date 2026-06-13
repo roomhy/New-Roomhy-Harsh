@@ -57,11 +57,9 @@ export default function TotalProperties() {
   const navigate = useNavigate();
   const apiUrl = getApiBase();
 
-  const [properties, setProperties] = useState([]);
+  const [allProperties, setAllProperties] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalRecords, setTotalRecords] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // filters
   const [search, setSearch]         = useState("");
@@ -95,13 +93,13 @@ export default function TotalProperties() {
     finally { setDetailsLoading(false); }
   };
 
-  const fetchProps = async (pNum=1) => {
+  const fetchProps = async () => {
     setLoading(true);
     try {
-      const res  = await fetch(`${apiUrl}/api/properties?page=${pNum}&limit=${LIMIT}&t=${Date.now()}`);
+      const res  = await fetch(`${apiUrl}/api/properties?limit=5000&t=${Date.now()}`);
       const data = await res.json();
       if (data.success && data.properties) {
-        setProperties(data.properties.map(p => ({
+        setAllProperties(data.properties.map(p => ({
           id:         p._id,
           propId:     p.propertyId || p.visitId || (p.locationCode && p.locationCode !== 'GEN' ? p.locationCode : null) || `PROP-${p._id?.slice(-4).toUpperCase()}`,
           title:      p.title || p.propertyInfo?.name || "Unnamed",
@@ -117,44 +115,60 @@ export default function TotalProperties() {
           listedOn:   p.createdAt ? new Date(p.createdAt).toLocaleDateString("en-IN",{month:"short",day:"numeric",year:"numeric"}) : "-",
           listedTime: p.createdAt ? new Date(p.createdAt).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}) : "",
         })));
-        setTotalPages(data.totalPages||1);
-        setTotalRecords(data.total||0);
         if (data.stats) setApiStats(data.stats);
-        setPage(pNum);
+        setCurrentPage(1);
       }
     } catch(e){ console.error(e); } finally { setLoading(false); }
   };
 
-  useEffect(()=>{ fetchProps(1); },[]);
+  useEffect(()=>{ fetchProps(); },[]);
 
   // derive unique values for dropdowns
-  const cities    = useMemo(()=>[...new Set(properties.map(p=>p.city).filter(c=>c&&c!=="-"))],[properties]);
-  const locations = useMemo(()=>[...new Set(properties.filter(p=>fCity==="all"||p.city===fCity).map(p=>p.locality).filter(l=>l&&l!=="-"))],[properties,fCity]);
-  const owners    = useMemo(()=>[...new Set(properties.map(p=>p.ownerName).filter(o=>o&&o!=="-"))],[properties]);
+  const cities    = useMemo(()=>[...new Set(allProperties.map(p=>p.city).filter(c=>c&&c!=="-"))],[allProperties]);
+  const locations = useMemo(()=>[...new Set(allProperties.filter(p=>fCity==="all"||p.city===fCity).map(p=>p.locality).filter(l=>l&&l!=="-"))],[allProperties,fCity]);
+  const owners    = useMemo(()=>[...new Set(allProperties.map(p=>p.ownerName).filter(o=>o&&o!=="-"))],[allProperties]);
 
-  const filtered = useMemo(()=>properties.filter(p=>{
-    const s = search.toLowerCase();
-    if(s && !p.title.toLowerCase().includes(s) && !p.ownerName.toLowerCase().includes(s) && !p.propId.toLowerCase().includes(s) && !p.city.toLowerCase().includes(s)) return false;
-    if(fStatus!=="all"   && p.status!==fStatus)     return false;
-    if(fType!=="all"     && p.type!==fType)          return false;
-    if(fCity!=="all"     && p.city!==fCity)          return false;
-    if(fLocation!=="all" && p.locality!==fLocation)  return false;
-    if(fOwner!=="all"    && p.ownerName!==fOwner)    return false;
-    if(fGender!=="all"   && p.gender!==fGender)      return false;
-    if(fPriceMin && p.price < Number(fPriceMin))     return false;
-    if(fPriceMax && p.price > Number(fPriceMax))     return false;
-    return true;
-  }),[properties,search,fStatus,fType,fCity,fLocation,fOwner,fGender,fPriceMin,fPriceMax]);
+  const filtered = useMemo(()=>{
+    let result = allProperties.filter(p=>{
+      const s = search.toLowerCase();
+      if(s && !p.title.toLowerCase().includes(s) && !p.ownerName.toLowerCase().includes(s) && !p.propId.toLowerCase().includes(s) && !p.city.toLowerCase().includes(s)) return false;
+      if(fStatus!=="all"   && p.status!==fStatus)     return false;
+      if(fType!=="all"     && p.type!==fType)          return false;
+      if(fCity!=="all"     && p.city!==fCity)          return false;
+      if(fLocation!=="all" && p.locality!==fLocation)  return false;
+      if(fOwner!=="all"    && p.ownerName!==fOwner)    return false;
+      if(fGender!=="all"   && p.gender!==fGender)      return false;
+      if(fPriceMin && p.price < Number(fPriceMin))     return false;
+      if(fPriceMax && p.price > Number(fPriceMax))     return false;
+      return true;
+    });
+    return result;
+  },[allProperties,search,fStatus,fType,fCity,fLocation,fOwner,fGender,fPriceMin,fPriceMax]);
+
+  // Frontend Pagination
+  const totalRecords = filtered.length;
+  const totalPages = Math.ceil(totalRecords / LIMIT) || 1;
+  
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
+
+  const paginatedProps = useMemo(() => {
+    const start = (currentPage - 1) * LIMIT;
+    return filtered.slice(start, start + LIMIT);
+  }, [filtered, currentPage]);
 
   const resetAll = () => { setSearch(""); setFStatus("all"); setFType("all"); setFCity("all"); setFLocation("all"); setFOwner("all"); setFGender("all"); setFPriceMin(""); setFPriceMax(""); };
 
   const stats = useMemo(()=>({
-    total:     totalRecords,
+    total:     allProperties.length,
     published: apiStats.published,
     pending:   apiStats.pending,
     inactive:  apiStats.inactive,
     rejected:  apiStats.rejected,
-  }),[apiStats,totalRecords]);
+  }),[apiStats,allProperties.length]);
 
   const pct = (n) => stats.total ? `${((n/stats.total)*100).toFixed(1)}%` : null;
 
@@ -167,7 +181,7 @@ export default function TotalProperties() {
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mt-1.5">Manage and view all properties listed on the platform.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={()=>fetchProps(page)} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 shadow-sm transition-all">
+          <button onClick={fetchProps} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 shadow-sm transition-all">
             <RefreshCw className="w-3.5 h-3.5"/> Refresh
           </button>
           <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 shadow-sm transition-all">
@@ -259,7 +273,7 @@ export default function TotalProperties() {
                 className="w-32 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-400 transition-all"/>
             </div>
             <p className="text-[10px] text-slate-400 font-medium self-center">
-              Showing <span className="font-bold text-slate-700">{filtered.length}</span> of {totalRecords} properties
+              Showing <span className="font-bold text-slate-700">{filtered.length}</span> matching properties
             </p>
           </div>
         )}
@@ -293,7 +307,7 @@ export default function TotalProperties() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {filtered.map(p => (
+                {paginatedProps.map(p => (
                   <tr key={p.id} className="group hover:bg-slate-50/80 transition-colors">
                     <td className="px-5 py-4"><input type="checkbox" className="rounded border-slate-300 cursor-pointer"/></td>
 
@@ -380,29 +394,29 @@ export default function TotalProperties() {
         {/* Pagination */}
         <div className="flex items-center justify-between px-5 py-4 border-t border-slate-100 bg-white">
           <p className="text-[11px] font-bold text-slate-400">
-            Showing {filtered.length>0?((page-1)*LIMIT)+1:0} to {Math.min(page*LIMIT,totalRecords)} of{" "}
+            Showing {filtered.length>0?((currentPage-1)*LIMIT)+1:0} to {Math.min(currentPage*LIMIT,totalRecords)} of{" "}
             <span className="text-slate-700">{totalRecords.toLocaleString()}</span> properties
           </p>
           <div className="flex items-center gap-1.5">
-            <button disabled={page===1} onClick={()=>fetchProps(page-1)}
+            <button disabled={currentPage===1} onClick={()=>setCurrentPage(currentPage-1)}
               className="flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-[11px] font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
               <ChevronLeft className="w-3.5 h-3.5"/> Prev
             </button>
             {Array.from({length:Math.min(totalPages,7)},(_,i)=>{
               let n;
               if(totalPages<=7) n=i+1;
-              else if(page<=4) n=i+1;
-              else if(page>=totalPages-3) n=totalPages-6+i;
-              else n=page-3+i;
+              else if(currentPage<=4) n=i+1;
+              else if(currentPage>=totalPages-3) n=totalPages-6+i;
+              else n=currentPage-3+i;
               return (
-                <button key={n} onClick={()=>fetchProps(n)}
+                <button key={n} onClick={()=>setCurrentPage(n)}
                   className={cn("w-9 h-9 rounded-xl text-[11px] font-bold transition-all",
-                    page===n?"bg-blue-600 text-white shadow-lg shadow-blue-200":"text-slate-500 hover:bg-slate-100 border border-slate-200")}>
+                    currentPage===n?"bg-blue-600 text-white shadow-lg shadow-blue-200":"text-slate-500 hover:bg-slate-100 border border-slate-200")}>
                   {n}
                 </button>
               );
             })}
-            <button disabled={page===totalPages} onClick={()=>fetchProps(page+1)}
+            <button disabled={currentPage===totalPages} onClick={()=>setCurrentPage(currentPage+1)}
               className="flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-[11px] font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
               Next <ChevronRight className="w-3.5 h-3.5"/>
             </button>
@@ -455,9 +469,8 @@ export default function TotalProperties() {
                 </div>
               ) : fullDetails ? (
                 <>
-                  {/* Pending Changes Section */}
                   {fullDetails.pendingChanges?.status === "pending" && (
-                    <PendingChangesSection prop={fullDetails} apiUrl={apiUrl} onRefresh={() => { fetchProps(page); openViewModal(selectedProp); }} />
+                    <PendingChangesSection prop={fullDetails} apiUrl={apiUrl} onRefresh={() => { fetchProps(); openViewModal(selectedProp); }} />
                   )}
 
                   {/* Images */}

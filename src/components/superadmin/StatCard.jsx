@@ -12,7 +12,8 @@ const COLORS = {
   indigo: "bg-indigo-50 text-indigo-600",
 };
 
-export function StatCard({ label, value, delta, trend = "neutral", icon: Icon, iconColor = "blue", loading }) {
+export function StatCard({ label, value, delta, trend = "neutral", icon: Icon, iconColor = "blue", loading, source }) {
+  const isNoData = value === "No Data Available";
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col transition-all hover:translate-y-[-4px] hover:shadow-md group">
       <div className="flex items-start gap-4">
@@ -26,7 +27,7 @@ export function StatCard({ label, value, delta, trend = "neutral", icon: Icon, i
           ) : (
             <div className="text-2xl font-black text-slate-900 tracking-tight truncate">{value}</div>
           )}
-          {delta && !loading && (
+          {delta && !loading && !isNoData && (
             <div className={cn(
               "text-[10px] mt-1.5 flex items-center gap-1 font-bold uppercase tracking-tight",
               trend === "up" && "text-emerald-600",
@@ -37,6 +38,9 @@ export function StatCard({ label, value, delta, trend = "neutral", icon: Icon, i
               {trend === "down" && <ArrowDown className="h-3 w-3" />}
               {delta}
             </div>
+          )}
+          {source && (
+            <div className="text-[9px] font-bold text-blue-500/80 uppercase tracking-widest mt-2">Source: {source}</div>
           )}
         </div>
       </div>

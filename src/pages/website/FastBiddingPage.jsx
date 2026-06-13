@@ -32,8 +32,7 @@ export default function FastBiddingPage() {
     gender: '',
     city: '',
     area: '',
-    minPrice: '',
-    maxPrice: ''
+    budgetQuery: ''
   });
 
   const apiUrl = useMemo(() => {
@@ -111,8 +110,28 @@ export default function FastBiddingPage() {
     const selectedArea = areas.find(a => (a._id || a.id) === form.area);
     const areaName = selectedArea?.name?.toLowerCase()?.trim() || '';
     const gender = form.gender.toLowerCase();
-    const minPrice = parseInt(form.minPrice || 0, 10);
-    const maxPrice = parseInt(form.maxPrice || 0, 10);
+    
+    let parsedMin = null;
+    let parsedMax = null;
+
+    if (form.budgetQuery) {
+      const q = form.budgetQuery.trim();
+      if (q.startsWith('<') || q.startsWith('<=')) {
+        parsedMax = parseInt(q.replace(/[^0-9]/g, ''), 10);
+      } else if (q.startsWith('>') || q.startsWith('>=')) {
+        parsedMin = parseInt(q.replace(/[^0-9]/g, ''), 10);
+      } else if (q.startsWith('=')) {
+        const val = parseInt(q.replace(/[^0-9]/g, ''), 10);
+        parsedMin = val;
+        parsedMax = val;
+      } else if (q.includes('-')) {
+        const parts = q.split('-');
+        parsedMin = parseInt(parts[0].replace(/[^0-9]/g, ''), 10);
+        parsedMax = parseInt(parts[1].replace(/[^0-9]/g, ''), 10);
+      } else {
+        parsedMax = parseInt(q.replace(/[^0-9]/g, ''), 10);
+      }
+    }
 
     const filtered = allProperties.filter(prop => {
       const propInfo = prop.propertyInfo || {};
@@ -129,11 +148,13 @@ export default function FastBiddingPage() {
         if (propGender && !genderMatch) return false;
       }
 
-      if (minPrice || maxPrice) {
+      if (parsedMin || parsedMax) {
         const rent = parseInt(prop.monthlyRent || prop.rent || propInfo.rent || propInfo.monthlyRent, 10);
+        const bufferedMax = parsedMax ? parsedMax + 3000 : null; // +₹3000 buffer logic
+
         if (Number.isFinite(rent)) {
-          if (minPrice && rent < minPrice) return false;
-          if (maxPrice && maxPrice !== 50000 && rent > maxPrice) return false;
+          if (parsedMin && rent < parsedMin) return false;
+          if (bufferedMax && rent > bufferedMax) return false;
         }
       }
 
@@ -142,7 +163,7 @@ export default function FastBiddingPage() {
 
     setProperties(filtered);
     setLoading(false);
-  }, [form.area, form.gender, form.minPrice, form.maxPrice, areas, allProperties]);
+  }, [form.area, form.gender, form.budgetQuery, areas, allProperties]);
 
   const handleFormChange = (e) => {
     const { id, value } = e.target;
@@ -154,8 +175,7 @@ export default function FastBiddingPage() {
     if (!form.gmail.trim() || !form.gmail.includes('@')) return false;
     if (!form.gender) return false;
     if (!form.city || !form.area) return false;
-    if (!form.minPrice || !form.maxPrice) return false;
-    if (parseInt(form.minPrice, 10) > parseInt(form.maxPrice, 10)) return false;
+    if (!form.budgetQuery) return false;
     return true;
   };
 
@@ -185,8 +205,16 @@ export default function FastBiddingPage() {
     const userId = getWebsiteUserId() || getWebsiteUser()?.loginId || '';
     const selectedCity = cities.find(c => (c._id || c.id) === form.city);
     const selectedArea = areas.find(a => (a._id || a.id) === form.area);
-    const bidMin = parseInt(form.minPrice || 0, 10);
-    const bidMax = parseInt(form.maxPrice || 0, 10);
+    
+    let parsedMin = null; let parsedMax = null;
+    if (form.budgetQuery) {
+      const q = form.budgetQuery.trim();
+      if (q.startsWith('<') || q.startsWith('<=')) { parsedMax = parseInt(q.replace(/[^0-9]/g, ''), 10); }
+      else if (q.startsWith('>') || q.startsWith('>=')) { parsedMin = parseInt(q.replace(/[^0-9]/g, ''), 10); }
+      else if (q.startsWith('=')) { const v = parseInt(q.replace(/[^0-9]/g, ''), 10); parsedMin = v; parsedMax = v; }
+      else if (q.includes('-')) { const p = q.split('-'); parsedMin = parseInt(p[0].replace(/[^0-9]/g, ''), 10); parsedMax = parseInt(p[1].replace(/[^0-9]/g, ''), 10); }
+      else { parsedMax = parseInt(q.replace(/[^0-9]/g, ''), 10); }
+    }
 
     for (const [index, property] of properties.entries()) {
       try {
@@ -212,19 +240,19 @@ export default function FastBiddingPage() {
           email: form.gmail,
           phone: '',
           request_type: 'bid',
-          bid_min: Number.isFinite(bidMin) && bidMin > 0 ? bidMin : null,
-          bid_max: Number.isFinite(bidMax) && bidMax > 0 ? bidMax : null,
+          bid_min: Number.isFinite(parsedMin) && parsedMin > 0 ? parsedMin : null,
+          bid_max: Number.isFinite(parsedMax) && parsedMax > 0 ? parsedMax : null,
           filter_criteria: {
             gender: form.gender,
             city_id: form.city,
             city: selectedCity?.name || selectedCity?.cityName || '',
             area_id: form.area,
             area: selectedArea?.name || selectedArea?.area_name || '',
-            min_price: Number.isFinite(bidMin) && bidMin > 0 ? bidMin : null,
-            max_price: Number.isFinite(bidMax) && bidMax > 0 ? bidMax : null,
+            min_price: Number.isFinite(parsedMin) && parsedMin > 0 ? parsedMin : null,
+            max_price: Number.isFinite(parsedMax) && parsedMax > 0 ? parsedMax : null,
             property_type: property.propertyType || property.propertyInfo?.propertyType || 'Property'
           },
-          message: `Looking for property with rent Rs ${form.minPrice}-${form.maxPrice}, Gender: ${form.gender}`
+          message: `Looking for property with budget: ${form.budgetQuery}, Gender: ${form.gender}`
         };
 
         await fetch(`${apiUrl}/api/booking/create`, {
@@ -350,35 +378,20 @@ export default function FastBiddingPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-2">Minimum Price (₹) *</label>
-                <input
-                  type="number"
-                  id="minPrice"
-                  value={form.minPrice}
-                  onChange={handleFormChange}
-                  placeholder="Min price"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  min="1000"
-                  step="500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-2">Maximum Price (₹) *</label>
-                <input
-                  type="number"
-                  id="maxPrice"
-                  value={form.maxPrice}
-                  onChange={handleFormChange}
-                  placeholder="Max price"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  min="1000"
-                  step="500"
-                  required
-                />
-              </div>
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-800 mb-2">Budget Query *</label>
+              <input
+                type="text"
+                id="budgetQuery"
+                value={form.budgetQuery}
+                onChange={handleFormChange}
+                placeholder="e.g. < 8000, > 5000, 5000-8000, or = 6000"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                We'll include properties up to +₹3000 buffer above your max budget so you have room to negotiate!
+              </p>
             </div>
 
             {/* Properties List — auto-included, no manual selection */}
@@ -439,7 +452,7 @@ export default function FastBiddingPage() {
             <div className="border-t border-gray-200 pt-6 flex gap-3">
               <button
                 type="button"
-                onClick={() => setForm({ fullName: '', gmail: '', gender: '', city: '', area: '', minPrice: '', maxPrice: '' })}
+                onClick={() => setForm({ fullName: '', gmail: '', gender: '', city: '', area: '', budgetQuery: '' })}
                 className="flex-1 bg-gray-100 text-gray-700 font-semibold py-3 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 Clear Form

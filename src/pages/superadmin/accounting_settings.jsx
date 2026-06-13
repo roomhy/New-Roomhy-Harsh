@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Building2, Users, Shield, Clock, Search, 
   ArrowUpRight, ArrowDownRight, MoreVertical, 
@@ -8,8 +8,9 @@ import {
   ArrowUpCircle, ArrowDownCircle, RotateCcw, Plus,
   Download, Eye, CreditCard, RefreshCw, Calculator,
   Receipt, FileText, Scale, LayoutGrid, Settings,
-  ShieldCheck, AlertCircle, Bell
+  ShieldCheck, AlertCircle, Bell, Send
 } from "lucide-react";
+import { fetchJson } from "../../utils/api";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -32,8 +33,47 @@ function Toggle({ on = false, onChange }) {
 
 export default function AccountingSettings() {
   const [switches, setSwitches] = useState({ autoPayouts: true, autoInvoices: true, overdueReminders: true, enableTaxes: true, inclusivePricing: true });
+  const [commissionPercentage, setCommissionPercentage] = useState(10);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const toggle = (key) => setSwitches(prev => ({ ...prev, [key]: !prev[key] }));
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const res = await fetchJson("/api/superadmin/settings");
+        if (res.success && res.settings) {
+          setCommissionPercentage(res.settings.commission_percentage ?? 10);
+        }
+      } catch (err) {
+        console.error("Failed to load settings:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadSettings();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetchJson("/api/superadmin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commission_percentage: Number(commissionPercentage) })
+      });
+      if (res.success) {
+        alert("Configuration saved successfully!");
+      } else {
+        alert(res.message || "Failed to save settings");
+      }
+    } catch (err) {
+      alert("Error saving settings: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="p-6 space-y-6 bg-[#F8FAFC] min-h-full">
@@ -44,7 +84,13 @@ export default function AccountingSettings() {
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Configure Global Accounting Rules & Financial Settlement Protocols</p>
          </div>
          <div className="flex items-center gap-3">
-            <button className="bg-slate-800 text-white px-6 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-slate-800/10 hover:bg-slate-900 transition-all">Save Configuration</button>
+            <button 
+              onClick={handleSave}
+              disabled={saving || loading}
+              className="bg-slate-800 text-white px-6 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-slate-800/10 hover:bg-slate-900 transition-all disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save Configuration"}
+            </button>
          </div>
       </div>
 
@@ -57,6 +103,26 @@ export default function AccountingSettings() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Platform Commission settings */}
+        <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-lg shadow-slate-200/50">
+           <div className="flex items-center gap-3 mb-6">
+              <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shadow-sm"><Calculator className="w-4 h-4" /></div>
+              <h3 className="text-[10px] font-bold text-slate-800 uppercase tracking-widest">Platform Commission Settings</h3>
+           </div>
+           <div className="space-y-4">
+              <InputGroup 
+                 label="Global Commission Percentage (%)" 
+                 type="number"
+                 value={commissionPercentage} 
+                 onChange={(e) => setCommissionPercentage(e.target.value)}
+                 placeholder="e.g. 10"
+              />
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                 This commission split is applied automatically to all new Razorpay transactions.
+              </p>
+           </div>
+        </div>
+
         {/* Currency & Format */}
         <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-lg shadow-slate-200/50">
            <div className="flex items-center gap-3 mb-6">
@@ -154,18 +220,24 @@ function StatCardHorizontal({ label, value, trend, up, icon: Icon, color }) {
   );
 }
 
-function InputGroup({ label, value, icon: Icon }) {
+function InputGroup({ label, value, onChange, type = "text", icon: Icon, placeholder, readOnly = false }) {
   return (
     <div className="space-y-1.5">
        <label className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none pl-1">{label}</label>
        <div className="relative group">
-          {Icon && <Icon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-300" />}
-          <div className={cn(
-            "w-full bg-slate-50 border border-slate-100 rounded-lg py-2 pr-3 text-[10px] font-bold text-slate-800 shadow-sm cursor-pointer hover:bg-white hover:border-blue-100 transition-all",
-            Icon ? "pl-8" : "pl-3"
-          )}>
-             {value}
-          </div>
+          {Icon && <Icon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />}
+          <input
+             type={type}
+             value={value}
+             onChange={onChange}
+             placeholder={placeholder}
+             readOnly={readOnly || !onChange}
+             className={cn(
+               "w-full bg-slate-50 border border-slate-100 rounded-lg py-2 pr-3 text-[10px] font-bold text-slate-800 shadow-sm transition-all",
+               Icon ? "pl-8" : "pl-3",
+               (!onChange || readOnly) ? "cursor-default opacity-85 select-none bg-slate-50/50" : "hover:bg-white hover:border-blue-100 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+             )}
+          />
        </div>
     </div>
   );

@@ -29,6 +29,7 @@ function AadhaarUploadArea({ doc, ocrStatus, onFileChange, onRemove, onUpload, u
           ref={inputRef}
           type="file"
           accept="image/*"
+          capture="environment"
           style={{ display: "none" }}
           onChange={(e) => onFileChange(e.target.files?.[0])}
         />
@@ -63,7 +64,7 @@ function AadhaarUploadArea({ doc, ocrStatus, onFileChange, onRemove, onUpload, u
   );
 }
 
-function UploadBox({ label, icon, doc, inputId, onFileChange, onRemove }) {
+function UploadBox({ label, icon, doc, inputId, capture, onFileChange, onRemove }) {
   const inputRef = useRef(null);
   const previewSrc = doc.preview || doc.url || "";
   const isImage = doc.type?.startsWith("image/") || (doc.url && !doc.url.endsWith(".pdf"));
@@ -106,6 +107,7 @@ function UploadBox({ label, icon, doc, inputId, onFileChange, onRemove }) {
           id={inputId}
           type="file"
           accept="image/*,application/pdf"
+          capture={capture}
           style={{ display: "none" }}
           onChange={(e) => onFileChange(e.target.files?.[0])}
         />
@@ -273,11 +275,12 @@ export default function DigitalCheckinOwnerprofile() {
               />
             </div>
             <div>
-              <label>Date of Birth <span className="req">*</span></label>
+              <label>Date of Birth (DD/MM/YYYY) <span className="req">*</span></label>
               <input
                 value={form.dob}
                 onChange={(e) => updateForm({ dob: e.target.value })}
-                type="date"
+                type="text"
+                placeholder="DD/MM/YYYY"
                 required
               />
             </div>
@@ -332,6 +335,7 @@ export default function DigitalCheckinOwnerprofile() {
               icon="🧑‍💼"
               doc={ownerPhoto}
               inputId="ownerPhotoInput"
+              capture="user"
               onFileChange={(file) => handleFileSelect("ownerPhoto", file)}
               onRemove={() => handleFileSelect("ownerPhoto", null)}
             />

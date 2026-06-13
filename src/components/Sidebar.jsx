@@ -181,13 +181,11 @@ const NAV = [
     path: "/superadmin/superchat",
     children: [
         { label: "Live Conversations", path: "/superadmin/superchat" },
-        { label: "Conversation Details", path: "/superadmin/superchat" },
-        { label: "Moderation & Filters", path: "/superadmin/superchat" },
-        { label: "Alerts & Violations", path: "/superadmin/superchat" },
-        { label: "Templates / Auto Messages", path: "/superadmin/superchat" },
-        { label: "Lead -> Chat Mapping", path: "/superadmin/superchat" },
-        { label: "Analytics", path: "/superadmin/superchat" },
-        { label: "Settings", path: "/superadmin/settings" },
+        { label: "Moderation & Filters", path: "/superadmin/chat/moderation" },
+        { label: "Alerts & Violations", path: "/superadmin/chat/alerts" },
+        { label: "Templates / Auto Messages", path: "/superadmin/chat/templates" },
+        { label: "Lead -> Chat Mapping", path: "/superadmin/chat/leads" },
+        { label: "Settings", path: "/superadmin/chat/settings" },
     ]
   },
   { 
@@ -202,12 +200,12 @@ const NAV = [
     path: "/superadmin/reports",
     children: [
         { label: "Overview", path: "/superadmin/reports" },
-        { label: "Property Performance", path: "/superadmin/reports" },
-        { label: "Location Wise Data", path: "/superadmin/reports" },
-        { label: "Occupancy Rate", path: "/superadmin/reports" },
-        { label: "Growth Analytics", path: "/superadmin/reports" },
-        { label: "Staff Performance Reports", path: "/superadmin/reports" },
-        { label: "Revenue Report", path: "/superadmin/reports" },
+        { label: "Property Performance", path: "/superadmin/reports/performance" },
+        { label: "Location Wise Data", path: "/superadmin/reports/locations" },
+        { label: "Occupancy Rate", path: "/superadmin/reports/occupancy" },
+        { label: "Growth Analytics", path: "/superadmin/reports/growth" },
+        { label: "Staff Performance Reports", path: "/superadmin/reports/staff" },
+        { label: "Revenue Report", path: "/superadmin/reports/revenue" },
     ]
   },
   { 
@@ -216,10 +214,10 @@ const NAV = [
     path: "/superadmin/booking",
     children: [
         { label: "Overview", path: "/superadmin/booking" },
-        { label: "Total Leads", path: "/superadmin/booking" },
+        { label: "Total Leads", path: "/superadmin/booking/leads" },
         { label: "Bookings", path: "/superadmin/direct-bookings" },
-        { label: "Conversion Rate", path: "/superadmin/booking" },
-        { label: "Top Performing Locations", path: "/superadmin/booking" },
+        { label: "Conversion Rate", path: "/superadmin/booking/conversion" },
+        { label: "Top Performing Locations", path: "/superadmin/booking/locations" },
     ]
   },
   { 
@@ -242,8 +240,8 @@ const NAV = [
         { label: "Overview", path: "/superadmin/complaint-history" },
         { label: "Tenants Complaints", path: "/superadmin/complaints/tenants" },
         { label: "Owners Complaints", path: "/superadmin/complaints/owners" },
-        { label: "Tickets System", path: "/superadmin/complaint-history" },
-        { label: "Issues Resolutions Tracking", path: "/superadmin/complaint-history" },
+        { label: "Tickets System", path: "/superadmin/support/tickets" },
+        { label: "Issues Resolution Tracking", path: "/superadmin/support/resolution" },
     ]
   },
   { label: "CRM", id: "crm", icon: Target, path: "/superadmin/enquiry" },
