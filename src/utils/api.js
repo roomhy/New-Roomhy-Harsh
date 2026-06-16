@@ -817,12 +817,24 @@ export const searchPropertiesByLocation = async (latitude, longitude, propertyTy
 // Get nearby areas for a location
 export const getNearbyAreas = async (latitude, longitude, city) => {
   try {
-    const areas = await fetchAreas();
+    const [areas, cities] = await Promise.all([fetchAreas(), fetchCities()]);
     
+    // Find selected city object to get its ID
+    const selectedCityObj = cities.find(c => (typeof c === 'object' ? c.name : c) === city);
+    const selectedCityId = selectedCityObj?._id || selectedCityObj?.id || '';
+
     // Filter areas by city
-    const cityAreas = areas.filter(a => 
-      (typeof a === 'object' ? a.city : a.split('-')[0]) === city
-    );
+    const cityAreas = areas.filter(a => {
+      if (typeof a === 'string') return a.split('-')[0] === city;
+      
+      const cityName = (a.cityName || a.city?.name || '').toLowerCase().trim();
+      const cityIdStr = (a.cityId || a.city?._id || a.city || '').toString();
+      const selectedCityLower = city.toLowerCase().trim();
+
+      return cityName === selectedCityLower || 
+             cityName.includes(selectedCityLower) || 
+             (selectedCityId && cityIdStr === selectedCityId);
+    });
 
     return cityAreas.map(a => typeof a === 'string' ? a : a.name);
   } catch (error) {

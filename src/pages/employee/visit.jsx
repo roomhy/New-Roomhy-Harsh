@@ -13,9 +13,8 @@ const readStoredUser = () => {
   try {
     const raw =
       sessionStorage.getItem("manager_user") ||
-      sessionStorage.getItem("user") ||
-      localStorage.getItem("manager_user") ||
-      localStorage.getItem("user");
+      localStorage.getItem("staff_user") ||
+      sessionStorage.getItem("staff_user");
     return raw ? JSON.parse(raw) : null;
   } catch (_) {
     return null;

@@ -209,6 +209,24 @@ export default function Rooms() {
     setAssignModalOpen(true);
   };
 
+const handleAddTenant = (room) => {
+  const beds = toLegacyBeds(room);
+  const occupiedBed = beds.find(b => b.status === "occupied" || b.tenantId);
+  const tenantId = occupiedBed?.tenantId || "";
+  setSelectedRoom(room);
+  setSelectedBedIndex(beds.findIndex(b => b.tenantId === tenantId));
+  setSelectedBedOccupied(!!occupiedBed);
+  setSelectedTenantId(tenantId);
+  if (tenantId) {
+    const t = tenants.find(x => (x._id || x.id) === tenantId);
+    if (t) setNewTenantForm({ name: t.name || "", phone: t.phone || "", email: t.email || "" });
+  } else {
+    setNewTenantForm({ name: "", phone: "", email: "" });
+  }
+  setAssignMode("existing");
+  setAssignModalOpen(true);
+};
+
   const handleCreateRoom = async (e) => {
     e.preventDefault();
     if (!owner?.loginId) return;
@@ -465,14 +483,14 @@ export default function Rooms() {
           {/* Room status colors */}
           <div className="flex flex-wrap items-center gap-2 text-[12px]">
             <span className="text-muted-foreground font-medium mr-1">Room Occupancy:</span>
-            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded border border-emerald-250 bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300 text-[11px] font-semibold">
+            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded border border-emerald-200 bg-emerald-50 text-emerald-800 text-[11px] font-semibold">
               <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" /> Fully Vacant (0% Filled)
             </span>
-            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded border border-amber-250 bg-amber-50/40 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 text-[11px] font-semibold">
-              <span className="size-1.5 rounded-full bg-amber-500" /> Partially Occupied
+            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded border border-orange-300 bg-orange-50 text-orange-800 text-[11px] font-bold">
+              <span className="size-1.5 rounded-full bg-orange-500 animate-pulse" /> Partially Occupied
             </span>
-            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded border border-teal-250 bg-teal-50/40 dark:bg-teal-950/20 text-teal-800 dark:text-teal-300 text-[11px] font-semibold">
-              <span className="size-1.5 rounded-full bg-teal-500" /> Fully Occupied (100% Filled)
+            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded border border-rose-300 bg-rose-50 text-rose-700 text-[11px] font-bold">
+              <span className="size-1.5 rounded-full bg-rose-500" /> Fully Occupied (100% Filled)
             </span>
           </div>
           {/* Bed status colors */}
@@ -552,40 +570,43 @@ export default function Rooms() {
                         const occupiedCount = beds.filter(b => b.status === "occupied" || b.tenantId).length;
                         const totalBeds = beds.length;
 
-                        let headerClass, bodyClass, cardBorderClass, badgeClass, statusLabel, dotColor;
+                        let cardBorderClass, badgeClass, statusLabel, dotColor, manageBtnClass, bedVacantClass, footerBorder;
 
                         if (occupiedCount === 0) {
-                          headerClass = "bg-emerald-50 text-emerald-700 border-b border-emerald-100";
-                          bodyClass = "bg-white";
                           cardBorderClass = "border-emerald-200";
                           badgeClass = "bg-emerald-100 text-emerald-700";
                           statusLabel = "Vacant";
                           dotColor = "bg-emerald-500";
+                          footerBorder = "border-slate-100";
+                          manageBtnClass = "bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100";
+                          bedVacantClass = "bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100";
                         } else if (occupiedCount === totalBeds) {
-                          headerClass = "bg-blue-50 text-blue-700 border-b border-blue-100";
-                          bodyClass = "bg-white";
-                          cardBorderClass = "border-blue-200";
-                          badgeClass = "bg-blue-100 text-blue-700";
+                          cardBorderClass = "border-rose-300";
+                          badgeClass = "bg-rose-100 text-rose-700";
                           statusLabel = "Full";
-                          dotColor = "bg-blue-500";
+                          dotColor = "bg-rose-500";
+                          footerBorder = "border-slate-100";
+                          manageBtnClass = "bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100";
+                          bedVacantClass = "bg-rose-50 border-rose-200 text-rose-300 hover:bg-rose-100";
                         } else {
-                          headerClass = "bg-amber-50 text-amber-700 border-b border-amber-100";
-                          bodyClass = "bg-white";
-                          cardBorderClass = "border-amber-200";
-                          badgeClass = "bg-amber-100 text-amber-700";
+                          cardBorderClass = "border-orange-300";
+                          badgeClass = "bg-orange-100 text-orange-700";
                           statusLabel = `${occupiedCount}/${totalBeds} Beds`;
-                          dotColor = "bg-amber-500";
+                          dotColor = "bg-orange-500";
+                          footerBorder = "border-slate-100";
+                          manageBtnClass = "bg-orange-50 border border-orange-200 text-orange-700 hover:bg-orange-100";
+                          bedVacantClass = "bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100";
                         }
 
                         return (
-                          <div key={room._id||room.id} className={cn("group rounded-2xl p-4 border shadow-sm relative overflow-hidden bg-white hover:shadow-md transition-all w-[85%] md:w-auto shrink-0 snap-start", cardBorderClass || "border-slate-200/60")}>
+                          <div key={room._id||room.id} className={cn("group rounded-2xl border shadow-sm relative overflow-hidden bg-white hover:shadow-md transition-all w-[85%] md:w-auto shrink-0 snap-start p-4", cardBorderClass)}>
                             {/* Header Row */}
                             <div className="flex justify-between items-start mb-3">
                               <div className="flex items-center gap-3">
-                                <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-[15px] font-bold shrink-0 border shadow-inner", 
-                                  occupiedCount === totalBeds ? "bg-blue-50 text-blue-600 border-blue-100/50" : 
-                                  occupiedCount === 0 ? "bg-emerald-50 text-emerald-600 border-emerald-100/50" : 
-                                  "bg-amber-50 text-amber-600 border-amber-100/50"
+                                <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-[15px] font-bold shrink-0 border shadow-inner",
+                                  occupiedCount === totalBeds ? "bg-rose-100 text-rose-600 border-rose-200" :
+                                  occupiedCount === 0 ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                                  "bg-orange-50 text-orange-600 border-orange-100"
                                 )}>
                                   <BedDouble className="w-4 h-4" />
                                 </div>
@@ -598,7 +619,7 @@ export default function Rooms() {
                               </div>
                               
                               <div className="flex flex-col items-end gap-1.5">
-                                <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold", badgeClass)}>
+                                <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-bold", badgeClass)}>
                                   <span className={cn("size-1.5 rounded-full", dotColor)} />
                                   {statusLabel}
                                 </span>
@@ -620,10 +641,8 @@ export default function Rooms() {
                                     title={isOcc ? `Occupied${bed.tenantName ? ` — ${bed.tenantName}` : ""}` : "Vacant — Click to assign"}
                                     className={cn("flex-1 h-8 rounded-lg grid place-items-center text-[10px] font-bold transition-colors cursor-pointer border",
                                       isOcc
-                                        ? "bg-blue-500 text-white border-blue-600 shadow-sm"
-                                        : i===0 && beds.length>2
-                                          ? "bg-amber-50 text-amber-600 hover:bg-amber-100 border-amber-200"
-                                          : "bg-slate-50 border-slate-200 border-dashed text-slate-400 hover:bg-slate-100")}
+                                        ? cn(badgeClass, "shadow-sm")
+                                        : cn(bedVacantClass, "border-dashed"))}
                                   >
                                     {String.fromCharCode(65+i)}
                                   </div>
@@ -632,23 +651,23 @@ export default function Rooms() {
                             </div>
 
                             {/* Footer */}
-                            <div className="flex items-center justify-between pt-2.5 border-t border-slate-100/80 mt-2">
-                              <div className="flex gap-4 mb-1">
-                                <div>
-                                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Rent</p>
-                                   <p className="text-[13.5px] font-black text-slate-800 leading-none">₹{(room.rent||0).toLocaleString("en-IN")}<span className="text-[10px] text-slate-500 font-semibold">/bed</span></p>
+                              <div className={cn("flex items-center justify-between pt-2.5 border-t mt-2", footerBorder)}>
+                                <div className="flex gap-4 mb-1">
+                                  <div>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Rent</p>
+                                    <p className="text-[13.5px] font-black text-slate-800 leading-none">₹{(room.rent||0).toLocaleString("en-IN")}<span className="text-[10px] text-slate-500 font-semibold">/bed</span></p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button type="button" onClick={() => {
+                                    const firstVacant = beds.findIndex(b => !(b.status==="occupied"||b.tenantId));
+                                    openAssignModal(room, firstVacant !== -1 ? firstVacant : 0);
+                                  }} className={cn("h-7 px-3.5 rounded-full flex items-center gap-1.5 transition-colors text-[11px] font-bold", manageBtnClass)}>
+                                    Manage
+                                  </button>
                                 </div>
                               </div>
-                              <div className="flex items-center shrink-0">
-                                <button type="button" onClick={() => {
-                                  const firstVacant = beds.findIndex(b => !(b.status==="occupied"||b.tenantId));
-                                  openAssignModal(room, firstVacant !== -1 ? firstVacant : 0);
-                                }} className="h-7 px-3.5 rounded-full bg-blue-50 border border-blue-100/50 text-blue-700 flex items-center gap-1.5 hover:bg-blue-100 transition-colors text-[11px] font-bold">
-                                  Manage
-                                </button>
-                              </div>
                             </div>
-                          </div>
                         );
                       })}
                       </div>
@@ -999,6 +1018,14 @@ export default function Rooms() {
               <button type="submit" disabled={isAssigning} className="w-full h-10 rounded-lg bg-foreground text-background text-[13px] font-medium hover:opacity-90 disabled:opacity-50">
                 {isAssigning ? "Assigning..." : "Assign Tenant"}
               </button>
+              <div className="pt-2.5 border-t border-slate-100 mt-4 text-center">
+                <a
+                  href={`/propertyowner/tenantrec?propertyId=${encodeURIComponent(selectedRoom?.propertyId || '')}&room=${encodeURIComponent(selectedRoom?.number || selectedRoom?.roomNo || '')}`}
+                  className="text-[12px] font-bold text-blue-600 hover:text-blue-700 transition-colors inline-flex items-center gap-1"
+                >
+                  <Plus size={14} /> Onboard a new tenant instead
+                </a>
+              </div>
             </form>
           )}
         </div>

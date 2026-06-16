@@ -113,18 +113,28 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
   // Load areas when city changes
   useEffect(() => {
     if (!form.city) { setAreas([]); return; }
+    
+    // Find selected city object to get its ID
+    const selectedCityObj = cities.find(c => (typeof c === 'object' ? c.name : c) === form.city);
+    const selectedCityId = selectedCityObj?._id || selectedCityObj?.id || '';
+
     fetchAreas()
       .then(allAreas => {
-        const cityLower = form.city.toLowerCase();
+        const cityLower = form.city.toLowerCase().trim();
         const filtered = allAreas.filter(a => {
           if (typeof a === 'string') return a.toLowerCase().startsWith(cityLower);
-          const cityName = (a.city?.name || a.cityName || '').toLowerCase();
-          return cityName === cityLower || cityName.includes(cityLower);
+          
+          const cityName = (a.cityName || a.city?.name || '').toLowerCase().trim();
+          const cityIdStr = (a.cityId || a.city?._id || a.city || '').toString();
+
+          return cityName === cityLower || 
+                 cityName.includes(cityLower) || 
+                 (selectedCityId && cityIdStr === selectedCityId);
         });
         setAreas(filtered.map(a => typeof a === 'string' ? a : (a.name || a.areaName || '')));
       })
       .catch(() => setAreas([]));
-  }, [form.city]);
+  }, [form.city, cities]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

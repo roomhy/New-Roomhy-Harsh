@@ -15,6 +15,21 @@ import { getOwnerRuntimeSession, clearOwnerRuntimeSession, fetchOwnerProperties,
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
+const toLegacyBeds = (room) => {
+  if (Array.isArray(room?.beds) && room.beds.length && typeof room.beds[0] === 'object' && 'status' in room.beds[0]) {
+    return room.beds;
+  }
+  const bedCount = Number(room?.beds || room?.capacity || room?.totalBeds || 0);
+  return Array.from({ length: bedCount }, (_, i) => {
+    const a = room?.bedAssignments?.find(x => Number(x.bedNo) === i + 1) || room?.bedAssignments?.[i] || room?.bedsInfo?.[i] || null;
+    const tid = a?.tenantId;
+    const hasOccupant = !!(a && (a.tenantName || a.name || (tid && String(tid).length > 0 && String(tid) !== '[object Object]')));
+    return hasOccupant
+      ? { status: "occupied", tenantId: tid ? String(tid) : null, tenantName: a.tenantName || a.name || null }
+      : { status: "available", tenantId: null, tenantName: null };
+  }).concat(bedCount === 0 ? [{ status: "available", tenantId: null, tenantName: null }] : []);
+};
+
 const dataURLtoFile = (dataUrl, filename) => {
   const [header, data] = dataUrl.split(",");
   const mime = header.match(/:(.*?);/)[1];
@@ -445,37 +460,76 @@ export default function TenantRec() {
   const [newTenant, setNewTenant] = useState(null);
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const pId = urlParams.get('propertyId');
-    const room = urlParams.get('room');
-    if (pId) {
-      setRoomAssignment(prev => ({
-        ...prev,
-        propertyId: pId,
-        ...(room ? { roomUnit: room } : {})
-      }));
-    }
-  }, []);
-
-  useEffect(() => {
-    // Load properties for dropdown specifically belonging to the logged-in owner
-    const loadProperties = async () => {
+    const initializeData = async () => {
       try {
+        // 1. Fetch properties first
         const props = await fetchOwnerProperties(owner.loginId);
         setProperties(props);
 
-        // Auto-select if there's only 1 property and none is selected via URL
-        if (props && props.length === 1 && !roomAssignment.propertyId) {
-          const urlParams = new URLSearchParams(window.location.search);
-          if (!urlParams.get('propertyId')) {
-            setRoomAssignment(prev => ({ ...prev, propertyId: props[0]._id }));
+        // 2. Parse URL query params
+        const urlParams = new URLSearchParams(window.location.search);
+        const pId = urlParams.get('propertyId');
+        const room = urlParams.get('room');
+        const nameParam = urlParams.get('name') || urlParams.get('fullName');
+        const emailParam = urlParams.get('email');
+        const phoneParam = urlParams.get('phone');
+        const depositParam = urlParams.get('deposit') || urlParams.get('depositAmount') || urlParams.get('bookingAmount') || urlParams.get('paidAmount');
+
+        // 3. Set basic details
+        if (nameParam || emailParam || phoneParam) {
+          setBasicDetails(prev => ({
+            ...prev,
+            fullName: nameParam || prev.fullName,
+            email: emailParam || prev.email,
+            phone: phoneParam || prev.phone
+          }));
+        }
+
+        // 4. Set tenancy details
+        if (depositParam) {
+          setTenancyDetails(prev => ({
+            ...prev,
+            depositAmount: depositParam
+          }));
+        }
+
+        // 5. Select property and room
+        if (pId) {
+          let matchedProp = props.find(p => p._id === pId || p.visitId === pId || p.propertyId === pId);
+          let resolvedPropertyId = matchedProp ? matchedProp._id : pId;
+          
+          if (!matchedProp) {
+            try {
+              const approvedPropData = await fetchJson(`/api/approved-properties/${pId}`);
+              const approvedProp = approvedPropData?.property || approvedPropData;
+              if (approvedProp && approvedProp.propertyId) {
+                const actualPropId = approvedProp.propertyId;
+                matchedProp = props.find(p => p._id === actualPropId || p.visitId === actualPropId || p.propertyId === actualPropId);
+                if (matchedProp) {
+                  resolvedPropertyId = matchedProp._id;
+                }
+              }
+            } catch (fetchErr) {
+              console.error("Could not resolve approved property ID:", fetchErr);
+            }
           }
+          
+          setRoomAssignment(prev => ({
+            ...prev,
+            propertyId: resolvedPropertyId,
+            ...(room ? { roomUnit: room } : {})
+          }));
+        } else if (props && props.length === 1) {
+          setRoomAssignment(prev => ({
+            ...prev,
+            propertyId: props[0]._id
+          }));
         }
       } catch (err) {
-        console.error("Failed to load properties:", err);
+        console.error("Initialization error:", err);
       }
     };
-    loadProperties();
+    initializeData();
   }, [owner.loginId]);
 
   useEffect(() => {
@@ -484,9 +538,13 @@ export default function TenantRec() {
       setRooms([]);
       return;
     }
+    let active = true;
     const loadRooms = async () => {
       try {
+        console.log("DEBUG loadRooms: propertyId =", roomAssignment.propertyId, "properties =", properties);
         const data = await fetchJson(`/api/rooms/property/${roomAssignment.propertyId}?unassigned=true`);
+        if (!active) return;
+        console.log("DEBUG loadRooms: API returned data =", data);
         let roomList = [];
         if (Array.isArray(data)) {
           roomList = data;
@@ -496,20 +554,27 @@ export default function TenantRec() {
 
         // Fallback generator
         if (roomList.length === 0) {
-          const selectedProp = properties.find(p => p._id === roomAssignment.propertyId);
+          console.log("DEBUG loadRooms: roomList is empty, trying fallback generator...");
+          const selectedProp = properties.find(p => p._id === roomAssignment.propertyId || p.visitId === roomAssignment.propertyId || p.propertyId === roomAssignment.propertyId);
+          console.log("DEBUG loadRooms: selectedProp =", selectedProp);
           if (selectedProp && Array.isArray(selectedProp.roomTypes)) {
             selectedProp.roomTypes.forEach(rt => {
               const count = parseInt(rt.totalRooms) || 0;
+              const bedsCount = parseInt(rt.occupancy) || parseInt(rt.totalBeds) || 1;
+              const priceVal = Number(rt.pricePerBed || rt.pricePerRoom || 0);
               for (let i = 1; i <= count; i++) {
                 roomList.push({
                   _id: `${rt.type}-${i}`,
                   title: `${rt.type} - Room ${i}`,
-                  type: rt.type
+                  type: rt.type,
+                  beds: bedsCount,
+                  price: priceVal
                 });
               }
             });
           }
         }
+        console.log("DEBUG loadRooms: final roomList =", roomList);
         setRooms(roomList);
 
         // Auto-fill logic if a room is already selected via URL
@@ -532,11 +597,16 @@ export default function TenantRec() {
           }
         }
       } catch (err) {
-        console.error("Failed to load rooms:", err);
-        setRooms([]);
+        if (active) {
+          console.error("Failed to load rooms:", err);
+          setRooms([]);
+        }
       }
     };
     loadRooms();
+    return () => {
+      active = false;
+    };
   }, [roomAssignment.propertyId, properties]);
 
   const validateForm = () => {
@@ -584,7 +654,7 @@ export default function TenantRec() {
 
     setSubmitting(true);
     try {
-      const selectedPropObj = properties.find(p => p._id === roomAssignment.propertyId);
+      const selectedPropObj = properties.find(p => p._id === roomAssignment.propertyId || p.visitId === roomAssignment.propertyId || p.propertyId === roomAssignment.propertyId);
       const payload = {
         name: basicDetails.fullName,
         email: basicDetails.email,
@@ -599,7 +669,7 @@ export default function TenantRec() {
         baseRoomRent: tenancyDetails.baseRoomRent,
         agreedRent: tenancyDetails.rentAmount,
         securityDepositTotal: tenancyDetails.depositAmount,
-        securityDepositPaid: 0,
+        securityDepositPaid: tenancyDetails.depositAmount || 0,
         dob: basicDetails.dob,
         gender: basicDetails.gender,
         rentAgreementType: roomAssignment.rentAgreementType,
@@ -826,21 +896,29 @@ export default function TenantRec() {
 
           {/* Section 2 */}
           {(!isMobile || activeMobileTab === 2) && (() => {
-            const floorOptions = [...new Set(rooms.map(r => r.floor).filter(Boolean))].sort();
-            const hasVacantBed = (r) => {
-              if (Array.isArray(r.beds)) {
-                return r.beds.some(b => !b.tenantId && b.status !== "occupied");
+            const availableRooms = rooms.filter(r => {
+              const matchesSelected = roomAssignment.roomUnit && (r.title === roomAssignment.roomUnit || r.number === roomAssignment.roomUnit || r.roomNo === roomAssignment.roomUnit);
+              if (matchesSelected) return true;
+
+              // Filter out inactive, unavailable or deleted rooms
+              if (r.isAvailable === false || r.status === "inactive" || r.isDeleted === true) {
+                return false;
               }
-              const total = Number(r.beds || r.capacity || r.totalBeds || 0);
-              return total > 0;
-            };
-            const roomsForFloor = (roomAssignment.floor
-              ? rooms.filter(r => !r.floor || r.floor === roomAssignment.floor)
-              : rooms
-            ).filter(hasVacantBed);
-            const selectedRoom = rooms.find(r => (r.title || r.number || r.roomNo) === roomAssignment.roomUnit);
-            const bedCount = selectedRoom ? (Array.isArray(selectedRoom.beds) ? selectedRoom.beds.length : Number(selectedRoom.beds || selectedRoom.capacity || 0)) : 0;
-            const bedOptions = Array.from({ length: bedCount }, (_, i) => `Bed ${i + 1}`);
+              // Filter out rooms with no vacant beds
+              const bedsList = toLegacyBeds(r);
+              return bedsList.some(b => b.status === "available" && !b.tenantId);
+            });
+
+            const floorOptions = [...new Set(availableRooms.map(r => r.floor).filter(Boolean))].sort();
+            const roomsForFloor = roomAssignment.floor
+              ? availableRooms.filter(r => !r.floor || r.floor === roomAssignment.floor)
+              : availableRooms;
+            
+            const selectedRoom = availableRooms.find(r => (r.title || r.number || r.roomNo) === roomAssignment.roomUnit);
+            const bedsList = selectedRoom ? toLegacyBeds(selectedRoom) : [];
+            const bedOptions = bedsList
+              .map((b, i) => ({ label: `Bed ${i + 1}`, value: String(i + 1), status: b.status, tenantId: b.tenantId }))
+              .filter(opt => opt.status === "available" && !opt.tenantId);
 
             const handleRoomSelect = (roomTitle) => {
               const room = rooms.find(r => (r.title || r.number || r.roomNo) === roomTitle);
@@ -926,8 +1004,8 @@ export default function TenantRec() {
                     value={roomAssignment.bed}
                     onChange={e => setRoomAssignment({ ...roomAssignment, bed: e.target.value })}
                     options={
-                      bedOptions.length > 0
-                        ? bedOptions.map((b, i) => ({ label: b, value: String(i + 1) }))
+                      selectedRoom
+                        ? bedOptions
                         : [{ label: "Bed 1", value: "1" }, { label: "Bed 2", value: "2" }, { label: "Bed 3", value: "3" }, { label: "Bed 4", value: "4" }]
                     }
                     placeholder={roomAssignment.roomUnit ? "Select bed" : "Select room first"}
@@ -1220,7 +1298,7 @@ export default function TenantRec() {
                       { label: "Accommodation Type", val: roomAssignment.roomType },
                       { label: "Bed", val: roomAssignment.bed },
                       { label: "Agreed Rent (₹)", val: tenancyDetails.rentAmount ? `₹${tenancyDetails.rentAmount}` : null },
-                      { label: "Security Deposit", val: tenancyDetails.depositAmount ? `₹${tenancyDetails.depositAmount}` : null },
+                      { label: "Deposit", val: tenancyDetails.depositAmount ? `₹${tenancyDetails.depositAmount}` : null },
                       { label: "Move-in Date", val: fmtDate(tenancyDetails.moveInDate) !== "—" ? fmtDate(tenancyDetails.moveInDate) : null },
                       { label: "Minimum Stay", val: tenancyDetails.minStay ? `${tenancyDetails.minStay} months` : null },
                       { label: "Notice Period", val: tenancyDetails.noticePeriod ? `${tenancyDetails.noticePeriod} days` : null },

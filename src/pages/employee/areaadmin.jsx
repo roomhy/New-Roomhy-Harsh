@@ -21,10 +21,9 @@ const getStaffUser = () => {
   try {
     const raw =
       sessionStorage.getItem("manager_user") ||
-      sessionStorage.getItem("user") ||
       localStorage.getItem("staff_user") ||
+      sessionStorage.getItem("staff_user") ||
       localStorage.getItem("manager_user") ||
-      localStorage.getItem("user") ||
       "null";
     const parsed = JSON.parse(raw);
     if (parsed) return parsed;
@@ -574,8 +573,12 @@ export default function SuperadminAreaadmin() {
 
   const logout = (event) => {
     event?.preventDefault?.();
-    localStorage.removeItem("user");
+    // Only clear staff-specific keys
+    localStorage.removeItem("staff_user");
+    localStorage.removeItem("staff_token");
     localStorage.removeItem("manager_user");
+    sessionStorage.removeItem("manager_user");
+    sessionStorage.removeItem("staff_user");
     if (typeof window.name === "string" && window.name.startsWith(WINDOW_NAME_SESSION_PREFIX)) {
       window.name = "";
     }

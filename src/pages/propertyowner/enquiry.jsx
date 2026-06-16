@@ -330,7 +330,14 @@ export default function Enquiry() {
                         {l.ts ? new Date(l.ts).toLocaleDateString("en-IN") : "Recent"}
                       </td>
                       <td className="px-5 py-3.5">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                          <button
+                            onClick={() => window.location.href = `/propertyowner/tenantrec?name=${encodeURIComponent(l.studentName || '')}&email=${encodeURIComponent(l.studentEmail || '')}&phone=${encodeURIComponent(l.studentPhone || '')}&propertyId=${encodeURIComponent(l.propertyId || '')}`}
+                            className="h-8 px-2.5 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-600 text-[11.5px] font-bold transition-colors"
+                            title="Add Tenant"
+                          >
+                            Add Tenant
+                          </button>
                           {phoneClean && (
                             <a 
                               href={`https://wa.me/${phoneClean}`}
@@ -406,21 +413,29 @@ export default function Enquiry() {
                   </div>
 
                   {/* CRM Action Buttons */}
-                  <div className="flex gap-2">
-                    <a href={`tel:${l.studentPhone}`} className="flex-1 py-3 rounded-xl bg-slate-50 text-slate-600 text-[11px] font-black uppercase tracking-wider flex flex-col items-center justify-center gap-1 hover:bg-slate-100 transition-colors border border-slate-100 shadow-sm">
-                      <Phone className="w-4 h-4 text-blue-500 mb-0.5" />
-                      Call
-                    </a>
-                    {phoneClean && (
-                      <a href={`https://wa.me/${phoneClean}?text=Hi%20${l.studentName}`} target="_blank" rel="noopener noreferrer" className="flex-1 py-3 rounded-xl bg-slate-50 text-slate-600 text-[11px] font-black uppercase tracking-wider flex flex-col items-center justify-center gap-1 hover:bg-slate-100 transition-colors border border-slate-100 shadow-sm">
-                        <MessageCircle className="w-4 h-4 text-emerald-500 mb-0.5" />
-                        WhatsApp
-                      </a>
-                    )}
-                    <button onClick={() => handleDelete(l._id)} className="w-12 py-3 rounded-xl bg-rose-50 text-rose-600 text-[11px] font-black uppercase tracking-wider flex flex-col items-center justify-center gap-1 hover:bg-rose-100 transition-colors border border-rose-100 shadow-sm shrink-0">
-                      <Trash2 className="w-4 h-4 text-rose-500 mb-0.5" />
-                      Drop
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => window.location.href = `/propertyowner/tenantrec?name=${encodeURIComponent(l.studentName || '')}&email=${encodeURIComponent(l.studentEmail || '')}&phone=${encodeURIComponent(l.studentPhone || '')}&propertyId=${encodeURIComponent(l.propertyId || '')}`}
+                      className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 hover:bg-blue-700 transition-colors shadow-sm"
+                    >
+                      Onboard Tenant
                     </button>
+                    <div className="flex gap-2">
+                      <a href={`tel:${l.studentPhone}`} className="flex-1 py-3 rounded-xl bg-slate-50 text-slate-600 text-[11px] font-black uppercase tracking-wider flex flex-col items-center justify-center gap-1 hover:bg-slate-100 transition-colors border border-slate-100 shadow-sm">
+                        <Phone className="w-4 h-4 text-blue-500 mb-0.5" />
+                        Call
+                      </a>
+                      {phoneClean && (
+                        <a href={`https://wa.me/${phoneClean}?text=Hi%20${l.studentName}`} target="_blank" rel="noopener noreferrer" className="flex-1 py-3 rounded-xl bg-slate-50 text-slate-600 text-[11px] font-black uppercase tracking-wider flex flex-col items-center justify-center gap-1 hover:bg-slate-100 transition-colors border border-slate-100 shadow-sm">
+                          <MessageCircle className="w-4 h-4 text-emerald-500 mb-0.5" />
+                          WhatsApp
+                        </a>
+                      )}
+                      <button onClick={() => handleDelete(l._id)} className="w-12 py-3 rounded-xl bg-rose-50 text-rose-600 text-[11px] font-black uppercase tracking-wider flex flex-col items-center justify-center gap-1 hover:bg-rose-100 transition-colors border border-rose-100 shadow-sm shrink-0">
+                        <Trash2 className="w-4 h-4 text-rose-500 mb-0.5" />
+                        Drop
+                      </button>
+                    </div>
                   </div>
                 </div>
               );

@@ -72,7 +72,10 @@ export default function FastBiddingPage() {
       }
       try {
         const allAreas = await fetchAreas();
-        const filtered = allAreas.filter(a => a.city?._id === form.city || a.city === form.city);
+        const filtered = allAreas.filter(a => {
+          const cityIdStr = (a.cityId || a.city?._id || a.city || '').toString();
+          return cityIdStr === form.city;
+        });
         setAreas(filtered);
       } catch {
         setAreas([]);

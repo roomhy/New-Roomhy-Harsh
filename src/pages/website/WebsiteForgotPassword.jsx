@@ -18,6 +18,45 @@ export default function WebsiteForgotPassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const [cooldownExpiry, setCooldownExpiry] = useState(() => {
+    const stored = localStorage.getItem("signup_otp_cooldown_expiry");
+    if (stored) {
+      const parsed = parseInt(stored, 10);
+      if (parsed > Date.now()) {
+        return parsed;
+      }
+    }
+    return 0;
+  });
+
+  const [secondsLeft, setSecondsLeft] = useState(0);
+
+  React.useEffect(() => {
+    if (!cooldownExpiry) {
+      setSecondsLeft(0);
+      return;
+    }
+
+    const updateTimer = () => {
+      const diff = Math.max(0, Math.ceil((cooldownExpiry - Date.now()) / 1000));
+      setSecondsLeft(diff);
+      if (diff <= 0) {
+        localStorage.removeItem("signup_otp_cooldown_expiry");
+        setCooldownExpiry(0);
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [cooldownExpiry]);
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  };
+
   const requestOtp = async (e) => {
     e.preventDefault();
     if (!email.trim() || !email.includes("@")) {
@@ -33,7 +72,14 @@ export default function WebsiteForgotPassword() {
         body: JSON.stringify({ email })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to send OTP.");
+      if (!res.ok) {
+        if (res.status === 429 || (data.message && data.message.toLowerCase().includes("too many"))) {
+          const expiry = Date.now() + 10 * 60 * 1000;
+          localStorage.setItem("signup_otp_cooldown_expiry", expiry.toString());
+          setCooldownExpiry(expiry);
+        }
+        throw new Error(data.message || "Failed to send OTP.");
+      }
       setStep("otp");
     } catch (err) {
       setError(err.message || "Failed to send OTP. Please try again.");
@@ -121,6 +167,19 @@ export default function WebsiteForgotPassword() {
                   Enter your registered email and we'll send you an OTP.
                 </p>
                 {error && <p className="text-red-500 text-sm mb-4 text-center">{error}</p>}
+
+                {secondsLeft > 0 && (
+                  <div className="p-4 mb-4 bg-rose-50 border border-rose-100 text-rose-800 rounded-2xl flex items-center gap-3 text-xs font-medium animate-in fade-in slide-in-from-top-1">
+                    <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center shrink-0">
+                      <Lock className="w-4 h-4 text-rose-600 animate-pulse" />
+                    </div>
+                    <div>
+                      <p className="font-bold">Rate Limit Exceeded</p>
+                      <p className="text-[11px] text-rose-600">Please wait {formatTime(secondsLeft)} before requesting a new OTP.</p>
+                    </div>
+                  </div>
+                )}
+
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
                 <input
                   type="email"
@@ -132,10 +191,10 @@ export default function WebsiteForgotPassword() {
                 />
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-60"
+                  disabled={loading || secondsLeft > 0}
+                  className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:bg-gray-400 disabled:opacity-100"
                 >
-                  {loading ? "Sending OTP..." : "Send OTP"}
+                  {secondsLeft > 0 ? `Locked (Wait ${formatTime(secondsLeft)})` : loading ? "Sending OTP..." : "Send OTP"}
                 </button>
               </form>
             )}

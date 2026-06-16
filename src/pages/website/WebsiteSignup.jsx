@@ -35,6 +35,46 @@ export default function WebsiteSignup() {
   const toastTimer = useRef(null);
   const [signupDelivery, setSignupDelivery] = useState({ email: true, whatsapp: false, sms: false, demoOtp: "" });
 
+  // OTP Cooldown rate limiter state
+  const [cooldownExpiry, setCooldownExpiry] = useState(() => {
+    const stored = localStorage.getItem("signup_otp_cooldown_expiry");
+    if (stored) {
+      const parsed = parseInt(stored, 10);
+      if (parsed > Date.now()) {
+        return parsed;
+      }
+    }
+    return 0;
+  });
+
+  const [secondsLeft, setSecondsLeft] = useState(0);
+
+  useEffect(() => {
+    if (!cooldownExpiry) {
+      setSecondsLeft(0);
+      return;
+    }
+
+    const updateTimer = () => {
+      const diff = Math.max(0, Math.ceil((cooldownExpiry - Date.now()) / 1000));
+      setSecondsLeft(diff);
+      if (diff <= 0) {
+        localStorage.removeItem("signup_otp_cooldown_expiry");
+        setCooldownExpiry(0);
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [cooldownExpiry]);
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  };
+
   const showToast = useCallback((message, type = "info") => {
     setToast({ message, type });
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -57,6 +97,11 @@ export default function WebsiteSignup() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
+        if (response.status === 429 || (data.message && data.message.toLowerCase().includes("too many"))) {
+          const expiry = Date.now() + 10 * 60 * 1000;
+          localStorage.setItem("signup_otp_cooldown_expiry", expiry.toString());
+          setCooldownExpiry(expiry);
+        }
         showToast(data.message || "Unable to send login code", "error");
         return;
       }
@@ -67,7 +112,7 @@ export default function WebsiteSignup() {
     } finally {
       setLoadingLoginSend(false);
     }
-  }, [apiUrl, loginEmail, showToast]);
+  }, [apiUrl, loginEmail, showToast, setCooldownExpiry]);
 
   const handleLoginVerify = useCallback(async (e) => {
     e.preventDefault();
@@ -127,6 +172,11 @@ export default function WebsiteSignup() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 429 || (data.message && data.message.toLowerCase().includes("too many"))) {
+          const expiry = Date.now() + 10 * 60 * 1000;
+          localStorage.setItem("signup_otp_cooldown_expiry", expiry.toString());
+          setCooldownExpiry(expiry);
+        }
         throw new Error(data.message || "Unable to send verification code");
       }
       setPendingPayload(payload);
@@ -143,7 +193,7 @@ export default function WebsiteSignup() {
     } finally {
       setLoadingCreate(false);
     }
-  }, [apiUrl, signup, showToast]);
+  }, [apiUrl, signup, showToast, setCooldownExpiry]);
 
   const handleVerify = useCallback(async () => {
     if (!pendingPayload) {
@@ -373,13 +423,27 @@ export default function WebsiteSignup() {
                   </div>
                 )}
 
+                {secondsLeft > 0 && (
+                  <div className="p-4 bg-rose-50 border border-rose-100 text-rose-800 rounded-2xl flex items-center gap-3 text-xs font-medium animate-in fade-in slide-in-from-top-1">
+                    <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center shrink-0">
+                      <Lock className="w-4 h-4 text-rose-600 animate-pulse" />
+                    </div>
+                    <div>
+                      <p className="font-bold">Rate Limit Exceeded</p>
+                      <p className="text-[11px] text-rose-600">Please wait {formatTime(secondsLeft)} before requesting a new OTP.</p>
+                    </div>
+                  </div>
+                )}
+
                 {!verificationVisible && (
                     <button
                       type="submit"
-                      disabled={loadingCreate}
+                      disabled={loadingCreate || secondsLeft > 0}
                       className="group w-full py-3.5 bg-gray-900 hover:bg-black text-white font-bold rounded-2xl transition-all shadow-xl hover:shadow-2xl flex items-center justify-center gap-2 transform hover:-translate-y-1 active:translate-y-0 disabled:bg-gray-400"
                     >
-                      {loadingCreate ? (
+                      {secondsLeft > 0 ? (
+                        `Locked (Wait ${formatTime(secondsLeft)})`
+                      ) : loadingCreate ? (
                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                       ) : (
                         <>
@@ -433,13 +497,27 @@ export default function WebsiteSignup() {
                   </div>
                 )}
 
+                {secondsLeft > 0 && (
+                  <div className="p-4 bg-rose-50 border border-rose-100 text-rose-800 rounded-2xl flex items-center gap-3 text-xs font-medium animate-in fade-in slide-in-from-top-1">
+                    <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center shrink-0">
+                      <Lock className="w-4 h-4 text-rose-600 animate-pulse" />
+                    </div>
+                    <div>
+                      <p className="font-bold">Rate Limit Exceeded</p>
+                      <p className="text-[11px] text-rose-600">Please wait {formatTime(secondsLeft)} before requesting a new OTP.</p>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   type="submit"
-                  disabled={loginCodeSent ? loadingLoginVerify : loadingLoginSend}
+                  disabled={loginCodeSent ? loadingLoginVerify : (loadingLoginSend || secondsLeft > 0)}
                   className="w-full py-3.5 bg-gray-900 hover:bg-black text-white font-bold rounded-2xl transition-all shadow-xl hover:shadow-2xl flex items-center justify-center gap-2 transform hover:-translate-y-1 active:translate-y-0 disabled:bg-gray-400"
                 >
                   {loginCodeSent
                     ? (loadingLoginVerify ? "Verifying..." : "Verify & Login")
+                    : secondsLeft > 0
+                    ? `Locked (Wait ${formatTime(secondsLeft)})`
                     : (loadingLoginSend ? "Sending Code..." : "Send Login Code")}
                 </button>
                 

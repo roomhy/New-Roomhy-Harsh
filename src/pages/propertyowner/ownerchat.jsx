@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession, fetchOwnerTenants } from "../../utils/propertyowner";
 import { apiFetch } from "../../services/api";
-import { Search, Send, User, MoreVertical, Phone, Video, Loader2, MessageSquare } from "lucide-react";
+import { Search, Send, User, MoreVertical, Phone, Video, Loader2, MessageSquare, Wallet } from "lucide-react";
 
 export default function OwnerChat() {
   const owner = getOwnerRuntimeSession();
@@ -17,8 +17,84 @@ export default function OwnerChat() {
   const [messages, setMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [associatedBooking, setAssociatedBooking] = useState(null);
   
   const messagesEndRef = React.useRef(null);
+
+  const generateWebsiteUserIdFromEmail = (email) => {
+    const safeEmail = String(email || '').trim().toLowerCase();
+    if (!safeEmail) return '';
+    let hash = 0;
+    for (let i = 0; i < safeEmail.length; i += 1) {
+      hash = (hash * 31 + safeEmail.charCodeAt(i)) % 1000000;
+    }
+    return `roomhyweb${String(hash).padStart(6, '0')}`;
+  };
+
+  const fetchAssociatedBooking = async (targetUserId) => {
+    if (!targetUserId) {
+      setAssociatedBooking(null);
+      return;
+    }
+    try {
+      const res = await apiFetch(`/api/booking?owner_id=${owner.loginId}`);
+      if (res && res.success && Array.isArray(res.data)) {
+        const targetClean = targetUserId.toLowerCase();
+        const sortedBookings = [...res.data].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        const match = sortedBookings.find(b => {
+          const isEmailMatch = String(b.email || '').toLowerCase() === targetClean;
+          const isUserIdMatch = String(b.user_id || '').toLowerCase() === targetClean;
+          const genUserId = generateWebsiteUserIdFromEmail(b.email);
+          const isGenMatch = genUserId && String(genUserId).toLowerCase() === targetClean;
+          return isEmailMatch || isUserIdMatch || isGenMatch;
+        });
+        setAssociatedBooking(match || null);
+      } else {
+        setAssociatedBooking(null);
+      }
+    } catch (err) {
+      console.error("Failed to fetch associated booking", err);
+      setAssociatedBooking(null);
+    }
+  };
+
+  const handleSendPaymentLink = async () => {
+    if (!associatedBooking || !activeChat) return;
+    const amount = associatedBooking.rent_amount || associatedBooking.bid_amount || 0;
+    const propertyName = associatedBooking.property_name || "property";
+    const tenantName = associatedBooking.name || activeChat.participant_name || "Tenant";
+    const bookingId = associatedBooking._id;
+    const paymentUrl = `http://localhost:5173/website/pay?bookingId=${bookingId}&amount=${amount}`;
+    const paymentMessage = `Dear ${tenantName}, please complete the payment of ₹${amount} to secure your booking for "${propertyName}". 💳 You can pay securely via Razorpay here: ${paymentUrl}`;
+
+    setIsSending(true);
+
+    const optimisticMsg = {
+      id: Date.now(),
+      sender: "Me",
+      text: paymentMessage,
+      time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+      isMe: true
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+    scrollToBottom();
+
+    try {
+      await apiFetch("/api/chat/send", {
+        method: "POST",
+        body: JSON.stringify({
+          from_login_id: owner.loginId,
+          to_login_id: activeChat.participant_login_id,
+          message: paymentMessage
+        })
+      });
+      fetchMessages(activeChat.participant_login_id);
+    } catch (err) {
+      console.error("Failed to send payment link", err);
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   const fetchInbox = async () => {
     try {
@@ -91,10 +167,14 @@ export default function OwnerChat() {
       setLoadingMessages(true);
       fetchMessages(activeChat.participant_login_id).finally(() => setLoadingMessages(false));
       
+      fetchAssociatedBooking(activeChat.participant_login_id);
+      
       const interval = setInterval(() => {
         fetchMessages(activeChat.participant_login_id);
       }, 3000);
       return () => clearInterval(interval);
+    } else {
+      setAssociatedBooking(null);
     }
   }, [activeChat]);
 
@@ -236,7 +316,20 @@ export default function OwnerChat() {
 
               {/* Input Area */}
               <div className="p-4 bg-white border-t border-border">
-                <form onSubmit={handleSend} className="flex gap-3">
+                <form onSubmit={handleSend} className="flex gap-3 items-center">
+                  <button
+                    type="button"
+                    onClick={handleSendPaymentLink}
+                    disabled={!associatedBooking || isSending}
+                    title={associatedBooking ? "Send Payment Link" : "No active booking request found"}
+                    className={`size-12 rounded-xl flex items-center justify-center transition-all shrink-0 ${
+                      associatedBooking 
+                        ? "bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-500/20" 
+                        : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                    }`}
+                  >
+                    <Wallet size={20} />
+                  </button>
                   <input 
                     type="text" 
                     value={message}
@@ -245,7 +338,7 @@ export default function OwnerChat() {
                     disabled={isSending}
                     className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                   />
-                  <button type="submit" disabled={isSending} className="bg-blue-600 hover:bg-blue-700 text-white size-12 rounded-xl flex items-center justify-center transition-all shadow-md shadow-blue-500/20 disabled:opacity-50">
+                  <button type="submit" disabled={isSending} className="bg-blue-600 hover:bg-blue-700 text-white size-12 rounded-xl flex items-center justify-center transition-all shadow-md shadow-blue-500/20 disabled:opacity-50 shrink-0">
                     <Send size={20} className="ml-1" />
                   </button>
                 </form>

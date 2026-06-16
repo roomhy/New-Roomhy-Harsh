@@ -30,7 +30,7 @@ export default function Tenantagreement() {
   }, []);
 
   useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem("tenant_user") || localStorage.getItem("user") || "null");
+    const stored = JSON.parse(localStorage.getItem("tenant_user") || "null");
     if (!stored?.loginId) {
       window.location.href = "/tenant/tenantlogin";
       return;

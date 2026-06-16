@@ -29,7 +29,7 @@ export default function WebsiteNavbar() {
       try {
         const citiesData = await fetchCities();
         if (Array.isArray(citiesData)) {
-          setCities(citiesData.map(c => typeof c === 'string' ? c : c.name));
+          setCities(citiesData);
         }
       } catch (error) {
         console.error('Error loading cities:', error);
@@ -43,11 +43,23 @@ export default function WebsiteNavbar() {
   useEffect(() => {
     const loadAreas = async () => {
       if (selectedCity) {
+        // Find selected city object to get its ID
+        const selectedCityObj = cities.find(c => (typeof c === 'object' ? c.name : c) === selectedCity);
+        const selectedCityId = selectedCityObj?._id || selectedCityObj?.id || '';
+
         try {
           const areasData = await fetchAreas();
-          const filteredAreas = areasData.filter(a => 
-            (typeof a === 'object' ? a.city : a.split('-')[0]) === selectedCity
-          );
+          const filteredAreas = areasData.filter(a => {
+            if (typeof a === 'string') return a.split('-')[0] === selectedCity;
+            
+            const cityName = (a.cityName || a.city?.name || '').toLowerCase().trim();
+            const cityIdStr = (a.cityId || a.city?._id || a.city || '').toString();
+            const selectedCityLower = selectedCity.toLowerCase().trim();
+
+            return cityName === selectedCityLower || 
+                   cityName.includes(selectedCityLower) || 
+                   (selectedCityId && cityIdStr === selectedCityId);
+          });
           setAreas(filteredAreas.map(a => typeof a === 'string' ? a : a.name));
         } catch (error) {
           console.error('Error loading areas:', error);
@@ -56,7 +68,7 @@ export default function WebsiteNavbar() {
       }
     };
     loadAreas();
-  }, [selectedCity]);
+  }, [selectedCity, cities]);
 
   const handleSearch = () => {
     const params = new URLSearchParams();
@@ -242,9 +254,10 @@ export default function WebsiteNavbar() {
                   className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"
                 >
                   <option value="">Select City</option>
-                  {cities.map(city => (
-                    <option key={city} value={city}>{city}</option>
-                  ))}
+                  {cities.map(city => {
+                    const cityName = typeof city === 'object' ? city.name : city;
+                    return <option key={cityName} value={cityName}>{cityName}</option>;
+                  })}
                 </select>
               </div>
 

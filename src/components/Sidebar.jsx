@@ -254,10 +254,9 @@ const getFilteredNav = () => {
     let rawUser = null;
     try {
       rawUser = sessionStorage.getItem("manager_user") ||
-                sessionStorage.getItem("user") ||
                 localStorage.getItem("staff_user") ||
+                sessionStorage.getItem("staff_user") ||
                 localStorage.getItem("manager_user") ||
-                localStorage.getItem("user") ||
                 "null";
     } catch (e) {}
     const user = JSON.parse(rawUser);
@@ -315,12 +314,12 @@ export function Sidebar({ open, isMobile, onClose, onLogout }) {
 
   const resolveUser = () => {
     try {
+      // Only read staff-specific keys — NOT generic 'user' (bleeds across panels)
       return JSON.parse(
         sessionStorage.getItem("manager_user") ||
-        sessionStorage.getItem("user") ||
         localStorage.getItem("staff_user") ||
+        sessionStorage.getItem("staff_user") ||
         localStorage.getItem("manager_user") ||
-        localStorage.getItem("user") ||
         "{}"
       );
     } catch {

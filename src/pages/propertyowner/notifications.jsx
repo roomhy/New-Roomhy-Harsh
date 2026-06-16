@@ -3,7 +3,7 @@ import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLay
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
 import { 
   Bell, Check, Trash2, IndianRupee, UserCheck, AlertTriangle, 
-  Settings, Info, ShieldAlert
+  Settings, Info, ShieldAlert, Plus
 } from "lucide-react";
 
 export default function NotificationsPage() {
@@ -32,7 +32,8 @@ export default function NotificationsPage() {
               title: meta.title || n.title || "Notification",
               msg: meta.message || n.message || "",
               time: new Date(n.createdAt).toLocaleString(),
-              read: n.read
+              read: n.read,
+              meta
             };
           });
           setNotifications(formatted);
@@ -171,6 +172,16 @@ export default function NotificationsPage() {
                     <span className="text-xs text-muted-foreground shrink-0">{item.time}</span>
                   </div>
                   <p className="text-[13px] text-muted-foreground leading-relaxed">{item.msg}</p>
+                  {item.type === "payment" && item.meta && (
+                    <div className="mt-3">
+                      <a
+                        href={`/propertyowner/tenantrec?fullName=${encodeURIComponent(item.meta.tenantName || '')}&email=${encodeURIComponent(item.meta.tenantEmail || '')}&phone=${encodeURIComponent(item.meta.tenantPhone || '')}&propertyId=${encodeURIComponent(item.meta.propertyId || '')}&deposit=${encodeURIComponent(item.meta.amount || 0)}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                      >
+                        <Plus size={12} /> Add Tenant
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">

@@ -202,6 +202,7 @@ export default function Payouts() {
                      <tr className="text-slate-400 text-[8px] font-bold uppercase border-b border-slate-50">
                         <th className="pb-4">PO Identity</th>
                         <th className="pb-4">Owner Name</th>
+                        <th className="pb-4 text-center">Move-In Date</th>
                         <th className="pb-4 text-center">Settlement Account</th>
                         <th className="pb-4 text-center">Disbursed (₹)</th>
                         <th className="pb-4 text-center">Reference</th>
@@ -222,6 +223,22 @@ export default function Payouts() {
                                 <p className="text-[11px] font-bold text-slate-800 leading-tight">{p.owner_name}</p>
                                 <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">ID: {p.owner_id}</p>
                              </div>
+                          </td>
+                          <td className="py-3 text-center">
+                             {p.moveInDate ? (
+                                <div className="flex flex-col items-center gap-1">
+                                  <span className="text-[9.5px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                    {new Date(p.moveInDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                                  </span>
+                                  {p.payout_status !== "Paid" && new Date(p.moveInDate) <= new Date() && (
+                                    <span className="text-[7.5px] font-bold text-rose-600 uppercase tracking-wider animate-pulse">
+                                      Due for transfer
+                                    </span>
+                                  )}
+                                </div>
+                             ) : (
+                                <span className="text-[9px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">Not Set</span>
+                             )}
                           </td>
                           <td className="py-3 text-center">
                              {p.bank_details?.account_number ? (

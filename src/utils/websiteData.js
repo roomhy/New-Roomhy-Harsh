@@ -74,7 +74,7 @@ export const loadAreasByCity = async () => {
     if (!response.ok) return areasByCity;
     const areaData = await response.json();
     (areaData.data || []).forEach((area) => {
-      const cityName = area.city || area.cityName;
+      const cityName = area.cityName || area.city?.name || (typeof area.city === 'string' ? area.city : '');
       if (!cityName) return;
       if (!areasByCity[cityName]) {
         areasByCity[cityName] = [];

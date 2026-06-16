@@ -152,7 +152,7 @@ export default function ReportsRevenue() {
     return (
       <div className="p-8 space-y-10 bg-[#F8FAFC] min-h-full flex flex-col items-center justify-center py-40">
         <div className="w-16 h-16 border-4 border-blue-600/10 border-t-blue-600 rounded-full animate-spin mb-4" />
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Compiling Platform Ledger...</p>
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Loading data...</p>
       </div>
     );
   }
@@ -170,7 +170,7 @@ export default function ReportsRevenue() {
     <div className="p-8 space-y-10 bg-[#F8FAFC] min-h-full font-inter text-slate-800">
       {/* Header Area */}
       <div className="flex flex-col gap-2">
-         <h1 className="text-4xl font-bold text-slate-800 tracking-tight leading-none">Revenue Intelligence Command</h1>
+         <h1 className="text-4xl font-bold text-slate-800 tracking-tight leading-none">Revenue & Payments</h1>
          <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase mt-2">
             <span>Reports</span>
             <ChevronRight className="w-3 h-3" />
@@ -178,7 +178,7 @@ export default function ReportsRevenue() {
          </div>
       </div>
 
-      <p className="text-sm font-bold text-slate-400">Dynamic breakdown of gross bookings revenue, platform commission margins, and owner settlement statuses.</p>
+      <p className="text-sm font-bold text-slate-400">View all payments, commissions and owner payouts on this platform.</p>
 
       {/* Global Commission Settings Panel */}
       <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col md:flex-row items-center justify-between gap-8 animate-in fade-in slide-in-from-top-6 duration-500">
@@ -187,14 +187,14 @@ export default function ReportsRevenue() {
              <Sliders className="w-8 h-8" />
           </div>
           <div>
-             <h3 className="text-xl font-bold text-slate-800 tracking-tight">Global Platform Commission settings</h3>
-             <p className="text-xs text-slate-400 font-bold uppercase mt-1">CALIBRATE DYNAMIC PLATFORM SPLITS FOR FUTURE PAYMENTS</p>
+              <h3 className="text-xl font-bold text-slate-800 tracking-tight">Platform Commission Rate</h3>
+             <p className="text-xs text-slate-400 font-bold uppercase mt-1">Set how much % the platform takes per booking</p>
           </div>
         </div>
         
         <div className="flex items-center gap-4">
           <div className="flex items-center bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4">
-             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-4">Dynamic Margin:</span>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-4">Current Rate:</span>
              {showSettingsEdit ? (
                <div className="flex items-center gap-2">
                  <input 
@@ -231,7 +231,7 @@ export default function ReportsRevenue() {
               onClick={() => setShowSettingsEdit(true)}
               className="px-8 py-4 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl text-[10px] font-bold uppercase shadow-lg transition-all active:scale-95"
             >
-              Adjust split percentage
+              Change Commission %
             </button>
           )}
         </div>
@@ -251,7 +251,7 @@ export default function ReportsRevenue() {
       <div className="grid grid-cols-1 gap-8">
         <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col">
            <div className="flex items-center justify-between mb-10">
-              <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Revenue Stream Velocity</h3>
+              <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Revenue Chart</h3>
               <div className="flex items-center gap-6">
                  <LegendPill color="#3B82F6" label="Booking Revenue" />
                  <span className="bg-slate-50 border-none rounded-2xl px-5 py-2.5 text-xs font-bold text-slate-500">Last 7 Active Days</span>
@@ -452,8 +452,8 @@ export default function ReportsRevenue() {
               {/* Header */}
               <div className="p-8 bg-slate-900 text-white flex items-center justify-between">
                  <div>
-                    <h3 className="text-xl font-bold tracking-tight">Initiate Payout Transfer</h3>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Platform Settlement Command</p>
+                    <h3 className="text-xl font-bold tracking-tight">Owner Payment Transfer</h3>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Send payment to owner</p>
                  </div>
                  <button 
                     onClick={() => setShowPayoutModal(false)}
@@ -473,7 +473,7 @@ export default function ReportsRevenue() {
                        <span className="text-slate-800">{selectedPayout.owner_name}</span>
                     </div>
                     <div className="flex justify-between items-center text-xs font-bold text-slate-500">
-                       <span>Gross Payout Share:</span>
+                        <span>Owner's Amount:</span>
                        <span className="text-emerald-600 text-lg font-black">₹{selectedPayout.owner_amount?.toLocaleString('en-IN')}</span>
                     </div>
                  </div>

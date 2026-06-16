@@ -45,7 +45,7 @@ const ensurePdfLibsLoaded = () =>
 
 // ─── LocalStorage helpers ──────────────────────────────────────────────────────
 const readTenantUser = () => {
-  try { return JSON.parse(localStorage.getItem("tenant_user") || localStorage.getItem("user") || "null"); }
+  try { return JSON.parse(localStorage.getItem("tenant_user") || "null"); }
   catch { return null; }
 };
 const readLocalTenants = () => {

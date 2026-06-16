@@ -155,7 +155,14 @@ export default function ConfirmedBookingsPage() {
                           {b.payment_status === "completed" ? "Signed & Paid" : "Pending Sign"}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right space-x-2">
+                      <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
+                        <button
+                          onClick={() => window.location.href = `/propertyowner/tenantrec?name=${encodeURIComponent(b.name || '')}&email=${encodeURIComponent(b.email || '')}&phone=${encodeURIComponent(b.phone || '')}&propertyId=${encodeURIComponent(b.property_id || b.property || '')}&paidAmount=${encodeURIComponent(b.payment_amount || b.rent_amount || b.total_amount || 0)}`}
+                          className="h-8 px-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-[11.5px] font-medium transition-colors"
+                          title="Onboard as Tenant"
+                        >
+                          Add Tenant
+                        </button>
                         <button 
                           onClick={() => handleDownload(b)}
                           className="size-8 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors" 
@@ -223,19 +230,27 @@ export default function ConfirmedBookingsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <button 
-                    onClick={() => handleDownload(b)}
-                    className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-[10px] font-black uppercase tracking-wider hover:bg-slate-200 transition-colors"
+                <div className="space-y-2">
+                  <button
+                    onClick={() => window.location.href = `/propertyowner/tenantrec?name=${encodeURIComponent(b.name || '')}&email=${encodeURIComponent(b.email || '')}&phone=${encodeURIComponent(b.phone || '')}&propertyId=${encodeURIComponent(b.property_id || b.property || '')}&paidAmount=${encodeURIComponent(b.payment_amount || b.rent_amount || b.total_amount || 0)}`}
+                    className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-blue-600 text-white text-[11px] font-black uppercase tracking-wider hover:bg-blue-705 transition-colors shadow-sm"
                   >
-                    <Download className="w-3.5 h-3.5" /> Download
+                    Add Tenant (Onboard)
                   </button>
-                  <button 
-                    onClick={() => handleCancel(b._id)}
-                    className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 text-[10px] font-black uppercase tracking-wider hover:bg-rose-100 transition-colors"
-                  >
-                    <Ban className="w-3.5 h-3.5" /> Cancel
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button 
+                      onClick={() => handleDownload(b)}
+                      className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-[10px] font-black uppercase tracking-wider hover:bg-slate-200 transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Download
+                    </button>
+                    <button 
+                      onClick={() => handleCancel(b._id)}
+                      className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 text-[10px] font-black uppercase tracking-wider hover:bg-rose-100 transition-colors"
+                    >
+                      <Ban className="w-3.5 h-3.5" /> Cancel
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

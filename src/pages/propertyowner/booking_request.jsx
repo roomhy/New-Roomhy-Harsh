@@ -4,7 +4,8 @@ import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/pr
 import { apiFetch } from "../../services/api";
 import { 
   Inbox, Search, MessageSquare, Phone, Calendar, 
-  CheckCircle2, XCircle, Clock, CreditCard, ArrowRight
+  CheckCircle2, XCircle, Clock, CreditCard, ArrowRight, Loader2,
+  Eye, X, User, Mail, MapPin
 } from "lucide-react";
 
 export default function BookingRequestPage() {
@@ -17,11 +18,13 @@ export default function BookingRequestPage() {
   const [search, setSearch] = useState("");
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedRequestForView, setSelectedRequestForView] = useState(null);
 
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [approvingItem, setApprovingItem] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentLink, setPaymentLink] = useState("");
+  const [processingId, setProcessingId] = useState(null);
 
   React.useEffect(() => {
     let active = true;
@@ -43,6 +46,7 @@ export default function BookingRequestPage() {
   }, [owner.loginId]);
 
   const handleAction = async (id, action) => {
+    setProcessingId(id);
     try {
       if (action === "approve") {
         await apiFetch(`/api/booking/requests/${id}/approve`, { method: "PUT" });
@@ -53,23 +57,28 @@ export default function BookingRequestPage() {
     } catch (err) {
       console.error(`Error performing booking action ${action}:`, err);
       alert(`Action failed: ${err.message}`);
+    } finally {
+      setProcessingId(null);
     }
   };
 
   const confirmApprove = async () => {
+    if (!approvingItem) return;
+    setProcessingId(approvingItem._id);
     try {
       await apiFetch(`/api/booking/requests/${approvingItem._id}/approve`, { 
         method: "PUT",
         body: JSON.stringify({ 
-           approved_amount: paymentAmount, 
-           payment_link: paymentLink 
+           approved_amount: paymentAmount
         })
       });
       setRequests(prev => prev.filter(r => r._id !== approvingItem._id));
       setShowApprovalModal(false);
-      alert(`Bid approved. Payment link sent to tenant for ₹${paymentAmount}.`);
+      alert(`Bid approved. Chat enabled and welcome message sent to tenant.`);
     } catch(err) {
       alert(`Action failed: ${err.message}`);
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -155,87 +164,286 @@ export default function BookingRequestPage() {
                 </div>
               </div>
 
-              <div className="border-t border-border/60 mt-6 pt-4 flex gap-2">
-                {item.request_type === 'bid' ? (
+              <div className="border-t border-border/60 mt-6 pt-4 flex flex-col gap-2">
+                <div className="flex gap-2">
+                  {item.request_type === 'bid' ? (
+                    <button 
+                      onClick={() => handleAction(item._id, "approve")}
+                      disabled={processingId !== null}
+                      className="flex-1 h-11 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {processingId === item._id ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          Enabling Chat...
+                        </>
+                      ) : (
+                        "Accept Bid & Enable Chat"
+                      )}
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handleAction(item._id, "approve")}
+                      disabled={processingId !== null}
+                      className="flex-1 h-11 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {processingId === item._id ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          Enabling Chat...
+                        </>
+                      ) : (
+                        "Approve & Enable Chat"
+                      )}
+                    </button>
+                  )}
                   <button 
-                    onClick={() => {
-                      setApprovingItem(item);
-                      setPaymentAmount(item.bid_min || item.bid_amount || item.rent_amount || 0);
-                      setPaymentLink(`https://roomhy.com/payment-checkout?booking_id=${item._id}&amount=${item.bid_min || item.bid_amount || item.rent_amount || 0}`);
-                      setShowApprovalModal(true);
-                    }}
-                    className="flex-1 h-11 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all"
+                    onClick={() => handleAction(item._id, "reject")}
+                    disabled={processingId !== null}
+                    className="px-4 h-11 border border-border rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center justify-center gap-1 disabled:opacity-50"
                   >
-                    Accept Bid & Create Payment Link
+                    {processingId === item._id ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      "Reject Request"
+                    )}
                   </button>
-                ) : (
-                  <button 
-                    onClick={() => handleAction(item._id, "approve")}
-                    className="flex-1 h-11 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all"
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setSelectedRequestForView(item)}
+                    className="flex-1 h-10 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2"
                   >
-                    Approve &amp; Assign Bed
+                    <Eye size={14} />
+                    View Details
                   </button>
-                )}
-                <button 
-                  onClick={() => handleAction(item._id, "reject")}
-                  className="px-4 h-11 border border-border rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50"
-                >
-                  Reject Request
-                </button>
+                  <button
+                    onClick={() => window.location.href = `/propertyowner/tenantrec?name=${encodeURIComponent(item.name || '')}&email=${encodeURIComponent(item.email || '')}&phone=${encodeURIComponent(item.phone || '')}&propertyId=${encodeURIComponent(item.property_id || item.property || '')}&paidAmount=${encodeURIComponent(item.payment_amount || item.rent_amount || item.total_amount || 0)}`}
+                    className="flex-[1.5] h-10 border border-blue-250 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                  >
+                    Onboard directly as Tenant
+                  </button>
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Bid Approval Modal */}
-      {showApprovalModal && approvingItem && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-card rounded-2xl p-6 w-full max-w-md shadow-xl border border-border">
-            <h3 className="font-serif text-[22px] font-bold text-foreground mb-4">Accept Bid & Generate Link</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Approved Amount (₹)</label>
-                <input 
-                  type="number" 
-                  value={paymentAmount}
-                  onChange={(e) => {
-                    setPaymentAmount(e.target.value);
-                    setPaymentLink(`https://roomhy.com/payment-checkout?booking_id=${approvingItem._id}&amount=${e.target.value}`);
-                  }}
-                  className="w-full h-11 px-3 rounded-xl bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Payment Link</label>
-                <input 
-                  type="text" 
-                  value={paymentLink}
-                  onChange={(e) => setPaymentLink(e.target.value)}
-                  className="w-full h-11 px-3 rounded-xl bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground bg-blue-50 text-blue-800 p-3 rounded-lg">
-                This link will be generated and shared with the tenant so they can pay to secure their booking.
-              </p>
-            </div>
-            <div className="mt-6 flex gap-3">
-              <button 
-                onClick={() => setShowApprovalModal(false)}
-                className="flex-1 h-11 border border-border text-foreground font-bold text-[13px] rounded-xl hover:bg-slate-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={confirmApprove}
-                className="flex-1 h-11 bg-indigo-600 text-white font-bold text-[13px] rounded-xl hover:bg-indigo-700 transition-colors"
-              >
-                Confirm & Accept
-              </button>
-            </div>
-          </div>
-        </div>
+      {selectedRequestForView && (
+        <ViewDetailsModal 
+          item={selectedRequestForView} 
+          onClose={() => setSelectedRequestForView(null)} 
+        />
       )}
     </PropertyOwnerLayout>
+  );
+}
+
+function ViewDetailsModal({ item, onClose }) {
+  if (!item) return null;
+
+  const getRequestTypeBadge = (type) => {
+    switch (type) {
+      case "bid":
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase">Bid Request</span>;
+      case "website":
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-50 text-sky-700 border border-sky-100 uppercase">Website Request</span>;
+      case "direct":
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase">Direct Booking</span>;
+      default:
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-50 text-slate-700 border border-slate-100 uppercase">{type || "Booking"}</span>;
+    }
+  };
+
+  const formattedMoveIn = item.check_in_date 
+    ? new Date(item.check_in_date).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })
+    : "Not specified";
+
+  const formattedCreated = item.created_at
+    ? new Date(item.created_at).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })
+    : "Today";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      {/* Modal Container */}
+      <div className="bg-card border border-border rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600">
+              <Eye size={20} />
+            </div>
+            <div>
+              <h2 className="font-serif text-xl font-bold text-foreground">Tenant Details & Bidding</h2>
+              <p className="text-xs text-muted-foreground">Booking request info and tenant profile</p>
+            </div>
+          </div>
+          <button 
+            onClick={onClose}
+            className="p-1.5 rounded-xl border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          
+          {/* Section: Profile & Type */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-500/5 p-4 rounded-xl border border-border/60">
+            <div>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Tenant Profile</span>
+              <h3 className="font-serif text-lg font-bold text-foreground">{item.name}</h3>
+              <div className="mt-2 space-y-1 text-xs text-muted-foreground font-mono">
+                <div className="flex items-center gap-1.5 font-sans">
+                  <Mail size={12} className="text-muted-foreground" />
+                  <span>{item.email}</span>
+                </div>
+                {item.phone && (
+                  <div className="flex items-center gap-1.5">
+                    <Phone size={12} className="text-muted-foreground" />
+                    <span>{item.phone}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-col md:items-end md:justify-center">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">Request Type</span>
+              {getRequestTypeBadge(item.request_type)}
+              <span className="text-[11px] text-muted-foreground mt-2 block font-mono">
+                Booking ID: {item._id}
+              </span>
+            </div>
+          </div>
+
+          {/* Section: Booking Details & Dates */}
+          <div>
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 pb-1.5 border-b border-border">Stay & Property</h4>
+            <div className="grid grid-cols-2 gap-4 text-xs">
+              <div>
+                <span className="text-muted-foreground block font-medium">Property Name</span>
+                <span className="text-foreground font-semibold">{item.property_name || "N/A"}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block font-medium">Proposed Move-In Date</span>
+                <span className="text-foreground font-semibold">{formattedMoveIn}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block font-medium">Received On</span>
+                <span className="text-foreground font-semibold">{formattedCreated}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block font-medium">Status</span>
+                <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 font-bold capitalize text-[10px] inline-block">
+                  {item.status || "Pending"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Section: Pricing & Payments */}
+          <div>
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 pb-1.5 border-b border-border">Financial Information</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+              <div>
+                <span className="text-muted-foreground block font-medium">Original Rent</span>
+                <span className="text-slate-600 font-bold">₹{(item.rent_amount || 0).toLocaleString("en-IN")}/mo</span>
+              </div>
+              {item.request_type === "bid" && (
+                <div>
+                  <span className="text-muted-foreground block font-medium">Proposed Bid Rent</span>
+                  <span className="text-indigo-600 font-extrabold text-sm">₹{(item.bid_amount || 0).toLocaleString("en-IN")}/mo</span>
+                </div>
+              )}
+              {item.request_type !== "bid" && (
+                <>
+                  <div>
+                    <span className="text-muted-foreground block font-medium">Token Paid</span>
+                    <span className="text-emerald-600 font-extrabold text-sm">₹{(item.payment_amount || item.rent_amount || item.total_amount || 0).toLocaleString("en-IN")}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block font-medium">Payment ID</span>
+                    <span className="text-foreground font-mono font-medium truncate block max-w-[120px]" title={item.payment_id || item.paymentId || "N/A"}>
+                      {item.payment_id || item.paymentId || "N/A"}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Section: Guardian / Emergency */}
+          {(item.guardian_name || item.guardian_phone) && (
+            <div>
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 pb-1.5 border-b border-border">Emergency / Guardian Details</h4>
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                {item.guardian_name && (
+                  <div>
+                    <span className="text-muted-foreground block font-medium">Guardian Name</span>
+                    <span className="text-foreground font-semibold">{item.guardian_name}</span>
+                  </div>
+                )}
+                {item.guardian_phone && (
+                  <div>
+                    <span className="text-muted-foreground block font-medium">Guardian Phone</span>
+                    <span className="text-foreground font-semibold font-mono">{item.guardian_phone}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Section: Permanent Address */}
+          {(item.address_street || item.address_city || item.address_state || item.address_postal_code) && (
+            <div>
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 pb-1.5 border-b border-border">Permanent Address</h4>
+              <div className="flex gap-2 text-xs items-start">
+                <MapPin className="text-muted-foreground mt-0.5 flex-shrink-0" size={14} />
+                <div>
+                  <span className="text-foreground font-medium">
+                    {[
+                      item.address_street,
+                      item.address_city,
+                      item.address_state,
+                      item.address_postal_code,
+                      item.address_country
+                    ].filter(Boolean).join(", ")}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section: Bid Note / Message */}
+          {item.message && (
+            <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-4">
+              <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block mb-1">Message from Tenant</span>
+              <p className="text-xs text-foreground italic">"{item.message}"</p>
+            </div>
+          )}
+
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-border p-4 bg-muted/20 flex justify-end gap-3">
+          <button 
+            onClick={onClose}
+            className="px-4 h-10 border border-border bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all"
+          >
+            Close
+          </button>
+          <button
+            onClick={() => window.location.href = `/propertyowner/tenantrec?name=${encodeURIComponent(item.name || '')}&email=${encodeURIComponent(item.email || '')}&phone=${encodeURIComponent(item.phone || '')}&propertyId=${encodeURIComponent(item.property_id || item.property || '')}&paidAmount=${encodeURIComponent(item.payment_amount || item.rent_amount || item.total_amount || 0)}`}
+            className="px-5 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+          >
+            Onboard directly as Tenant
+          </button>
+        </div>
+
+      </div>
+    </div>
   );
 }

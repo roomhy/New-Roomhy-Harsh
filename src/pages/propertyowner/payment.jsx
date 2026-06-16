@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { Send, Plus, Search, Wallet, CheckCircle2, Clock, AlertTriangle, Phone, MessageCircle, RefreshCw, X, Receipt, Smartphone, CreditCard, Banknote, FileText } from "lucide-react";
 import { MobileTabs, MobileEmptyState } from "../../components/propertyowner/MobileComponents";
@@ -34,28 +35,21 @@ const Pill = ({ tone = "muted", children }) => {
 };
 
 const StatCard = ({ label, value, icon: Icon, tone = "default", hint, onClick }) => {
-  const toneBg = {
-    info: "bg-blue-50/50 border border-blue-150/60 text-blue-600 dark:bg-blue-950/10",
-    success: "bg-emerald-50/50 border border-emerald-150/60 text-emerald-600 dark:bg-emerald-950/10",
-    warning: "bg-amber-50/50 border border-amber-150/60 text-amber-600 dark:bg-amber-950/10",
-    default: "bg-slate-50/50 border border-slate-150/60 text-slate-600 dark:bg-slate-950/10"
-  };
-  
-  const textClr = {
-    info: "text-blue-900 dark:text-blue-300",
-    success: "text-emerald-900 dark:text-emerald-300",
-    warning: "text-amber-900 dark:text-amber-300",
-    default: "text-slate-900 dark:text-slate-300"
+  const iconClr = {
+    info: "text-blue-500",
+    success: "text-emerald-500",
+    warning: "text-amber-500",
+    default: "text-slate-400"
   };
 
   return (
-    <div onClick={onClick} className={`w-[38%] md:w-auto shrink-0 snap-start rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${onClick ? 'cursor-pointer' : ''} ${toneBg[tone] || toneBg.default}`}>
+    <div onClick={onClick} className={`w-[38%] md:w-auto shrink-0 snap-start rounded-xl border border-border bg-white p-4 shadow-sm transition-all hover:shadow-md ${onClick ? 'cursor-pointer' : ''}`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] font-bold uppercase tracking-wider">{label}</span>
-        {Icon && <Icon className="size-4 shrink-0" />}
+        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
+        {Icon && <Icon className={`size-4 shrink-0 ${iconClr[tone] || iconClr.default}`} />}
       </div>
-      <div className={`text-2xl font-black leading-none ${textClr[tone] || textClr.default}`}>{value}</div>
-      {hint && <div className="text-[10px] opacity-70 mt-1 font-semibold">{hint}</div>}
+      <div className="text-2xl font-black leading-none text-slate-800">{value}</div>
+      {hint && <div className="text-[10px] text-muted-foreground mt-1 font-semibold">{hint}</div>}
     </div>
   );
 };
@@ -420,10 +414,12 @@ export default function Payment() {
     }
   };
 
+  const navigate = useNavigate();
+
   const handleViewHistory = async (row) => {
     if (!row.invoice?._id) return;
     setHistoryLoading(true);
-    setHistoryModal({ tenantName: row.name, billingMonth: row.invoice.billingMonth, payments: [] });
+    setHistoryModal({ tenantName: row.name, billingMonth: row.invoice.billingMonth, payments: [], row });
     try {
       const data = await fetchInvoiceById(row.invoice._id);
       const [yr, mo] = (data.invoice?.billingMonth || "").split("-");
@@ -437,6 +433,7 @@ export default function Payment() {
         totalPaid:    data.invoice?.paidAmount || 0,
         status:       data.invoice?.status,
         payments:     data.payments || [],
+        row,
       });
     } catch {
       showToast("Could not load payment history", "error");
@@ -444,6 +441,19 @@ export default function Payment() {
     } finally {
       setHistoryLoading(false);
     }
+  };
+
+  const handleGoToAddTenant = (row) => {
+    if (!row) return;
+    const params = new URLSearchParams();
+    if (row.name)       params.set("fullName", row.name);
+    if (row.email && row.email !== "-") params.set("email", row.email);
+    if (row.phone && row.phone !== "-") params.set("phone", row.phone);
+    if (row.depositAmount) params.set("depositAmount", row.depositAmount);
+    if (row.propertyId)  params.set("propertyId", row.propertyId);
+    if (row.roomNo)      params.set("room", row.roomNo);
+    setHistoryModal(null);
+    navigate(`/propertyowner/tenantrec?${params.toString()}`);
   };
 
   const handleSendReminder = async (row) => {
@@ -568,43 +578,7 @@ export default function Payment() {
         <StatCard label="Paid this month" value={counts.paid} icon={CheckCircle2} tone="success" />
       </div>
 
-      {/* Missing-contact warning cards — only shown when there are gaps */}
-      {missingContacts && (missingContacts.missingEmailCount > 0 || missingContacts.missingPhoneCount > 0) && (
-        <div className="grid grid-cols-2 gap-3 mb-5">
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 shadow-soft">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[12px] text-amber-700 font-semibold uppercase tracking-wide">Missing Email</span>
-              <AlertTriangle className="size-4 text-amber-500" />
-            </div>
-            <div className="font-serif text-[26px] leading-none text-amber-700">{missingContacts.missingEmailCount}</div>
-            <div className="text-[11.5px] text-amber-600 mt-1.5">
-              tenant{missingContacts.missingEmailCount !== 1 ? "s" : ""} won't receive email reminders
-            </div>
-            <button
-              onClick={() => window.location.href = "/propertyowner/tenantrec"}
-              className="mt-2.5 text-[11.5px] font-medium text-amber-700 underline underline-offset-2 hover:text-amber-900"
-            >
-              Fix from Tenants page →
-            </button>
-          </div>
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 shadow-soft">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[12px] text-amber-700 font-semibold uppercase tracking-wide">Missing Phone</span>
-              <Phone className="size-4 text-amber-500" />
-            </div>
-            <div className="font-serif text-[26px] leading-none text-amber-700">{missingContacts.missingPhoneCount}</div>
-            <div className="text-[11.5px] text-amber-600 mt-1.5">
-              tenant{missingContacts.missingPhoneCount !== 1 ? "s" : ""} unreachable by call or WhatsApp
-            </div>
-            <button
-              onClick={() => window.location.href = "/propertyowner/tenantrec"}
-              className="mt-2.5 text-[11.5px] font-medium text-amber-700 underline underline-offset-2 hover:text-amber-900"
-            >
-              Fix from Tenants page →
-            </button>
-          </div>
-        </div>
-      )}
+
 
 
       {/* Filter tabs + search */}
@@ -1037,7 +1011,16 @@ export default function Payment() {
               )}
             </div>
 
-            <div className="px-5 pb-4">
+            <div className="px-5 pb-4 flex flex-col gap-2">
+              {historyModal.row && (
+                <button
+                  onClick={() => handleGoToAddTenant(historyModal.row)}
+                  className="w-full h-10 rounded-xl bg-indigo-600 text-white text-[13px] font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Plus className="size-3.5" />
+                  Add as New Tenant
+                </button>
+              )}
               <button
                 onClick={() => setHistoryModal(null)}
                 className="w-full h-10 rounded-xl border border-border text-[13px] font-medium hover:bg-muted transition-colors"

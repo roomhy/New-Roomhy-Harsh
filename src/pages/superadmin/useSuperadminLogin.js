@@ -109,11 +109,10 @@ export const useSuperadminLogin = () => {
           name: "Super Admin",
           role: "superadmin"
         };
-        sessionStorage.setItem("user", JSON.stringify(user));
-        localStorage.setItem("user", JSON.stringify(user));
+        // Only set staff-specific keys — do NOT set generic 'user'/'token'
+        sessionStorage.setItem("staff_user", JSON.stringify(user));
         localStorage.setItem("staff_user", JSON.stringify(user));
         localStorage.setItem("staff_token", "superadmin_token");
-        localStorage.setItem("token", "superadmin_token");
         sessionStorage.removeItem("owner_session");
         localStorage.removeItem("owner_user");
         window.location.href = resolvePanelPath("superadmin", "superadmin");
@@ -123,10 +122,10 @@ export const useSuperadminLogin = () => {
       if (db && db.email === email && db.password === pwd) {
         const user = { ...db, loginId: db.loginId || db.id || "SUPER_ADMIN", role: "superadmin" };
         sessionStorage.setItem("user", JSON.stringify(user));
-        localStorage.setItem("user", JSON.stringify(user));
+        // Only set staff-specific keys — do NOT set generic 'user'/'token'
+        sessionStorage.setItem("staff_user", JSON.stringify(user));
         localStorage.setItem("staff_user", JSON.stringify(user));
         localStorage.setItem("staff_token", "superadmin_token");
-        localStorage.setItem("token", "superadmin_token");
         sessionStorage.removeItem("owner_session");
         localStorage.removeItem("owner_user");
         window.location.href = resolvePanelPath("superadmin", "superadmin");
@@ -148,11 +147,10 @@ export const useSuperadminLogin = () => {
         if (response.ok) {
           const data = await response.json();
           if (data.token && data.user) {
+            // Only set staff-specific keys — do NOT set generic 'user'/'token'
             localStorage.setItem("staff_user", JSON.stringify(data.user));
             localStorage.setItem("staff_token", data.token);
-            sessionStorage.setItem("user", JSON.stringify(data.user));
-            localStorage.setItem("user", JSON.stringify(data.user));
-            localStorage.setItem("token", data.token);
+            sessionStorage.setItem("staff_user", JSON.stringify(data.user));
             sessionStorage.removeItem("owner_session");
             localStorage.removeItem("owner_user");
             window.location.href = resolvePanelPath("superadmin", "superadmin");
@@ -223,9 +221,8 @@ export const useSuperadminLogin = () => {
       const user = { ...mgr, role: "areamanager" };
       user.areaCode = user.areaCode || user.area || user.areaName || "";
       user.areaName = user.areaName || user.area || "";
+      // Only set staff-specific keys
       sessionStorage.setItem("manager_user", JSON.stringify(user));
-      sessionStorage.setItem("user", JSON.stringify(user));
-      localStorage.setItem("user", JSON.stringify(user));
       localStorage.setItem("staff_user", JSON.stringify(user));
       localStorage.setItem("staff_token", "manager_token");
       persistWindowSession(user);
@@ -257,9 +254,8 @@ export const useSuperadminLogin = () => {
         areaCode: emp.areaCode || ""
       };
 
+      // Only set staff-specific keys
       sessionStorage.setItem("manager_user", JSON.stringify(user));
-      sessionStorage.setItem("user", JSON.stringify(user));
-      localStorage.setItem("user", JSON.stringify(user));
       localStorage.setItem("staff_user", JSON.stringify(user));
       localStorage.setItem("staff_token", "employee_token");
       persistWindowSession(user);
@@ -288,8 +284,8 @@ export const useSuperadminLogin = () => {
       passwordSet: true
     };
 
+    // Only set tenant-specific key — do NOT set generic 'user'
     localStorage.setItem("tenant_user", JSON.stringify(tenantUser));
-    localStorage.setItem("user", JSON.stringify(tenantUser));
     window.location.href = resolvePanelPath("tenant", "tenantdashboard");
   }, []);
 

@@ -15,13 +15,10 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token =
-      localStorage.getItem('website_token') ||
-      localStorage.getItem('token');
-    const rawUser =
-      localStorage.getItem('website_user') ||
-      localStorage.getItem('user') ||
-      localStorage.getItem('userData');
+    // Only read website-specific keys — NOT generic 'token'/'user'
+    // because superadmin/staff also set those and would leak into the website navbar
+    const token = localStorage.getItem('website_token');
+    const rawUser = localStorage.getItem('website_user');
 
     if (token && rawUser) {
       try {
@@ -29,9 +26,6 @@ export const AuthProvider = ({ children }) => {
       } catch {
         localStorage.removeItem('website_token');
         localStorage.removeItem('website_user');
-        localStorage.removeItem('token');
-        localStorage.removeItem('userData');
-        localStorage.removeItem('user');
       }
     }
     setLoading(false);
