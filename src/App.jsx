@@ -220,7 +220,7 @@ const DomainGuard = () => {
     }
 
     // 3. Fallback for main website domain (roomhy.com) and others
-    if (path === "/" || path === "/index" || path === "") {
+    if (path === "/" || path === "/index" || path === "" || path === "/website" || path === "/website/index") {
       window.location.replace("/coming-soon");
       return;
     }
