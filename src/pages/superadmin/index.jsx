@@ -56,13 +56,27 @@ export default function SuperadminIndexPage() {
             }
 
             if (res.ok && data.token) {
+                const allowedRoles = ["superadmin", "admin", "areamanager", "employee"];
+                const userRole = String(data.user.role || "").toLowerCase();
+                if (!allowedRoles.includes(userRole)) {
+                    setError("Access Denied: Invalid role for this login panel.");
+                    return;
+                }
+
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("user", JSON.stringify(data.user));
                 sessionStorage.setItem("token", data.token);
                 sessionStorage.setItem("user", JSON.stringify(data.user));
                 
+                // Set unified staff/manager session keys for employees and admins
+                localStorage.setItem("staff_user", JSON.stringify(data.user));
+                localStorage.setItem("staff_token", data.token);
+                sessionStorage.setItem("manager_user", JSON.stringify(data.user));
+                sessionStorage.setItem("staff_user", JSON.stringify(data.user));
+                localStorage.setItem("manager_user", JSON.stringify(data.user));
+                
                 // Redirect based on role
-                if (data.user.role === 'superadmin') {
+                if (userRole === 'superadmin' || userRole === 'admin') {
                     navigate("/superadmin/superadmin");
                 } else {
                     navigate("/employee/areaadmin");

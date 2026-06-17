@@ -59,6 +59,18 @@ export default function SuperadminAreaadminPage() {
             return;
         }
 
+        // Auto-heal missing storage keys to prevent sidebar routing failures
+        try {
+            const token = sessionStorage.getItem('token') || localStorage.getItem('token') || '';
+            if (!sessionStorage.getItem('manager_user')) sessionStorage.setItem('manager_user', JSON.stringify(storedUser));
+            if (!localStorage.getItem('staff_user')) localStorage.setItem('staff_user', JSON.stringify(storedUser));
+            if (!sessionStorage.getItem('staff_user')) sessionStorage.setItem('staff_user', JSON.stringify(storedUser));
+            if (!localStorage.getItem('manager_user')) localStorage.setItem('manager_user', JSON.stringify(storedUser));
+            if (token && !localStorage.getItem('staff_token')) localStorage.setItem('staff_token', token);
+        } catch (e) {
+            console.warn("Auto-heal session keys failed", e);
+        }
+
         if (storedUser.role === 'areamanager' || storedUser.role === 'manager' || storedUser.role === 'employee') {
             if (!window.location.pathname.startsWith('/employee/')) {
                 navigate('/employee/areaadmin');

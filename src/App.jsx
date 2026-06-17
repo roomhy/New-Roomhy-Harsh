@@ -74,10 +74,10 @@ const resolveHostHome = () => {
     }
     if (role === "areamanager" || role === "employee") return "/employee/areaadmin";
     if (owner?.loginId) return "/propertyowner/admin";
-    return "/website/index";
+    return "/coming-soon";
   }
 
-  return "/website/index";
+  return "/coming-soon";
 };
 
 const HtmlRedirectOrHome = () => {
@@ -168,7 +168,7 @@ const RouteRoleGuard = () => {
       return;
     }
 
-    if (isEmployeeRoute && role !== 'areamanager' && role !== 'employee') {
+    if (isEmployeeRoute && role !== 'areamanager' && role !== 'employee' && role !== 'superadmin' && role !== 'admin') {
       window.location.replace('/superadmin/index');
     }
   }, [location.pathname]);
@@ -221,7 +221,7 @@ const DomainGuard = () => {
 
     // 3. Fallback for main website domain (roomhy.com) and others
     if (path === "/" || path === "/index" || path === "") {
-      window.location.replace("/website/index");
+      window.location.replace("/coming-soon");
       return;
     }
     const isAllowedWebsite = path.startsWith("/website") || path === "/coming-soon" || path.startsWith("/digital-checkin") || path.startsWith("/pay");

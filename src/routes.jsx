@@ -111,7 +111,7 @@ const routeEntries = [
   
   // Employee Routes
   ["/employee/superadmin", "./pages/superadmin/superadmin.jsx"],
-  ["/employee/areaadmin", "./pages/superadmin/superadmin.jsx"],
+  ["/employee/areaadmin", "./pages/superadmin/areaadmin.jsx"],
   ["/employee/backup", "./pages/superadmin/backup.jsx"],
   ["/employee/booking", "./pages/superadmin/booking.jsx"],
   ["/employee/complaint-history", "./pages/superadmin/complaint-history.jsx"],
