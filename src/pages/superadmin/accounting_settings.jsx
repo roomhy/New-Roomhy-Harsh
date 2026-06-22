@@ -34,6 +34,7 @@ function Toggle({ on = false, onChange }) {
 export default function AccountingSettings() {
   const [switches, setSwitches] = useState({ autoPayouts: true, autoInvoices: true, overdueReminders: true, enableTaxes: true, inclusivePricing: true });
   const [commissionPercentage, setCommissionPercentage] = useState(10);
+  const [stats, setStats] = useState({ totalRevenue: 0 });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -42,9 +43,15 @@ export default function AccountingSettings() {
   useEffect(() => {
     async function loadSettings() {
       try {
-        const res = await fetchJson("/api/superadmin/settings");
+        const [res, statsRes] = await Promise.all([
+           fetchJson("/api/superadmin/settings"),
+           fetchJson("/api/superadmin/revenue/stats")
+        ]);
         if (res.success && res.settings) {
           setCommissionPercentage(res.settings.commission_percentage ?? 10);
+        }
+        if (statsRes.success) {
+          setStats(statsRes.stats);
         }
       } catch (err) {
         console.error("Failed to load settings:", err);
@@ -96,9 +103,9 @@ export default function AccountingSettings() {
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCardHorizontal label="Settlement Cycle" value="Weekly" trend="Automated" up icon={Clock} color="blue" />
+        <StatCardHorizontal label="Global Revenue Processed" value={`₹${((stats.totalRevenue || 0)/100000).toFixed(1)}L`} trend="Lifetime" up icon={Clock} color="blue" />
         <StatCardHorizontal label="Tax Compliance" value="Active" trend="GST Enabled" up icon={ShieldCheck} color="emerald" />
-        <StatCardHorizontal label="Fee Tiers" value="03 Levels" trend="Dynamic" up icon={Scale} color="indigo" />
+        <StatCardHorizontal label="Fee Split" value={`${commissionPercentage}%`} trend="Platform" up icon={Scale} color="indigo" />
         <StatCardHorizontal label="Currency Hub" value="INR (₹)" trend="Default" up icon={Wallet} color="blue" />
       </div>
 

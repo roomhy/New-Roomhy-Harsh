@@ -101,76 +101,80 @@ const NAV = [
     icon: Wallet, 
     path: "/superadmin/accounting-overview", 
     children: [
-        { label: "Overview", path: "/superadmin/accounting-overview" },
+        { label: "Overview", path: "/superadmin/accounting" },
         { 
           label: "Transaction Management (Tenants)", 
           children: [
-            { label: "Monthly Payment Receipt", path: "/superadmin/accounting_invoices" },
-            { label: "Payment History", path: "/superadmin/accounting_transactions" },
-            { label: "Other Charges", path: "/superadmin/accounting_transactions" },
+            { label: "Monthly Payment Receipt", path: "/superadmin/accounting/tenant/receipts" },
+            { label: "Payment History", path: "/superadmin/accounting/tenant/history" },
+            { label: "Other Charges", path: "/superadmin/accounting/tenant/other-charges" },
+            { label: "Payment Tracking", path: "/superadmin/accounting/tenant/tracking" },
           ]
         },
         { 
           label: "Transaction Management (Owners)", 
           children: [
-            { label: "Monthly Payment Receipt", path: "/superadmin/accounting_payouts" },
-            { label: "Payment History", path: "/superadmin/accounting_payouts" },
-            { label: "Service Fees Details", path: "/superadmin/accounting_commission" },
+            { label: "Monthly Payment Receipt", path: "/superadmin/accounting/owner/receipts" },
+            { label: "Payment History", path: "/superadmin/accounting/owner/history" },
+            { label: "Service Fees Details", path: "/superadmin/accounting/owner/service-fees" },
           ]
         },
         { 
           label: "Owner Payout", 
           children: [
-            { label: "Payout Cycle", path: "/superadmin/accounting_payouts" },
-            { label: "Manual + Auto Payout Option", path: "/superadmin/accounting_payouts" },
-            { label: "Pending Payouts", path: "/superadmin/accounting_payouts" },
-            { label: "Bank Transfer Tracking", path: "/superadmin/accounting_payouts" },
-            { label: "Cash Received Details", path: "/superadmin/accounting_payouts" },
-            { label: "Failed Payout Alerts", path: "/superadmin/accounting_payouts" },
+            { label: "Payout Cycle", path: "/superadmin/accounting/payouts/cycle" },
+            { label: "Manual + Auto Payout Option", path: "/superadmin/accounting/payouts/options" },
+            { label: "Pending Payouts", path: "/superadmin/accounting/payouts/pending" },
+            { label: "Bank Transfer Tracking", path: "/superadmin/accounting/payouts/bank-transfer" },
+            { label: "Cash Received Details", path: "/superadmin/accounting/payouts/cash-received" },
+            { label: "Failed Payout Alerts", path: "/superadmin/accounting/payouts/failed" },
           ]
         },
         { 
           label: "Roomhy Overview", 
           children: [
-            { label: "Fixed Fees", path: "/superadmin/accounting_settings" },
-            { label: "Per Bed Fees", path: "/superadmin/accounting_settings" },
-            { label: "Discount", path: "/superadmin/accounting_settings" },
+            { label: "Fixed Fees", path: "/superadmin/accounting/revenue/fees" },
+            { label: "Per Bed Fees", path: "/superadmin/accounting/revenue/fees" },
+            { label: "Commission Management", path: "/superadmin/accounting/revenue/commission" },
+            { label: "Discount Management", path: "/superadmin/accounting/revenue/discounts" },
+            { label: "Revenue Tracking", path: "/superadmin/accounting/revenue/tracking" },
           ]
         },
         { 
           label: "Invoice System", 
           children: [
-            { label: "Auto Invoice Generation", path: "/superadmin/accounting_invoices" },
-            { label: "GST", path: "/superadmin/accounting_taxes" },
-            { label: "Download PDF", path: "/superadmin/accounting_invoices" },
-            { label: "Invoice Numbering System", path: "/superadmin/accounting_settings" },
+            { label: "Auto Invoice Generation", path: "/superadmin/accounting/invoices/generation" },
+            { label: "GST", path: "/superadmin/accounting/invoices/gst" },
+            { label: "Download PDF", path: "/superadmin/accounting/invoices/history" },
+            { label: "Invoice Numbering System", path: "/superadmin/accounting/invoices/numbering" },
           ]
         },
         { 
           label: "Refund Management", 
           children: [
-            { label: "Booking Amount Refund", path: "/superadmin/refund" },
-            { label: "Partial Refund", path: "/superadmin/refund" },
-            { label: "Refund Approval System", path: "/superadmin/refund" },
-            { label: "Refund History", path: "/superadmin/refund" },
+            { label: "Booking Amount Refund", path: "/superadmin/accounting/refunds/process" },
+            { label: "Partial Refund", path: "/superadmin/accounting/refunds/process" },
+            { label: "Refund Approval System", path: "/superadmin/accounting/refunds/approvals" },
+            { label: "Refund History", path: "/superadmin/accounting/refunds/history" },
           ]
         },
         { 
           label: "Alert & Automation", 
           children: [
-            { label: "Rent Due Reminder", path: "/superadmin/settings" },
-            { label: "Payment Success/Failure Alerts", path: "/superadmin/settings" },
-            { label: "Payout Processed Notification", path: "/superadmin/settings" },
+            { label: "Rent Due Reminder", path: "/superadmin/accounting/automation/due-reminders" },
+            { label: "Payment Success/Failure Alerts", path: "/superadmin/accounting/automation/payment-alerts" },
+            { label: "Payout Processed Notification", path: "/superadmin/accounting/automation/payout-alerts" },
           ]
         },
         { 
           label: "Analytics", 
           children: [
-            { label: "Roomhy Monthly Revenue", path: "/superadmin/reports_revenue" },
-            { label: "Owners Monthly Revenue", path: "/superadmin/reports_revenue" },
-            { label: "Due Rents", path: "/superadmin/rentcollection" },
-            { label: "Profit / Loss Report", path: "/superadmin/reports" },
-            { label: "Cashflow Dashboard", path: "/superadmin/accounting" },
+            { label: "Roomhy Monthly Revenue", path: "/superadmin/accounting/analytics/roomhy-revenue" },
+            { label: "Owners Monthly Revenue", path: "/superadmin/accounting/analytics/owner-revenue" },
+            { label: "Due Rents", path: "/superadmin/accounting/analytics/due-rents" },
+            { label: "Profit / Loss Report", path: "/superadmin/accounting/analytics/profit-loss" },
+            { label: "Cashflow Dashboard", path: "/superadmin/accounting/analytics/cashflow" },
+            { label: "Transaction Reports", path: "/superadmin/accounting/analytics/transactions-report" },
           ]
         },
     ]

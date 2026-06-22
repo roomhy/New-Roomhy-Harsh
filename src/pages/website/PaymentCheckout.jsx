@@ -58,7 +58,10 @@ export default function PaymentCheckout() {
         body: JSON.stringify({
           amount: Number(amount),
           currency: "INR",
-          receipt: `pay_${String(bookingId).slice(-8)}_${Date.now()}`
+          receipt: `pay_${String(bookingId).slice(-8)}_${Date.now()}`,
+          notes: {
+            bookingId: bookingId
+          }
         })
       });
 

@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession, fetchOwnerTenants } from "../../utils/propertyowner";
 import { apiFetch } from "../../services/api";
-import { Search, Send, User, MoreVertical, Phone, Video, Loader2, MessageSquare, Wallet } from "lucide-react";
+import { Search, Send, User, MoreVertical, Phone, Video, Loader2, MessageSquare, Wallet, AlertTriangle } from "lucide-react";
+import { toast } from "react-hot-toast";
 
 export default function OwnerChat() {
   const owner = getOwnerRuntimeSession();
@@ -20,6 +21,15 @@ export default function OwnerChat() {
   const [associatedBooking, setAssociatedBooking] = useState(null);
   
   const messagesEndRef = React.useRef(null);
+  const scrollContainerRef = React.useRef(null);
+
+  const isNearBottom = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return true;
+    const threshold = 150; // pixels from the bottom
+    return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
+  };
+
 
   const generateWebsiteUserIdFromEmail = (email) => {
     const safeEmail = String(email || '').trim().toLowerCase();
@@ -88,7 +98,7 @@ export default function OwnerChat() {
           message: paymentMessage
         })
       });
-      fetchMessages(activeChat.participant_login_id);
+      fetchMessages(activeChat.participant_login_id, true);
     } catch (err) {
       console.error("Failed to send payment link", err);
     } finally {
@@ -135,19 +145,34 @@ export default function OwnerChat() {
     }
   };
 
-  const fetchMessages = async (targetUserId) => {
+  const fetchMessages = async (targetUserId, forceScroll = false) => {
     try {
       if (!targetUserId) return;
       const res = await apiFetch(`/api/chat/conversation?user1=${owner.loginId}&user2=${targetUserId}`);
       if (res && Array.isArray(res)) {
-        setMessages(res.map(msg => ({
+        const formatted = res.map(msg => ({
           id: msg._id,
           sender: msg.sender_login_id === owner.loginId ? "Me" : msg.sender_name,
           text: msg.message,
           time: new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-          isMe: msg.sender_login_id === owner.loginId
-        })));
-        scrollToBottom();
+          isMe: msg.sender_login_id === owner.loginId,
+          sender_login_id: msg.sender_login_id
+        }));
+
+        let changed = false;
+        setMessages(prev => {
+          if (prev.length === formatted.length && 
+              prev.every((msg, idx) => msg.id === formatted[idx].id && msg.text === formatted[idx].text)) {
+            return prev;
+          }
+          changed = true;
+          return formatted;
+        });
+
+        if (forceScroll || (changed && isNearBottom())) {
+          scrollToBottom();
+        }
+
         // Mark these messages as read
         await apiFetch(`/api/chat/mark-read/${owner.loginId}?sender=${targetUserId}`, { method: "POST" });
       }
@@ -165,12 +190,12 @@ export default function OwnerChat() {
   React.useEffect(() => {
     if (activeChat) {
       setLoadingMessages(true);
-      fetchMessages(activeChat.participant_login_id).finally(() => setLoadingMessages(false));
+      fetchMessages(activeChat.participant_login_id, true).finally(() => setLoadingMessages(false));
       
       fetchAssociatedBooking(activeChat.participant_login_id);
       
       const interval = setInterval(() => {
-        fetchMessages(activeChat.participant_login_id);
+        fetchMessages(activeChat.participant_login_id, false);
       }, 3000);
       return () => clearInterval(interval);
     } else {
@@ -184,9 +209,7 @@ export default function OwnerChat() {
     }, 50);
   };
 
-  React.useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -214,9 +237,23 @@ export default function OwnerChat() {
           message: optimisticMsg.text
         })
       });
-      fetchMessages(activeChat.participant_login_id);
+      fetchMessages(activeChat.participant_login_id, true);
     } catch (err) {
       console.error("Failed to send message", err);
+      // Remove the optimistic message on error
+      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+      toast.error(err.message || "Sharing personal contact details outside the platform is not allowed.", {
+        icon: '⚠️',
+        duration: 5000,
+        style: {
+          border: '1px solid #fee2e2',
+          padding: '16px',
+          color: '#b91c1c',
+          background: '#fef2f2',
+          fontWeight: 'bold',
+          fontSize: '13px'
+        }
+      });
     } finally {
       setIsSending(false);
     }
@@ -300,17 +337,34 @@ export default function OwnerChat() {
               </div>
 
               {/* Messages Feed */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-4">
                 {loadingMessages && messages.length === 0 ? (
                   <div className="text-center py-8 text-slate-400">Loading messages...</div>
-                ) : messages.map((msg, i) => (
-                  <div key={msg.id || i} className={`flex ${msg.isMe ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[70%] rounded-2xl p-4 shadow-sm ${msg.isMe ? "bg-blue-600 text-white rounded-br-sm" : "bg-white border border-slate-100 text-slate-800 rounded-bl-sm"}`}>
-                      <p className="text-[13px]">{msg.text}</p>
-                      <span className={`text-[10px] block mt-1.5 text-right ${msg.isMe ? "text-blue-200" : "text-slate-400"}`}>{msg.time}</span>
+                ) : messages.map((msg, i) => {
+                  const isSystem = String(msg.sender_login_id).toLowerCase() === 'system';
+                  return (
+                    <div key={msg.id || i} className={`flex ${isSystem ? "justify-center w-full my-3" : msg.isMe ? "justify-end" : "justify-start"}`}>
+                      {isSystem ? (
+                        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-3xl p-5 max-w-[85%] text-center shadow-sm flex flex-col items-center gap-2">
+                          <div className="flex items-center gap-1.5 justify-center">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[9px] font-black uppercase tracking-wider">
+                              <AlertTriangle size={10} /> System Warning
+                            </span>
+                          </div>
+                          <p className="text-xs font-bold leading-relaxed text-slate-700 max-w-md">
+                            {msg.text}
+                          </p>
+                          <span className="text-[9px] font-bold text-amber-600 block mt-1">{msg.time}</span>
+                        </div>
+                      ) : (
+                        <div className={`max-w-[70%] rounded-2xl p-4 shadow-sm ${msg.isMe ? "bg-blue-600 text-white rounded-br-sm" : "bg-white border border-slate-100 text-slate-800 rounded-bl-sm"}`}>
+                          <p className="text-[13px]">{msg.text}</p>
+                          <span className={`text-[10px] block mt-1.5 text-right ${msg.isMe ? "text-blue-200" : "text-slate-400"}`}>{msg.time}</span>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <div ref={messagesEndRef} />
               </div>
 

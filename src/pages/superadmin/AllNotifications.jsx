@@ -68,6 +68,7 @@ export default function AllNotifications() {
       case "new_enquiry": return "New Property Enquiry ✉️";
       case "owner_new_booking_request": return "New Booking Request";
       case "owner_new_chat": return "New Message";
+      case "chat_violation": return "⚠️ Chat Policy Violation Detected";
       default: return "System Alert";
     }
   };
@@ -78,6 +79,8 @@ export default function AllNotifications() {
         return `Guest ${meta.guestName || "User"} booked ${meta.propertyName || "Property"} for INR ${meta.amount || 0}`;
       case "new_enquiry":
         return `Enquiry from ${meta.userName || "User"} on ${meta.propertyName || "Property"}: "${meta.message || ""}"`;
+      case "chat_violation":
+        return meta.message || "A chat policy violation attempt was detected between owner and tenant.";
       default:
         return "You have a new alert on your Roomhy dashboard.";
     }
@@ -135,6 +138,7 @@ export default function AllNotifications() {
       case "new_enquiry":
         return <MessageSquare size={16} className="text-blue-600" />;
       case "complaint":
+      case "chat_violation":
         return <AlertTriangle size={16} className="text-rose-600" />;
       default:
         return <Info size={16} className="text-slate-600" />;
@@ -149,6 +153,7 @@ export default function AllNotifications() {
       case "new_enquiry":
         return "bg-blue-50 border-blue-100";
       case "complaint":
+      case "chat_violation":
         return "bg-rose-50 border-rose-100";
       default:
         return "bg-slate-50 border-slate-100";

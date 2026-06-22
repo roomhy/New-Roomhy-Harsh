@@ -23,6 +23,7 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import { fetchJson, getApiBase } from "../../utils/api";
 import EmojiPicker from 'emoji-picker-react';
+import { toast } from "react-hot-toast";
 
 const generateWebsiteUserIdFromEmail = (email) => {
   const safeEmail = String(email || "").trim().toLowerCase();
@@ -203,6 +204,25 @@ export default function WebsiteChat() {
         loadChats();
       }
     });
+    socket.on("message_blocked", (data) => {
+      toast.error(data.message || "Sharing personal contact details outside the platform is not allowed.", {
+        icon: '⚠️',
+        duration: 5000,
+        style: {
+          border: '1px solid #fee2e2',
+          padding: '16px',
+          color: '#b91c1c',
+          background: '#fef2f2',
+          fontWeight: 'bold',
+          fontSize: '13px'
+        }
+      });
+      refreshCurrentConversation();
+    });
+    socket.on("error", (err) => {
+      toast.error(err.message || "An error occurred");
+      refreshCurrentConversation();
+    });
 
     return () => {
       socket.disconnect();
@@ -272,7 +292,7 @@ export default function WebsiteChat() {
       }
     } catch (err) {
       console.error("Upload failed:", err);
-      alert("File upload failed.");
+      toast.error("File upload failed.");
     } finally {
       setIsUploading(false);
     }
@@ -301,7 +321,7 @@ export default function WebsiteChat() {
       
     } catch (error) {
       console.error("Error deleting conversation:", error);
-      alert("Failed to delete conversation.");
+      toast.error("Failed to delete conversation.");
     }
   };
 
@@ -388,29 +408,46 @@ export default function WebsiteChat() {
                   <div className="timestamp-separator">TODAY</div>
                   
                   {messages.map((msg) => {
+                    const isSystem = String(msg.sender_login_id || "").toLowerCase() === 'system';
                     const isMine = String(msg.sender_login_id || "").trim().toLowerCase() === String(websiteUserId).toLowerCase();
                     const isImage = msg.message_type === 'image';
                     const isFile = msg.message_type === 'file';
 
                     return (
-                      <div key={msg._id} className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
-                        <div className={`message-bubble ${isMine ? "message-sent" : "message-received"}`}>
-                          {isImage ? (
-                            <img src={msg.file_url} alt="uploaded" className="max-w-full rounded-xl" onClick={() => window.open(msg.file_url, '_blank')} />
-                          ) : isFile ? (
-                            <div className="flex items-center gap-2">
-                               <FileText size={16} />
-                               <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="underline">{msg.message.replace('Sent a file: ', '')}</a>
+                      <div key={msg._id} className={`flex flex-col ${isSystem ? 'items-center w-full my-3' : isMine ? 'items-end' : 'items-start'}`}>
+                        {isSystem ? (
+                          <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-3xl p-5 max-w-[85%] text-center shadow-sm flex flex-col items-center gap-2">
+                            <div className="flex items-center gap-1.5 justify-center">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[9px] font-black uppercase tracking-wider">
+                                <ShieldCheck size={10} /> System Warning
+                              </span>
                             </div>
-                          ) : (
-                            String(msg.message).split(/(https?:\/\/[^\s]+)/g).map((part, i) => 
-                              part.match(/(https?:\/\/[^\s]+)/g) 
-                                ? <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline text-blue-600 hover:text-blue-800 break-all">{part}</a>
-                                : part
-                            )
-                          )}
-                        </div>
-                        <span className="text-[9px] text-gray-400 mt-1 px-2">{formatTime(msg.created_at)}</span>
+                            <p className="text-xs font-bold leading-relaxed text-slate-700 max-w-md">
+                              {msg.message}
+                            </p>
+                            <span className="text-[9px] text-gray-400 mt-1 block">{formatTime(msg.created_at)}</span>
+                          </div>
+                        ) : (
+                          <>
+                            <div className={`message-bubble ${isMine ? "message-sent" : "message-received"}`}>
+                              {isImage ? (
+                                <img src={msg.file_url} alt="uploaded" className="max-w-full rounded-xl" onClick={() => window.open(msg.file_url, '_blank')} />
+                              ) : isFile ? (
+                                <div className="flex items-center gap-2">
+                                   <FileText size={16} />
+                                   <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="underline">{msg.message.replace('Sent a file: ', '')}</a>
+                                </div>
+                              ) : (
+                                String(msg.message).split(/(https?:\/\/[^\s]+)/g).map((part, i) => 
+                                  part.match(/(https?:\/\/[^\s]+)/g) 
+                                    ? <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline text-blue-600 hover:text-blue-800 break-all">{part}</a>
+                                    : part
+                                )
+                              )}
+                            </div>
+                            <span className="text-[9px] text-gray-400 mt-1 px-2">{formatTime(msg.created_at)}</span>
+                          </>
+                        )}
                       </div>
                     );
                   })}

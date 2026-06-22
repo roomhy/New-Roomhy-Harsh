@@ -76,7 +76,7 @@ export default function Index() {
   const handleSuperAdminLogin = async (identifier, pass) => {
     const dbStr = safeLocalStorageGet("roomhy_superadmin_db");
     const db = dbStr ? JSON.parse(dbStr) : null;
-    if (!db && identifier === "roomhyadmin@gmail.com" && pass === "admin@123") {
+    if (!import.meta.env.PROD && !db && identifier === "roomhyadmin@gmail.com" && pass === "admin@123") {
       const user = { id: "SUPER_ADMIN", loginId: "SUPER_ADMIN", email: identifier, name: "Super Admin", role: "superadmin" };
       setStaffSession(user, "superadmin_token");
       navigate(resolvePanelPath("superadmin", "superadmin"));

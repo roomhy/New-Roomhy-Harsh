@@ -328,6 +328,11 @@ const handleAddTenant = (room) => {
       
       const t = tenants.find(x => (x._id || x.id) === selectedTenantId);
       if (!t) { setErrorMsg("Select a tenant."); setIsAssigning(false); return; }
+      if (!t.email || t.email === "-") {
+        setErrorMsg("Tenant's email is missing. Email is required to assign a room.");
+        setIsAssigning(false);
+        return;
+      }
       
       const payload = { 
         name: t.name, 
@@ -345,8 +350,15 @@ const handleAddTenant = (room) => {
       setAssignModalOpen(false);
       clearOwnerFetchCache(owner.loginId);
       await load(owner);
-    } catch (e) { 
-      setErrorMsg(e?.body || e?.message || "Failed."); 
+    } catch (e) {
+      // e.body may be a raw JSON string like {"success":false,"message":"..."}
+      let msg = "Failed.";
+      if (e?.body) {
+        try { msg = JSON.parse(e.body)?.message || e.body; } catch { msg = e.body; }
+      } else if (e?.message) {
+        try { msg = JSON.parse(e.message)?.message || e.message; } catch { msg = e.message; }
+      }
+      setErrorMsg(msg);
     } finally {
       setIsAssigning(false);
     }
@@ -354,10 +366,15 @@ const handleAddTenant = (room) => {
 
   // Group rooms by property
   const grouped = useMemo(() => {
+    // g stores { propTitle: { rooms: [], propId: string } }
     const g = {};
-    // Pre-fill properties so even properties with 0 rooms show up
+    // Build propId → title lookup from known properties
+    const propIdToTitle = {};
     properties.forEach(p => {
-      g[p.title || p.name || "Your Property"] = [];
+      const key = p.title || p.name || "Your Property";
+      const pid = String(p._id || p.id || "");
+      g[key] = { rooms: [], propId: pid };
+      if (pid) propIdToTitle[pid] = key;
     });
 
     const filteredRooms = rooms.filter(r => {
@@ -372,9 +389,11 @@ const handleAddTenant = (room) => {
     });
 
     filteredRooms.forEach(r => {
-      const k = r.propertyTitle || r.propertyId || "Your Property";
-      if (!g[k]) g[k] = [];
-      g[k].push(r);
+      const pid = String(r.propertyId || "");
+      // Use propId→title map first so rooms with empty propertyTitle still land in correct bucket
+      const k = (pid && propIdToTitle[pid]) || r.propertyTitle || pid || "Your Property";
+      if (!g[k]) g[k] = { rooms: [], propId: pid };
+      g[k].rooms.push(r);
     });
     return g;
   }, [rooms, showFilter, floorFilter, sharingFilter, properties]);
@@ -518,14 +537,17 @@ const handleAddTenant = (room) => {
           </div>
           ) : (
             <>
-              {Object.entries(grouped).map(([propTitle, allPropRooms]) => {
+              {Object.entries(grouped).map(([propTitle, propData]) => {
+                const allPropRooms = propData.rooms || [];
                 const allBeds = allPropRooms.flatMap(r => toLegacyBeds(r));
                 const pOcc = allBeds.filter(b => b.status==="occupied"||b.tenantId).length;
                 const pTotal = allBeds.length;
                 const pct = pTotal ? Math.round((pOcc/pTotal)*100) : 0;
                 // Per-property pagination
-                const propId = allPropRooms[0]?.propertyId || "";
-                const totalPropRooms = propertyTotals[propId] || allPropRooms.length;
+                const propId = propData.propId || "";
+                // Total rooms from backend (if paginated) or count rooms loaded for this property
+                const loadedForProp = rooms.filter(r => String(r.propertyId) === propId || r.propertyTitle === propTitle).length;
+                const totalPropRooms = (propId && propertyTotals[propId]) ? propertyTotals[propId] : loadedForProp;
                 const propPage = propPages[propTitle] || 1;
                 const propTotalPages = Math.max(1, Math.ceil(totalPropRooms / ROOMS_PER_PAGE));
                 const safePropPage = Math.min(propPage, propTotalPages);
@@ -542,9 +564,21 @@ const handleAddTenant = (room) => {
                           {allPropRooms.length} rooms · {pOcc}/{pTotal} beds occupied
                         </div>
                       </div>
-                      <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold",
-                        pct > 90 ? "bg-blue-50 text-blue-600" : pct > 0 ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"
-                      )}>{pct}% full</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRoomForm({ ...defaultRoomForm, propertyId: propId || (properties.find(p => p.title === propTitle || p.name === propTitle)?._id) });
+                            setRoomModalOpen(true);
+                          }}
+                          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-blue-600 text-white text-[12px] font-semibold hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20"
+                        >
+                          <Plus size={13} /> Add Room
+                        </button>
+                        <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold",
+                          pct > 90 ? "bg-blue-50 text-blue-600" : pct > 0 ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"
+                        )}>{pct}% full</span>
+                      </div>
                     </div>
 
                     {/* Room Cards Grid */}
@@ -612,7 +646,7 @@ const handleAddTenant = (room) => {
                                 <div>
                                   <h3 className="text-[14px] font-bold text-slate-900 leading-tight">Room {room.number||room.roomNo||room.title}</h3>
                                   <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1 font-medium">
-                                    {room.gender||"Mixed"} • {room.type||"AC"}
+                                    {room.gender||"Co-Ed"} • {room.type||"AC"}
                                   </p>
                                 </div>
                               </div>
@@ -676,7 +710,7 @@ const handleAddTenant = (room) => {
                   {propTotalPages > 1 && (
                     <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
                         <span className="text-[12px] text-slate-400 font-medium">
-                          Showing {(safePropPage-1)*ROOMS_PER_PAGE+1}–{Math.min(safePropPage*ROOMS_PER_PAGE, totalPropRooms)} of {totalPropRooms} rooms
+                          Showing {Math.min((safePropPage-1)*ROOMS_PER_PAGE+1, totalPropRooms)}–{Math.min(safePropPage*ROOMS_PER_PAGE, totalPropRooms)} of {totalPropRooms} rooms
                         </span>
                         <div className="flex items-center gap-1.5">
                           <button
@@ -686,19 +720,38 @@ const handleAddTenant = (room) => {
                           >
                             ←
                           </button>
-                          {Array.from({ length: propTotalPages }, (_, i) => i + 1).map(p => (
-                            <button
-                              key={p}
-                              onClick={() => setPropertyPage(p)}
-                              className={cn("w-8 h-8 rounded-lg text-[12px] font-semibold transition-all",
-                                p === safePropPage
-                                  ? "bg-blue-600 text-white"
-                                  : "bg-white border border-slate-200 text-slate-400 hover:bg-slate-50"
-                              )}
-                            >
-                              {p}
-                            </button>
-                          ))}
+                          {(() => {
+                            // Smart pagination: show max 7 page buttons with ellipsis
+                            const pages = [];
+                            const delta = 2;
+                            const left = safePropPage - delta;
+                            const right = safePropPage + delta;
+                            let lastPushed = null;
+                            for (let i = 1; i <= propTotalPages; i++) {
+                              if (i === 1 || i === propTotalPages || (i >= left && i <= right)) {
+                                if (lastPushed !== null && i - lastPushed > 1) {
+                                  pages.push('...');
+                                }
+                                pages.push(i);
+                                lastPushed = i;
+                              }
+                            }
+                            return pages.map((p, idx) =>
+                              p === '...'
+                                ? <span key={`ellipsis-${idx}`} className="w-8 h-8 flex items-center justify-center text-[12px] text-slate-400">…</span>
+                                : <button
+                                    key={p}
+                                    onClick={() => setPropertyPage(p)}
+                                    className={cn("w-8 h-8 rounded-lg text-[12px] font-semibold transition-all",
+                                      p === safePropPage
+                                        ? "bg-blue-600 text-white"
+                                        : "bg-white border border-slate-200 text-slate-400 hover:bg-slate-50"
+                                    )}
+                                  >
+                                    {p}
+                                  </button>
+                            );
+                          })()}
                           <button
                             disabled={safePropPage >= propTotalPages}
                             onClick={() => setPropertyPage(safePropPage + 1)}

@@ -2,12 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import {
   Search, MoreVertical, User, Send, Paperclip, Smile, Phone, Mail,
-  Star, Globe, ChevronRight, UserCheck, Calendar, ArrowUpRight, ArrowDownRight, Building2, DollarSign, RefreshCw, Shield, MessageSquare
+  Star, Globe, ChevronRight, UserCheck, Calendar, ArrowUpRight, ArrowDownRight, Building2, DollarSign, RefreshCw, Shield, MessageSquare,
+  AlertTriangle, ArrowLeft
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area } from "recharts";
 import { fetchJson, getApiBase } from "../../utils/api";
 import { PageHeader } from "../../components/superadmin/PageHeader";
 import EmojiPicker from 'emoji-picker-react';
+import { toast } from "react-hot-toast";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 const SUPERADMIN_LOGIN_ID = "SUPER_ADMIN";
@@ -65,6 +67,13 @@ const resolveChatError = (err, fallback) => {
 
 export default function SuperChat() {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
   const [inbox, setInbox] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -75,22 +84,48 @@ export default function SuperChat() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [viewMode, setViewMode] = useState("my"); // "my" or "all"
+  const [highlightedMessageId, setHighlightedMessageId] = useState(null);
   const socketRef = useRef(null);
   const activeChatRef = useRef(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const superadminLoginId = useMemo(() => getCurrentSuperadmin(), []);
+  const fromAlerts = useMemo(() => {
+    const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+    return params.get("fromAlerts") || null;
+  }, []);
 
   useEffect(() => { activeChatRef.current = activeChat; }, [activeChat]);
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const highlightId = params.get("highlightId");
+    if (!highlightId) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const highlightId = params.get("highlightId");
+    if (highlightId && messages.length > 0) {
+      setHighlightedMessageId(highlightId);
+      setTimeout(() => {
+        const element = document.getElementById(`msg-${highlightId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 600);
+    }
+  }, [messages]);
 
   const loadInbox = async () => {
     setLoadingInbox(true);
     setError("");
     try {
       const endpoint = viewMode === "all" 
-        ? `/api/chat/all-chats?search=${encodeURIComponent(search)}`
-        : `/api/chat/inbox/${encodeURIComponent(superadminLoginId)}?search=${encodeURIComponent(search)}`;
+        ? `/api/chat/all-chats?search=${encodeURIComponent(debouncedSearch)}`
+        : `/api/chat/inbox/${encodeURIComponent(superadminLoginId)}?search=${encodeURIComponent(debouncedSearch)}`;
       
       const data = await fetchJson(endpoint);
       const conversations = Array.isArray(data?.conversations) ? data.conversations : [];
@@ -115,7 +150,35 @@ export default function SuperChat() {
     }
   };
 
-  useEffect(() => { loadInbox(); }, [superadminLoginId, search, viewMode]);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const roomId = params.get("roomId");
+    const user1 = params.get("user1");
+    const user2 = params.get("user2");
+    if (roomId || (user1 && user2)) {
+      setViewMode("all");
+    }
+  }, []);
+
+  useEffect(() => { loadInbox(); }, [superadminLoginId, debouncedSearch, viewMode]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const roomId = params.get("roomId");
+    const user1 = params.get("user1");
+    const user2 = params.get("user2");
+
+    if (inbox.length > 0) {
+      if (roomId) {
+        const found = inbox.find(c => c.participant_login_id === roomId || c.pair_key === roomId);
+        if (found) setActiveChat(found);
+      } else if (user1 && user2) {
+        const pairKey = [user1, user2].sort().join(':');
+        const found = inbox.find(c => c.pair_key === pairKey || (c.user1 === user1 && c.user2 === user2) || (c.user1 === user2 && c.user2 === user1));
+        if (found) setActiveChat(found);
+      }
+    }
+  }, [inbox]);
 
   useEffect(() => {
     const loadConversation = async () => {
@@ -155,6 +218,46 @@ export default function SuperChat() {
         setMessages((Array.isArray(list) ? list : []).map(normalizeMessage));
       }
       await loadInbox();
+    });
+    socket.on("new_violation_alert", (alertData) => {
+      toast.custom(
+        (t) => (
+          <div className="bg-white border border-rose-100 rounded-2xl shadow-2xl p-5 max-w-sm pointer-events-auto flex flex-col gap-2.5 animate-in fade-in slide-in-from-top-4 duration-300">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🚨</span>
+              <span className="text-xs font-black text-rose-600 uppercase tracking-wider">
+                Violation Detected: {alertData.violationType.replace('_', ' ').toUpperCase()}
+              </span>
+            </div>
+            <div className="text-xs text-slate-700 leading-normal">
+              <strong>{alertData.senderName}</strong> sent a policy violating message in conversation between Owner <strong>{alertData.ownerName}</strong> and Tenant <strong>{alertData.tenantName}</strong>.
+            </div>
+            <div className="bg-rose-50/50 border border-rose-100/50 p-2.5 rounded-xl text-[11px] italic font-semibold text-rose-700">
+              "{alertData.messageSnippet}"
+            </div>
+            <div className="flex items-center justify-end gap-2 mt-1">
+              <button 
+                onClick={() => toast.dismiss(t.id)} 
+                className="px-3 py-1.5 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-500 hover:bg-slate-50 transition-colors"
+              >
+                Dismiss
+              </button>
+              <button 
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  // Construct a URL to highlight the specific message
+                  window.location.href = `/superadmin/superchat?roomId=${alertData.ownerId}&user1=${alertData.ownerId}&user2=${alertData.tenantId}&highlightId=${alertData.id}&fromAlerts=all`;
+                }}
+                className="px-3 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-[10px] font-bold shadow-lg shadow-slate-900/10 transition-colors"
+              >
+                View & Action
+              </button>
+            </div>
+          </div>
+        ),
+        { duration: 8000, position: "top-right" }
+      );
+      loadInbox();
     });
     return () => socket.disconnect();
   }, [superadminLoginId]);
@@ -213,7 +316,7 @@ export default function SuperChat() {
       }
     } catch (err) {
       console.error("Upload failed:", err);
-      alert("File upload failed.");
+      toast.error("File upload failed.");
     } finally {
       setIsUploading(false);
     }
@@ -229,9 +332,20 @@ export default function SuperChat() {
           { label: "Overview", active: true }
         ]}
         actions={
-          <div className="flex items-center gap-3 bg-white border border-slate-100 px-4 py-2 rounded-xl shadow-sm text-xs font-bold text-slate-600">
-            <Calendar className="w-4 h-4 text-slate-400" />
-            <span>May 22 - May 28, 2024</span>
+          <div className="flex items-center gap-3">
+            {fromAlerts && (
+              <a 
+                href={fromAlerts === "all" ? "/superadmin/chat/alerts" : `/superadmin/chat/alerts?filterType=${fromAlerts}`}
+                className="flex items-center gap-2 px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-100 rounded-xl text-xs font-black shadow-sm transition-all hover:scale-105 active:scale-95 duration-200"
+              >
+                <ArrowLeft size={14} className="animate-pulse" />
+                <span>Back to Alerts</span>
+              </a>
+            )}
+            <div className="flex items-center gap-3 bg-white border border-slate-100 px-4 py-2 rounded-xl shadow-sm text-xs font-bold text-slate-600">
+              <Calendar className="w-4 h-4 text-slate-400" />
+              <span>May 22 - May 28, 2024</span>
+            </div>
           </div>
         }
       />
@@ -261,7 +375,7 @@ export default function SuperChat() {
           <div className="flex-1 overflow-y-auto custom-scrollbar">
             {loadingInbox && inbox.length === 0 ? <div className="p-4 text-xs text-slate-400">Loading conversations...</div> : null}
             {inbox.map((chat) => (
-              <div key={chat.participant_login_id} onClick={() => setActiveChat(chat)} className={cn("p-5 flex items-center gap-4 cursor-pointer transition-all border-b border-slate-50", activeChat?.participant_login_id === chat.participant_login_id ? "bg-blue-50/50 border-l-4 border-l-blue-600" : "hover:bg-slate-50")}>
+              <div key={chat.pair_key || chat.participant_login_id} onClick={() => setActiveChat(chat)} className={cn("p-5 flex items-center gap-4 cursor-pointer transition-all border-b border-slate-50", activeChat?.participant_login_id === chat.participant_login_id ? "bg-blue-50/50 border-l-4 border-l-blue-600" : "hover:bg-slate-50")}>
                 <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">
                   {String(chat.participant_name || "U").charAt(0).toUpperCase()}
                 </div>
@@ -301,6 +415,7 @@ export default function SuperChat() {
               const role = String(msg.sender_role || "").toLowerCase();
               const isOwner = role === "property_owner";
               const isAdmin = role === "superadmin";
+              const isSystem = String(msg.sender_login_id).toLowerCase() === 'system';
               
               // Define side: 
               // In monitor mode: Owner Left, User Right
@@ -314,42 +429,81 @@ export default function SuperChat() {
 
               const isImage = msg.message_type === 'image';
               const isFile = msg.message_type === 'file';
-
-              const isWhiteText = isRightSide || viewMode === "all";
-
+              const isBlocked = msg.is_blocked;
+              const isWhiteText = viewMode === "all" || isRightSide;
+              const isHighlighted = highlightedMessageId === msg._id;
               return (
-                <div key={msg.key} className={cn("flex flex-col", isRightSide ? "items-end" : "items-start")}>
-                  {viewMode === "all" && (
-                    <span className={cn("text-[9px] font-bold mb-1 px-1 uppercase tracking-wider", isOwner ? "text-blue-500" : "text-emerald-500")}>
-                        {msg.sender_name || msg.sender_login_id} ({isOwner ? "Owner" : "User"})
-                    </span>
+                <div 
+                  key={msg.key} 
+                  id={`msg-${msg._id}`} 
+                  className={cn(
+                    "flex flex-col p-1.5 transition-all duration-700", 
+                    isHighlighted ? "bg-amber-50/70 border border-amber-200 rounded-2xl shadow-md px-3 py-2 scale-[1.01]" : "",
+                    isBlocked || isSystem ? "items-center w-full my-3" : (isRightSide ? "items-end" : "items-start")
                   )}
-                  <div className={cn(
-                    "max-w-[75%] p-4 rounded-2xl shadow-sm", 
-                    isRightSide 
-                      ? (viewMode === "all" ? "bg-emerald-600 text-white rounded-tr-none" : "bg-blue-600 text-white rounded-tr-none")
-                      : (viewMode === "all" ? "bg-blue-600 text-white rounded-tl-none" : "bg-white border border-slate-100 rounded-tl-none")
-                  )}>
-                    {isImage ? (
-                      <div className="space-y-2">
-                        <img src={msg.file_url} alt="uploaded" className="max-w-full rounded-xl border border-white/20 shadow-sm cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(msg.file_url, '_blank')} />
-                        <p className={cn("text-[10px] font-medium opacity-80", isWhiteText ? "text-white" : "text-slate-500")}>{msg.text}</p>
+                >
+                  {isSystem ? (
+                    <div className="bg-amber-50/60 border border-amber-200/80 text-amber-800 rounded-3xl p-5 max-w-[85%] text-center shadow-sm flex flex-col items-center gap-2">
+                      <div className="flex items-center gap-1.5 justify-center">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[9px] font-black uppercase tracking-wider">
+                          <AlertTriangle size={10} /> System Warning
+                        </span>
                       </div>
-                    ) : isFile ? (
-                      <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className={cn("flex items-center gap-3 p-3 rounded-xl border transition-all", isWhiteText ? "bg-white/10 border-white/20 hover:bg-white/20" : "bg-slate-50 border-slate-100 hover:bg-slate-100")}>
-                        <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center shrink-0", isWhiteText ? "bg-white/20 text-white" : "bg-blue-50 text-blue-600")}>
-                           <Paperclip size={20} />
-                        </div>
-                        <div className="min-w-0">
-                           <p className={cn("text-[11px] font-bold truncate", isWhiteText ? "text-white" : "text-slate-800")}>{msg.text.replace('Sent a file: ', '')}</p>
-                           <p className={cn("text-[9px] font-medium opacity-60", isWhiteText ? "text-white" : "text-slate-500")}>Click to download</p>
-                        </div>
-                      </a>
-                    ) : (
-                      <p className={cn("text-xs font-medium leading-relaxed", isWhiteText ? "text-white" : "text-slate-600")}>{msg.text}</p>
-                    )}
-                    <span className={cn("text-[9px] font-bold mt-2 block", isWhiteText ? "text-blue-100 text-right" : "text-slate-300")}>{formatClock(msg.createdAt)}</span>
-                  </div>
+                      <p className="text-xs font-bold leading-relaxed text-slate-700 max-w-md">
+                        {msg.text}
+                      </p>
+                      <span className="text-[9px] font-bold text-amber-600 block mt-1">{formatClock(msg.createdAt)}</span>
+                    </div>
+                  ) : isBlocked ? (
+                    <div className="bg-red-50 border border-red-200 text-red-800 rounded-3xl p-5 max-w-[85%] text-left shadow-sm">
+                      <div className="flex items-center gap-1.5 mb-2.5">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-red-100 text-red-700 text-[9px] font-black uppercase tracking-wider">
+                          <AlertTriangle size={10} /> Blocked: {msg.violation_type ? msg.violation_type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') : 'Policy Violation'}
+                        </span>
+                      </div>
+                      <p className="text-xs font-extrabold text-red-900 mb-1">
+                        {msg.sender_name || msg.sender_login_id} ({isOwner ? "Owner" : "User"}) tried to send:
+                      </p>
+                      <p className="text-xs italic bg-white/70 p-3 rounded-xl border border-red-100 font-mono break-all text-slate-800">
+                        "{msg.text}"
+                      </p>
+                      <span className="text-[9px] font-bold text-red-400 mt-2 block">{formatClock(msg.createdAt)}</span>
+                    </div>
+                  ) : (
+                    <>
+                      {viewMode === "all" && (
+                        <span className={cn("text-[9px] font-bold mb-1 px-1 uppercase tracking-wider", isOwner ? "text-blue-500" : "text-emerald-500")}>
+                            {msg.sender_name || msg.sender_login_id} ({isOwner ? "Owner" : "User"})
+                        </span>
+                      )}
+                      <div className={cn(
+                        "max-w-[75%] p-4 rounded-2xl shadow-sm", 
+                        isRightSide 
+                          ? (viewMode === "all" ? "bg-emerald-600 text-white rounded-tr-none" : "bg-blue-600 text-white rounded-tr-none")
+                          : (viewMode === "all" ? "bg-blue-600 text-white rounded-tl-none" : "bg-white border border-slate-100 rounded-tl-none")
+                      )}>
+                        {isImage ? (
+                          <div className="space-y-2">
+                            <img src={msg.file_url} alt="uploaded" className="max-w-full rounded-xl border border-white/20 shadow-sm cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(msg.file_url, '_blank')} />
+                            <p className={cn("text-[10px] font-medium opacity-80", isWhiteText ? "text-white" : "text-slate-500")}>{msg.text}</p>
+                          </div>
+                        ) : isFile ? (
+                          <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className={cn("flex items-center gap-3 p-3 rounded-xl border transition-all", isWhiteText ? "bg-white/10 border-white/20 hover:bg-white/20" : "bg-slate-50 border-slate-100 hover:bg-slate-100")}>
+                            <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center shrink-0", isWhiteText ? "bg-white/20 text-white" : "bg-blue-50 text-blue-600")}>
+                               <Paperclip size={20} />
+                            </div>
+                            <div className="min-w-0">
+                               <p className={cn("text-[11px] font-bold truncate", isWhiteText ? "text-white" : "text-slate-800")}>{msg.text.replace('Sent a file: ', '')}</p>
+                               <p className={cn("text-[9px] font-medium opacity-60", isWhiteText ? "text-white" : "text-slate-500")}>Click to download</p>
+                            </div>
+                          </a>
+                        ) : (
+                          <p className={cn("text-xs font-medium leading-relaxed", isWhiteText ? "text-white" : "text-slate-600")}>{msg.text}</p>
+                        )}
+                        <span className={cn("text-[9px] font-bold mt-2 block", isWhiteText ? "text-blue-100 text-right" : "text-slate-300")}>{formatClock(msg.createdAt)}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}

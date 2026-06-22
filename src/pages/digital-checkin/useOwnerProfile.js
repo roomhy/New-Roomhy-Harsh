@@ -163,7 +163,7 @@ export const useOwnerProfile = () => {
             title: `Occupied Room ${i + 1}`,
             type: "Occupied",
             roomType: "Occupied",
-            gender: "Mixed",
+            gender: "Co-Ed",
             beds: Array.from({ length: bedCount }, (_, bi) => ({
               status: "occupied",
               tenantId: `OCC-${i + 1}-${bi + 1}`,
@@ -177,7 +177,7 @@ export const useOwnerProfile = () => {
             title: `Vacant Room ${i + 1}`,
             type: "Vacant",
             roomType: "Vacant",
-            gender: "Mixed",
+            gender: "Co-Ed",
             beds: Array.from({ length: bedCount }, () => ({
               status: "available",
               tenantId: "",

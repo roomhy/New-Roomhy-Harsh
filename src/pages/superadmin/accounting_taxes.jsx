@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Building2, Users, Shield, Clock, Search, 
   ArrowUpRight, ArrowDownRight, MoreVertical, 
@@ -9,6 +9,7 @@ import {
   Download, Eye, CreditCard, RefreshCw, Calculator,
   Receipt, FileText, Scale, LayoutGrid
 } from "lucide-react";
+import { fetchJson } from "../../utils/api";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -21,6 +22,27 @@ const taxes = [
 ];
 
 export default function Taxes() {
+  const [stats, setStats] = useState({ totalRevenue: 0 });
+  const [loading, setLoading] = useState(true);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const statsRes = await fetchJson("/api/superadmin/revenue/stats");
+      if (statsRes.success) setStats(statsRes.stats);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadData(); }, []);
+
+  // Assuming GST is roughly 18% of the platform commission, but since we don't have exact GST amounts in stats, 
+  // we'll estimate or just show the total revenue. 
+  const estGST = (stats.totalRevenue || 0) * 0.18;
+
   return (
     <div className="p-6 space-y-6 bg-[#F8FAFC] min-h-full">
       {/* Header Area */}
@@ -38,10 +60,10 @@ export default function Taxes() {
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCardHorizontal label="Total Collected" value="₹3.3L" trend="+15.6% Flux" up icon={Calculator} color="blue" />
-        <StatCardHorizontal label="GST Revenue" value="₹2.7L" trend="Main Stream" up icon={Receipt} color="emerald" />
-        <StatCardHorizontal label="Compliance SLA" value="99.8%" trend="Optimal" up icon={Shield} color="indigo" />
-        <StatCardHorizontal label="Active Rules" value="05" trend="Platform Wide" up icon={Scale} color="blue" />
+        <StatCardHorizontal label="Global Revenue" value={`₹${((stats.totalRevenue || 0)/100000).toFixed(1)}L`} trend="Lifetime" up icon={Calculator} color="blue" />
+        <StatCardHorizontal label="Est GST Flow" value={`₹${(estGST/100000).toFixed(1)}L`} trend="18% Approx" up icon={Receipt} color="emerald" />
+        <StatCardHorizontal label="Compliance SLA" value="100%" trend="Optimal" up icon={Shield} color="indigo" />
+        <StatCardHorizontal label="Active Rules" value={taxes.length.toString()} trend="Platform Wide" up icon={Scale} color="blue" />
       </div>
 
       {/* Main Table Card */}
@@ -53,8 +75,8 @@ export default function Taxes() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
                   <input placeholder="Search rules..." className="w-full bg-slate-50 border-none rounded-xl py-2 pl-9 pr-3 text-[10px] font-bold outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all shadow-sm" />
                </div>
-               <button className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-blue-600 transition-all border border-slate-100 shadow-sm">
-                  <RefreshCw className="w-3.5 h-3.5" />
+               <button onClick={loadData} className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-blue-600 transition-all border border-slate-100 shadow-sm">
+                  <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
                </button>
             </div>
          </div>

@@ -141,7 +141,8 @@ lucide.createIcons();
             const db = JSON.parse(localStorage.getItem('roomhy_superadmin_db') || 'null');
             
             // Check hardcoded default credentials first (fastest)
-            if (!db && email === 'roomhyadmin@gmail.com' && password === 'admin@123') {
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            if (isLocal && !db && email === 'roomhyadmin@gmail.com' && password === 'admin@123') {
                 console.log('[Staff Login] ✅ SuperAdmin login with default credentials');
                 const user = { id: 'SUPER_ADMIN', loginId: 'SUPER_ADMIN', email, name: 'Super Admin', role: 'superadmin' };
                 sessionStorage.setItem('user', JSON.stringify(user));

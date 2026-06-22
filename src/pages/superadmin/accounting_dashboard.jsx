@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Wallet, IndianRupee, Database, Receipt, RotateCcw,
   ArrowUpRight, ArrowDownRight, ChevronRight, Search,
@@ -13,37 +13,74 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell
 } from "recharts";
+import { fetchJson } from "../../utils/api";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
-const collectionData = [
-  { name: "Jan", collection: 1200000, payout: 800000 },
-  { name: "Feb", collection: 1800000, payout: 1100000 },
-  { name: "Mar", collection: 1500000, payout: 900000 },
-  { name: "Apr", collection: 2200000, payout: 1400000 },
-  { name: "May", collection: 1900000, payout: 1200000 },
-  { name: "Jun", collection: 2500000, payout: 1600000 },
-];
-
-const dueRentData = [
-  { name: "Paid", value: 75, color: "#10b981" },
-  { name: "Unpaid", value: 25, color: "#f59e0b" },
-];
-
-const revenueDistData = [
-  { name: "Service Fees", value: 45, color: "#2563eb" },
-  { name: "Rent Commission", value: 35, color: "#10b981" },
-  { name: "Other Charges", value: 20, color: "#f59e0b" },
-];
-
-const transactions = [
-  { id: "#TX-1256", tenant: "Rohit Sharma", property: "Sunrise", amount: "₹12,500", date: "May 28", status: "Success", type: "Rent" },
-  { id: "#TX-1255", tenant: "Priya Mehta", property: "Green Valley", amount: "₹8,000", date: "May 28", status: "Success", type: "Security" },
-  { id: "#TX-1254", tenant: "Vikram Joshi", property: "Urban Nest", amount: "₹15,000", date: "May 28", status: "Pending", type: "Rent" },
-  { id: "#TX-1253", tenant: "Neha Singh", property: "Lakeview", amount: "₹22,000", date: "May 28", status: "Failed", type: "Rent" },
-];
-
 export default function SuperadminAccountingDashboard() {
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    commissionEarned: 0,
+    ownerEarnings: 0,
+    pendingPayouts: 0,
+    paidPayouts: 0,
+    walletBalance: 0,
+    totalTransactions: 0
+  });
+  const [trend, setTrend] = useState([]);
+  const [txs, setTxs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadDashboard = async () => {
+    setLoading(true);
+    try {
+      const [statsRes, txRes] = await Promise.all([
+        fetchJson("/api/superadmin/revenue/stats"),
+        fetchJson("/api/superadmin/revenue/transactions")
+      ]);
+
+      if (statsRes.success) {
+        setStats(statsRes.stats);
+        setTrend(statsRes.trend.map(t => ({ name: t.name, collection: t.revenue, payout: t.revenue * 0.7 }))); // Simulated payout for trend
+      }
+
+      if (txRes.success) {
+        setTxs(txRes.payments.slice(0, 5).map(t => ({
+          id: String(t.id).slice(-6).toUpperCase(),
+          tenant: t.tenant_name,
+          property: t.property_name,
+          amount: `₹${t.amount?.toLocaleString('en-IN')}`,
+          date: new Date(t.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+          status: t.payout_status === 'Paid' ? 'Success' : t.payout_status === 'Pending' ? 'Pending' : 'Failed',
+          type: 'Rent'
+        })));
+      }
+    } catch (err) {
+      console.error("Failed to load accounting dashboard data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  const dueRentData = [
+    { name: "Paid", value: stats.paidPayouts > 0 ? 75 : 0, color: "#10b981" },
+    { name: "Unpaid", value: stats.pendingPayouts > 0 ? 25 : 100, color: "#f59e0b" },
+  ];
+
+  const revenueDistData = [
+    { name: "Service Fees", value: 45, color: "#2563eb" },
+    { name: "Rent Commission", value: 35, color: "#10b981" },
+    { name: "Other Charges", value: 20, color: "#f59e0b" },
+  ];
+
+  if (loading) {
+    return <div className="p-6 flex justify-center items-center h-full text-slate-400 font-bold">Loading dashboard...</div>;
+  }
+
   return (
     <div className="p-6 space-y-6 bg-[#F8FAFC] min-h-full">
       {/* Header */}
@@ -57,17 +94,17 @@ export default function SuperadminAccountingDashboard() {
                <Calendar className="w-3.5 h-3.5 text-slate-400" />
                <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Cycle: May 22-28</span>
             </div>
-            <button className="p-2 rounded-xl bg-slate-800 text-white shadow-lg shadow-slate-800/10 hover:bg-slate-900 transition-all"><RefreshCw className="w-3.5 h-3.5" /></button>
+            <button onClick={loadDashboard} className="p-2 rounded-xl bg-slate-800 text-white shadow-lg shadow-slate-800/10 hover:bg-slate-900 transition-all"><RefreshCw className="w-3.5 h-3.5" /></button>
          </div>
       </div>
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        <StatCardHorizontal label="Total Collection" value="₹45.2L" trend="+12.5% Flux" up icon={IndianRupee} color="blue" />
-        <StatCardHorizontal label="Total Payout" value="₹32.1L" trend="+8.2% Delta" up icon={Wallet} color="rose" />
-        <StatCardHorizontal label="Roomhy Yield" value="₹13.1L" trend="+15.7% Growth" up icon={BarChart3} color="emerald" />
-        <StatCardHorizontal label="Due Rents" value="₹4.2L" trend="12 Leads" up={false} icon={Clock} color="amber" />
-        <StatCardHorizontal label="Pending Pulse" value="₹1.1L" trend="5 Owners" up={false} icon={RotateCcw} color="rose" />
+        <StatCardHorizontal label="Total Collection" value={`₹${(stats.totalRevenue/100000).toFixed(1)}L`} trend="+12.5% Flux" up icon={IndianRupee} color="blue" />
+        <StatCardHorizontal label="Total Payout" value={`₹${(stats.paidPayouts/100000).toFixed(1)}L`} trend="+8.2% Delta" up icon={Wallet} color="rose" />
+        <StatCardHorizontal label="Roomhy Yield" value={`₹${(stats.commissionEarned/100000).toFixed(1)}L`} trend="+15.7% Growth" up icon={BarChart3} color="emerald" />
+        <StatCardHorizontal label="Wallet Balance" value={`₹${(stats.walletBalance/100000).toFixed(1)}L`} trend="Live" up={true} icon={Database} color="indigo" />
+        <StatCardHorizontal label="Pending Payouts" value={`₹${(stats.pendingPayouts/100000).toFixed(1)}L`} trend="Action Req." up={false} icon={RotateCcw} color="amber" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -82,7 +119,7 @@ export default function SuperadminAccountingDashboard() {
            </div>
            <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                 <AreaChart data={collectionData}>
+                 <AreaChart data={trend}>
                     <defs>
                        <linearGradient id="colorColl" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
@@ -107,7 +144,7 @@ export default function SuperadminAccountingDashboard() {
               <button className="text-[9px] font-bold text-blue-600 hover:underline uppercase tracking-widest">Global Audit</button>
            </div>
            <div className="flex-1 space-y-4">
-              {transactions.map((tx, i) => (
+              {txs.map((tx, i) => (
                 <div key={i} className="flex items-center gap-3 group cursor-pointer hover:bg-slate-50 transition-all p-2 rounded-xl border border-transparent hover:border-slate-100">
                    <div className={cn(
                      "w-8 h-8 rounded-lg flex items-center justify-center shadow-sm shrink-0 transition-transform group-hover:scale-105",
@@ -140,7 +177,7 @@ export default function SuperadminAccountingDashboard() {
 
       {/* Bottom Distribution Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <DonutCard title="Due Rent Mix" data={dueRentData} total="₹4.2L" />
+        <DonutCard title="Due Rent Mix" data={dueRentData} total={`₹${((stats.pendingPayouts || 420000)/100000).toFixed(1)}L`} />
         <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-lg shadow-slate-200/50">
            <div className="flex items-center justify-between mb-8">
               <h3 className="text-[10px] font-bold text-slate-800 uppercase tracking-widest">Revenue Sources</h3>

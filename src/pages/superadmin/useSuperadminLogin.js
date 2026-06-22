@@ -101,7 +101,7 @@ export const useSuperadminLogin = () => {
     async (email, pwd) => {
       const db = JSON.parse(localStorage.getItem("roomhy_superadmin_db") || "null");
 
-      if (!db && email === "roomhyadmin@gmail.com" && pwd === "admin@123") {
+      if (!import.meta.env.PROD && !db && email === "roomhyadmin@gmail.com" && pwd === "admin@123") {
         const user = {
           id: "SUPER_ADMIN",
           loginId: "SUPER_ADMIN",
