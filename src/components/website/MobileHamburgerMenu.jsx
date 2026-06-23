@@ -51,7 +51,7 @@ export default function MobileHamburgerMenu() {
   if (!isMobile) return null;
 
   const menuItems = [
-    { icon: Home, label: 'Home', path: '/' },
+    { icon: Home, label: 'Home', path: '/website/index' },
     { icon: Building2, label: 'Our Properties', path: '/website/ourproperty' },
     { icon: Gavel, label: 'Fast Bidding', path: '/website/fast-bidding' },
     { icon: PlusCircle, label: 'List Property', path: '/website/list' },
@@ -94,7 +94,7 @@ export default function MobileHamburgerMenu() {
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
-          <Link to="/" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
+          <Link to="/website/index" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
             <img 
               src="/website/images/logoroomhy_cropped.jpg" 
               alt="Roohmy Logo" 

@@ -355,7 +355,7 @@ const routeEntries = [
   ["/website/index", "./HomePage.jsx"],
   ["/index", "./HomePage.jsx"],
   ["/coming-soon", "./pages/ComingSoon.jsx"],
-  ["/", "./HomePage.jsx"],
+  ["/", "./pages/ComingSoon.jsx"],
   ["/propertyowner/room-photos", "./pages/propertyowner/room-photos.jsx"],
   ["/propertyowner/tenant-docs", "./pages/propertyowner/tenant-docs.jsx"],
   ["/propertyowner/dues-report", "./pages/propertyowner/dues-report.jsx"],

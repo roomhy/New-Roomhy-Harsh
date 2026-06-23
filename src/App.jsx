@@ -19,7 +19,7 @@ const PageLoader = () => (
 );
 
 const resolveHostHome = () => {
-  if (typeof window === "undefined") return "/website/index";
+  if (typeof window === "undefined") return "/coming-soon";
   const host = (window.location.hostname || "").toLowerCase();
 
   const readStoredUser = () => {
@@ -74,10 +74,10 @@ const resolveHostHome = () => {
     }
     if (role === "areamanager" || role === "employee") return "/employee/areaadmin";
     if (owner?.loginId) return "/propertyowner/admin";
-    return "/website/index";
+    return "/coming-soon";
   }
 
-  return "/website/index";
+  return "/coming-soon";
 };
 
 const HtmlRedirectOrHome = () => {
@@ -221,12 +221,12 @@ const DomainGuard = () => {
 
     // 3. Fallback for main website domain (roomhy.com) and others
     if (path === "/" || path === "/index" || path === "" || path === "/website") {
-      window.location.replace("/website/index");
+      window.location.replace("/coming-soon");
       return;
     }
     const isAllowedWebsite = path.startsWith("/website") || path === "/coming-soon" || path.startsWith("/digital-checkin") || path.startsWith("/pay");
     if (!isAllowedWebsite) {
-      window.location.replace("/website/index");
+      window.location.replace("/coming-soon");
     }
   }, [location.pathname]);
 
