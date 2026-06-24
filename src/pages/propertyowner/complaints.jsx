@@ -1,40 +1,27 @@
 import React, { useState, useEffect } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
-import { apiFetch } from "../../services/api";
-import { AlertCircle, CheckCircle2, Clock, Plus, Search, Loader2 } from "lucide-react";
-import { MobileTabs, MobileEmptyState } from "../../components/propertyowner/MobileComponents";
+import { fetchJson } from "../../utils/api";
+import { cacheGet, cacheSet, cacheInvalidate } from "../../utils/cache";
+import { AlertCircle, Search, Loader2 } from "lucide-react";
+import { MobileEmptyState } from "../../components/propertyowner/MobileComponents";
+import toast from "react-hot-toast";
+
+const COMPLAINTS_TTL = 2 * 60 * 1000; // 2 minutes
 
 const Pill = ({ tone="muted", children }) => {
   const t = { success:"bg-green-100 text-green-700", warning:"bg-amber-100 text-amber-700", danger:"bg-red-100 text-red-700", muted:"bg-gray-100 text-gray-600" };
   return <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11.5px] font-medium ${t[tone]||t.muted}`}>{children}</span>;
 };
 
-const StatCard = ({ label, value, icon:Icon, tone="muted" }) => {
-  const bg = {
-    muted: "bg-slate-50 border-slate-150/60 text-slate-600 dark:bg-slate-950/10",
-    warning: "bg-amber-50/50 border-amber-150/60 text-amber-600 dark:bg-amber-950/10",
-    success: "bg-emerald-50/50 border-emerald-150/60 text-emerald-600 dark:bg-emerald-950/10",
-    danger: "bg-rose-50/50 border-rose-150/60 text-rose-600 dark:bg-rose-950/10"
-  };
-  
-  const textClr = {
-    muted: "text-slate-900 dark:text-slate-300",
-    warning: "text-amber-900 dark:text-amber-300",
-    success: "text-emerald-900 dark:text-emerald-300",
-    danger: "text-rose-900 dark:text-rose-300"
-  };
-
-  return (
-    <div className={`w-[38%] md:w-auto shrink-0 snap-start rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${bg[tone]||bg.muted}`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] font-bold uppercase tracking-wider">{label}</span>
-        {Icon&&<Icon className="size-4 shrink-0"/>}
-      </div>
-      <div className={`text-2xl font-black leading-none ${textClr[tone]||textClr.muted}`}>{value}</div>
-    </div>
-  );
-};
+const StatCard = ({ label, value, valueColor = "text-foreground", sub }) => (
+  <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
+    <span className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
+    <h3 className={`text-[28px] font-bold mt-1 ${valueColor}`}>
+      {value} <span className="text-[16px] font-semibold text-muted-foreground">{sub}</span>
+    </h3>
+  </div>
+);
 
 export default function Complaints() {
   const owner = getOwnerRuntimeSession();
@@ -51,23 +38,44 @@ export default function Complaints() {
 
   useEffect(() => {
     const fetchData = async () => {
+      const compKey = `complaints:${owner.loginId}`;
+      const empKey  = `employees:${owner.loginId}`;
+
+      // Serve cached complaints immediately
+      const cachedComp = cacheGet(compKey);
+      const cachedEmp  = cacheGet(empKey);
+      if (cachedComp) {
+        setComplaints(cachedComp);
+        setLoading(false);
+        if (cachedEmp) setStaffList(cachedEmp);
+        return;
+      }
+
+      setLoading(true);
       try {
-        setLoading(true);
-        const [compData, empData] = await Promise.all([
-           apiFetch(`/api/complaints/owner/${owner.loginId}`),
-           apiFetch(`/api/employees`)
-        ]);
-        
-        if (compData && compData.complaints) {
-          setComplaints(compData.complaints);
-        }
-        if (empData && empData.data) {
-          setStaffList(empData.data.filter(e => e.parentLoginId === owner.loginId));
-        }
+        const compData = await fetchJson(`/api/complaints/owner/${encodeURIComponent(owner.loginId)}`);
+        const list = compData?.complaints || [];
+        cacheSet(compKey, list, COMPLAINTS_TTL);
+        setComplaints(list);
       } catch (err) {
-        console.error("Error fetching data:", err);
+        console.error("Error fetching complaints:", err);
+        toast.error("Failed to load complaints. Please refresh.");
       } finally {
         setLoading(false);
+      }
+      // Staff list is optional — fetch separately so failure doesn't block complaints
+      try {
+        if (cachedEmp) {
+          setStaffList(cachedEmp);
+        } else {
+          const empData = await fetchJson(`/api/employees?parentLoginId=${encodeURIComponent(owner.loginId)}`);
+          if (empData?.data) {
+            cacheSet(empKey, empData.data, COMPLAINTS_TTL);
+            setStaffList(empData.data);
+          }
+        }
+      } catch {
+        // Staff list unavailable — assign dropdown will be empty, not a blocker
       }
     };
     fetchData();
@@ -75,34 +83,40 @@ export default function Complaints() {
 
   const updateStatus = async (id, newStatus) => {
     try {
-      const data = await apiFetch(`/api/complaints/${id}/status`, {
+      const data = await fetchJson(`/api/complaints/${id}/status`, {
         method: "PUT",
         body: JSON.stringify({ status: newStatus })
       });
-      if (data && data.success) {
+      if (data?.success) {
+        cacheInvalidate(`complaints:${owner.loginId}`);
         setComplaints(prev => prev.map(c => c._id === id ? { ...c, status: newStatus } : c));
+        toast.success(`Complaint marked as ${newStatus}.`);
       }
     } catch (err) {
       console.error("Failed to update status", err);
+      toast.error("Failed to update status. Please try again.");
     }
   };
 
   const assignStaff = async (id, staffId) => {
     try {
       const staffObj = staffList.find(s => s._id === staffId);
-      const data = await apiFetch(`/api/complaints/${id}/assign`, {
+      const data = await fetchJson(`/api/complaints/${id}/assign`, {
         method: "PATCH",
-        body: JSON.stringify({ assignedStaffId: staffId, assignedStaffName: staffObj ? staffObj.name : null })
+        body: JSON.stringify({ assignedStaffId: staffId, assignedStaffName: staffObj?.name || null })
       });
-      if (data && data.success) {
-        setComplaints(prev => prev.map(c => c._id === id ? { 
-          ...c, 
-          assignedStaffId: staffId, 
-          assignedStaffName: staffObj ? staffObj.name : null 
+      if (data?.success) {
+        cacheInvalidate(`complaints:${owner.loginId}`);
+        setComplaints(prev => prev.map(c => c._id === id ? {
+          ...c,
+          assignedStaffId: staffId,
+          assignedStaffName: staffObj?.name || null
         } : c));
+        toast.success("Staff assigned.");
       }
     } catch (err) {
       console.error("Failed to assign staff", err);
+      toast.error("Failed to assign staff. Please try again.");
     }
   };
 
@@ -128,11 +142,11 @@ export default function Complaints() {
         </div>
       ) : (
         <>
-          <div className="flex overflow-x-auto snap-x gap-3 pb-3 mb-6 no-scrollbar scroll-smooth md:grid md:grid-cols-4 md:pb-0">
-            <StatCard label="Total" value={complaints.length} icon={AlertCircle} tone="muted"/>
-            <StatCard label="Open" value={complaints.filter(c=>(c.status||"Open")==="Open").length} icon={AlertCircle} tone="danger"/>
-            <StatCard label="In Progress" value={complaints.filter(c=>["In Progress", "Taken"].includes(c.status)).length} icon={Clock} tone="warning"/>
-            <StatCard label="Resolved" value={complaints.filter(c=>c.status==="Resolved").length} icon={CheckCircle2} tone="success"/>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <StatCard label="Total" value={complaints.length} sub="Complaints" />
+            <StatCard label="Open" value={complaints.filter(c=>(c.status||"Open")==="Open").length} sub="Tickets" valueColor="text-rose-600" />
+            <StatCard label="In Progress" value={complaints.filter(c=>["In Progress","Taken"].includes(c.status)).length} sub="Active" valueColor="text-amber-600" />
+            <StatCard label="Resolved" value={complaints.filter(c=>c.status==="Resolved").length} sub="Closed" valueColor="text-emerald-600" />
           </div>
           <div className="hidden md:flex flex-wrap items-center gap-1.5 mb-4 border-b border-border">
             {[{k:"all",l:"All"},{k:"open",l:"Open"},{k:"in-progress",l:"In Progress"},{k:"resolved",l:"Resolved"}].map(({k,l}) => (

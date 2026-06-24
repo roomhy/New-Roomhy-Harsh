@@ -5,7 +5,7 @@ import {
   Calendar, Search, CheckCircle2, XCircle, 
   Clock, Sparkles, MessageSquare
 } from "lucide-react";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
 
 export default function LeaveRequestsPage() {
   const owner = getOwnerRuntimeSession();

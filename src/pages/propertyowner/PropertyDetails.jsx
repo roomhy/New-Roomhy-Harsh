@@ -27,7 +27,9 @@ export default function PropertyDetails() {
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
+  const [saveMsg, setSaveMsg] = useState(null);
+  const [fetchError, setFetchError] = useState("");
+
   // Form states
   const [amenities, setAmenities] = useState([]);
   const [exclusiveBenefits, setExclusiveBenefits] = useState([]);
@@ -72,96 +74,29 @@ export default function PropertyDetails() {
     fetchPropertyDetails();
   }, []);
 
-  // Static sample data for Vercel deployment
-const staticPropertyData = {
-  _id: "static123",
-  title: "Roomhy Boys PG - Kota",
-  description: "Premium paying guest accommodation for boys near coaching centers",
-  address: "Talwandi, Kota, Rajasthan 324005",
-  locationCode: "KOT",
-  status: "active",
-  isPublished: true,
-  amenities: [
-    { name: "High-Speed WiFi", icon: "wifi", category: "basic" },
-    { name: "Air Conditioning", icon: "wind", category: "comfort" },
-    { name: "Attached Bathroom", icon: "droplet", category: "basic" },
-    { name: "Study Table", icon: "check", category: "basic" },
-    { name: "Power Backup", icon: "zap", category: "comfort" }
-  ],
-  exclusiveBenefits: [
-    {
-      title: "Free First Month Maintenance",
-      description: "No maintenance charges for the first month",
-      icon: "gift"
-    },
-    {
-      title: "24/7 Medical Support",
-      description: "On-call doctor assistance",
-      icon: "shield"
-    }
-  ],
-  propertyViews: [
-    {
-      label: "Facade",
-      images: ["https://picsum.photos/800/600?random=1"],
-      description: "Beautiful exterior"
-    },
-    {
-      label: "Room",
-      images: ["https://picsum.photos/800/600?random=2"],
-      description: "Spacious rooms"
-    }
-  ],
-  facilities: {
-    wifi: true,
-    ac: true,
-    food: true,
-    laundry: true,
-    parking: false,
-    gym: false,
-    tv: true,
-    powerBackup: true
-  },
-  propertyType: "pg",
-  gender: "male",
-  monthlyRent: 8000,
-  totalRooms: 20,
-  bedsPerRoom: 2
-};
 
 const fetchPropertyDetails = async () => {
+    setLoading(true);
+    setFetchError("");
     try {
       const session = getOwnerRuntimeSession();
-      
-      // Try API first, fallback to static data
-      let data;
-      try {
-        const response = await fetch(`/api/properties/ensure-owner`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ownerLoginId: session.loginId })
-        });
-        data = await response.json();
-      } catch (apiError) {
-        console.warn('API failed, using static data:', apiError.message);
-        data = { success: true, property: staticPropertyData };
-      }
-      
+      const response = await fetch(`/api/properties/ensure-owner`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ownerLoginId: session.loginId })
+      });
+      const data = await response.json();
       if (data.success) {
         setProperty(data.property);
         setAmenities(data.property.amenities || []);
         setExclusiveBenefits(data.property.exclusiveBenefits || []);
         setPropertyViews(data.property.propertyViews || []);
         setFacilities(data.property.facilities || facilities);
+      } else {
+        setFetchError(data.message || 'Failed to load property details.');
       }
-    } catch (error) {
-      console.error('Error fetching property:', error);
-      // Use static data as ultimate fallback
-      setProperty(staticPropertyData);
-      setAmenities(staticPropertyData.amenities);
-      setExclusiveBenefits(staticPropertyData.exclusiveBenefits);
-      setPropertyViews(staticPropertyData.propertyViews);
-      setFacilities(staticPropertyData.facilities);
+    } catch {
+      setFetchError('Failed to load property details. Please refresh.');
     } finally {
       setLoading(false);
     }
@@ -169,51 +104,29 @@ const fetchPropertyDetails = async () => {
 
   const savePropertyDetails = async () => {
     setSaving(true);
+    setSaveMsg(null);
     try {
       const session = getOwnerRuntimeSession();
-      
-      // Try API first
-      try {
-        const response = await fetch(`/api/properties/${property._id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.token}`
-          },
-          body: JSON.stringify({
-            amenities,
-            exclusiveBenefits,
-            propertyViews,
-            facilities
-          })
-        });
-
-        const data = await response.json();
-        if (data.success) {
-          alert('Property details updated successfully!');
-          setProperty(data.property);
-        } else {
-          throw new Error(data.message);
-        }
-      } catch (apiError) {
-        console.warn('API save failed, updating local state:', apiError.message);
-        // Update local state for demo purposes
-        const updatedProperty = {
-          ...property,
-          amenities,
-          exclusiveBenefits,
-          propertyViews,
-          facilities,
-          updatedAt: new Date()
-        };
-        setProperty(updatedProperty);
-        alert('Demo mode: Changes saved locally! (Backend not available)');
+      const response = await fetch(`/api/properties/${property._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.token}`
+        },
+        body: JSON.stringify({ amenities, exclusiveBenefits, propertyViews, facilities })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setProperty(data.property);
+        setSaveMsg({ type: 'success', text: 'Property details updated successfully.' });
+      } else {
+        setSaveMsg({ type: 'error', text: data.message || 'Save failed. Please try again.' });
       }
-    } catch (error) {
-      console.error('Error saving property:', error);
-      alert('Error updating property');
+    } catch {
+      setSaveMsg({ type: 'error', text: 'Save failed. Please check your connection and try again.' });
     } finally {
       setSaving(false);
+      setTimeout(() => setSaveMsg(null), 5000);
     }
   };
 
@@ -271,6 +184,21 @@ const fetchPropertyDetails = async () => {
     );
   }
 
+  if (fetchError) {
+    return (
+      <PropertyOwnerLayout
+        owner={owner}
+        title="Property Details"
+        onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
+      >
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-700 text-sm font-medium flex items-center gap-4">
+          {fetchError}
+          <button onClick={fetchPropertyDetails} className="underline font-bold shrink-0">Retry</button>
+        </div>
+      </PropertyOwnerLayout>
+    );
+  }
+
   return (
     <PropertyOwnerLayout
       owner={owner}
@@ -298,6 +226,18 @@ const fetchPropertyDetails = async () => {
               {saving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
+          {saveMsg && (
+            <div className={`mt-4 rounded-lg px-4 py-3 text-sm font-medium flex items-center gap-3 ${
+              saveMsg.type === 'success'
+                ? 'bg-green-50 border border-green-200 text-green-700'
+                : 'bg-red-50 border border-red-200 text-red-700'
+            }`}>
+              {saveMsg.text}
+              {saveMsg.type === 'error' && (
+                <button onClick={savePropertyDetails} className="underline font-bold shrink-0">Retry</button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Quick Facilities */}

@@ -24,7 +24,7 @@ const writeJson = (key, value) => {
 };
 
 const _fetchCache = {};
-const _CACHE_TTL = 60_000;
+const _CACHE_TTL = 3 * 60_000; // 3 minutes — reduces repeated layout property fetches
 const _getCached = (key) => { const e = _fetchCache[key]; return e && Date.now() - e.ts < _CACHE_TTL ? e.data : null; };
 const _setCached = (key, data) => { _fetchCache[key] = { data, ts: Date.now() }; };
 

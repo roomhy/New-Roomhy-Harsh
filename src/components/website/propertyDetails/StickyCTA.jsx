@@ -97,7 +97,7 @@ export default function StickyCTA({ property, onBookNow }) {
           <div className="px-7 py-8 space-y-4">
             <button
               onClick={onBookNow || (() => { if (property.ownerPhone) window.location.href = `tel:${property.ownerPhone}`; })}
-              className="w-full py-4.5 bg-[#EE4266] text-white font-black rounded-md text-base shadow-[0_4px_15px_rgba(238,66,102,0.3)] hover:bg-[#d63a5b] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              className="w-full py-4 bg-[#EE4266] text-white font-black rounded-md text-base shadow-[0_4px_15px_rgba(238,66,102,0.3)] hover:bg-[#d63a5b] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
               Book Now
             </button>

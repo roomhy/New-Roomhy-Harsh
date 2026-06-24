@@ -15,6 +15,11 @@ const _CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 let _formattedPropertiesCache = null;
 let _formattedPropertiesCacheTs = 0;
 
+// In-flight GET request deduplication.
+// If the exact same GET URL is requested while one is already in-flight,
+// the existing Promise is returned — no second network request is made.
+const _inflightRequests = new Map();
+
 const _fetchCached = (url, ttlMs = _CACHE_TTL_MS) => {
   const entry = _cache.get(url);
   if (entry && Date.now() - entry.ts < ttlMs) return entry.promise;
@@ -48,47 +53,70 @@ export const getApiBase = () => {
   return "https://roohmy-backend-xwa9.vercel.app";
 };
 
+// Read JWT from localStorage — sent as Authorization: Bearer header on every request.
+// Cookie is also set by the backend for httpOnly support; both mechanisms work simultaneously.
 export const getAuthHeader = () => {
-  if (typeof window === "undefined") return {};
-  let token = "";
-  try {
-    token = sessionStorage.getItem("token") || localStorage.getItem("token") || "";
-  } catch (_) {
-    token = "";
-  }
+  const token = localStorage.getItem("token") || sessionStorage.getItem("token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-export const fetchJson = async (path, options = {}) => {
+export const fetchJson = (path, options = {}) => {
   const base = getApiBase();
   const url = path.startsWith("http") ? path : `${base}${path}`;
   const method = (options.method || 'GET').toUpperCase();
-  const hasBody = method !== 'GET' && method !== 'HEAD';
-  const headers = {
-    ...(hasBody ? { "Content-Type": "application/json" } : {}),
-    ...(options.headers || {}),
-    ...getAuthHeader()
-  };
-  const res = await fetch(url, { 
-    credentials: "include", // Essential for CORS with credentials
-    ...options, 
-    headers 
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    let errorMsg = `Request failed: ${res.status} ${res.statusText}`;
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed.error) errorMsg = parsed.error + (parsed.details ? `: ${parsed.details}` : '');
-    } catch (e) {
-      // Not JSON
-    }
-    const err = new Error(errorMsg);
-    err.status = res.status;
-    err.body = text;
-    throw err;
+
+  // Return the existing in-flight Promise for identical GET requests
+  if (method === 'GET') {
+    const existing = _inflightRequests.get(url);
+    if (existing) return existing;
   }
-  return res.json();
+
+  const promise = (async () => {
+    const hasBody = method !== 'GET' && method !== 'HEAD';
+    const headers = {
+      ...(hasBody ? { "Content-Type": "application/json" } : {}),
+      ...(options.headers || {}),
+      ...getAuthHeader(),
+    };
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    try {
+      const res = await fetch(url, {
+        credentials: "include",
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        let errorMsg = `Request failed: ${res.status} ${res.statusText}`;
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed.error) errorMsg = parsed.error + (parsed.details ? `: ${parsed.details}` : '');
+        } catch (_) {}
+        const err = new Error(errorMsg);
+        err.status = res.status;
+        err.body = text;
+        throw err;
+      }
+      return res.json();
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        const timeoutErr = new Error('Request timed out. Please try again.');
+        timeoutErr.status = 408;
+        timeoutErr.name = 'TimeoutError';
+        throw timeoutErr;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  })().finally(() => {
+    if (method === 'GET') _inflightRequests.delete(url);
+  });
+
+  if (method === 'GET') _inflightRequests.set(url, promise);
+  return promise;
 };
 
 // Fetch cities from backend — cached 10 minutes (cities rarely change)
@@ -1341,6 +1369,11 @@ export const fetchHomeOverviewStats = async () => {
   }
 };
 
+// ── Compatibility shims for services/api.js migration ────────────────────────
+// Pages previously importing from src/services/api.js can update their import
+// path to src/utils/api.js and continue using apiFetch/API_URL unchanged.
+// They gain: 12-second timeout, GET deduplication, shared cache layer.
 
+export const API_URL = getApiBase();
 
-
+export const apiFetch = (path, options = {}) => fetchJson(path, options);

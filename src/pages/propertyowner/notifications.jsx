@@ -1,10 +1,13 @@
 import React, { useState } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
-import { 
-  Bell, Check, Trash2, IndianRupee, UserCheck, AlertTriangle, 
+import { cacheGet, cacheSet, cacheInvalidate } from "../../utils/cache";
+import {
+  Bell, Check, Trash2, IndianRupee, UserCheck, AlertTriangle,
   Settings, Info, ShieldAlert, Plus
 } from "lucide-react";
+
+const NOTIF_TTL = 2 * 60 * 1000; // 2 minutes
 
 export default function NotificationsPage() {
   const owner = getOwnerRuntimeSession();
@@ -20,6 +23,13 @@ export default function NotificationsPage() {
   React.useEffect(() => {
     if (!owner?.loginId) return;
     const fetchNotifs = async () => {
+      const cacheKey = `notifications:${owner.loginId}`;
+      const cached = cacheGet(cacheKey);
+      if (cached) {
+        setNotifications(cached);
+        setLoading(false);
+        return;
+      }
       try {
         const { fetchJson } = await import("../../utils/api");
         const res = await fetchJson(`/api/notifications?toLoginId=${encodeURIComponent(owner.loginId)}`);
@@ -36,6 +46,7 @@ export default function NotificationsPage() {
               meta
             };
           });
+          cacheSet(cacheKey, formatted, NOTIF_TTL);
           setNotifications(formatted);
         }
       } catch (e) {
@@ -54,6 +65,7 @@ export default function NotificationsPage() {
         method: 'PUT',
         body: JSON.stringify({ toLoginId: owner.loginId })
       });
+      cacheInvalidate(`notifications:${owner.loginId}`);
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     } catch (e) {
       console.error(e);
@@ -64,6 +76,7 @@ export default function NotificationsPage() {
     try {
       const { fetchJson } = await import("../../utils/api");
       await fetchJson(`/api/notifications/${id}/read`, { method: 'PUT' });
+      cacheInvalidate(`notifications:${owner.loginId}`);
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
     } catch (e) {
       console.error(e);
@@ -72,7 +85,7 @@ export default function NotificationsPage() {
 
   const handleDeleteNotification = async (id) => {
     try {
-      // Add delete logic here if the API exists, for now just remove from state
+      cacheInvalidate(`notifications:${owner.loginId}`);
       setNotifications(prev => prev.filter(n => n.id !== id));
     } catch (e) {
       console.error(e);

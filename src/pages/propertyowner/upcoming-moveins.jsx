@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession, fetchOwnerTenants } from "../../utils/propertyowner";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
 import { 
   CalendarClock, Search, UserPlus, Phone, Mail, 
   ArrowRight, CheckCircle, Clock, AlertTriangle
@@ -43,7 +44,7 @@ export default function UpcomingMoveinsPage() {
       });
       setMoveins(prev => prev.filter(m => m._id !== tenantId));
     } catch (err) {
-      alert("Error approving check-in: " + err.message);
+      toast.error("Error approving check-in: " + err.message);
     }
   };
 
@@ -57,7 +58,7 @@ export default function UpcomingMoveinsPage() {
       });
       setMoveins(prev => prev.map(m => m._id === tenantId ? { ...m, moveInDate: newDate } : m));
     } catch (err) {
-      alert("Error rescheduling check-in: " + err.message);
+      toast.error("Error rescheduling check-in: " + err.message);
     }
   };
 

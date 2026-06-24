@@ -5,7 +5,8 @@ import {
   Users, Search, Plus, Trash2, Edit3, 
   CheckCircle2, AlertCircle, Phone, Sparkles
 } from "lucide-react";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
+import { cacheGet, cacheSet } from "../../utils/cache";
 
 export default function AssignedStaffPage() {
   const owner = getOwnerRuntimeSession();
@@ -23,16 +24,19 @@ export default function AssignedStaffPage() {
   }, [owner.loginId]);
 
   const fetchStaffWorkload = async () => {
+    const CACHE_KEY = `assigned:${owner.loginId}`;
+    const cached = cacheGet(CACHE_KEY);
+    if (cached) { setStaff(cached); setLoading(false); return; }
     try {
       setLoading(true);
       const [empData, compData, maintData, attData] = await Promise.all([
-        apiFetch('/api/employees'),
+        apiFetch(`/api/employees?parentLoginId=${owner.loginId}`),
         apiFetch(`/api/complaints/owner/${owner.loginId}`),
         apiFetch(`/api/maintenance/owner/${owner.loginId}`),
         apiFetch(`/api/hr/attendance/${owner.loginId}`)
       ]);
 
-      const myStaff = (empData.data || []).filter(e => e.parentLoginId === owner.loginId);
+      const myStaff = empData.data || [];
       
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -76,7 +80,9 @@ export default function AssignedStaffPage() {
          }
       });
 
-      setStaff(Object.values(staffMap));
+      const result = Object.values(staffMap);
+      setStaff(result);
+      cacheSet(CACHE_KEY, result, 2 * 60 * 1000);
     } catch (err) {
       console.error(err);
     } finally {

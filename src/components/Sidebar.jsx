@@ -245,6 +245,7 @@ const NAV = [
         { label: "Tenants Complaints", path: "/superadmin/complaints/tenants" },
         { label: "Owners Complaints", path: "/superadmin/complaints/owners" },
         { label: "Tickets System", path: "/superadmin/support/tickets" },
+        { label: "Website Queries", path: "/superadmin/support/website-queries" },
         { label: "Issues Resolution Tracking", path: "/superadmin/support/resolution" },
     ]
   },

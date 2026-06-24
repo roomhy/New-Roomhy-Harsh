@@ -8,8 +8,8 @@ import {
   fetchOwnerTenants,
   downloadCsv
 } from "../../utils/propertyowner";
-import { ownerApi } from "../../services/api";
-import { Building, UserCog, Shield, Globe, Lock, Check, Database, Download, Landmark, Eye, EyeOff, ExternalLink } from "lucide-react";
+import { Building, UserCog, Shield, Globe, Lock, Check, Database, Download, Landmark, Eye, EyeOff, ExternalLink, X, Loader2 } from "lucide-react";
+import toast from "react-hot-toast";
 import { fetchJson } from "../../utils/api";
 
 function FieldRow({ label, value, masked, empty }) {
@@ -64,8 +64,17 @@ export default function Settings() {
   const [bankData, setBankData]       = useState(null);
   const [bankLoading, setBankLoading] = useState(true);
 
+  const [pwModal, setPwModal] = useState(false);
+  const [pwStep, setPwStep] = useState("otp"); // "otp" | "reset"
+  const [pwOtp, setPwOtp] = useState("");
+  const [pwToken, setPwToken] = useState("");
+  const [pwNew, setPwNew] = useState("");
+  const [pwConfirm, setPwConfirm] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwError, setPwError] = useState("");
+
   useEffect(() => {
-    ownerApi.getOwner(owner.loginId)
+    fetchJson(`/api/owners/${encodeURIComponent(owner.loginId)}`)
       .then(data => setBankData({
         accountHolder: data.checkinAccountHolderName || data.accountHolderName || "",
         bankName:      data.checkinBankName      || data.bankName      || "",
@@ -171,29 +180,85 @@ export default function Settings() {
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {
       console.error("Export backup failed:", err);
-      alert("Failed to export backup data. Please try again.");
+      toast.error("Failed to export backup data. Please try again.");
     } finally {
       setExporting(false);
     }
   };
 
   useEffect(() => {
-    const handleScrollAndExport = () => {
+    const handleScrollToBackup = () => {
       if (window.location.hash === "#backup") {
         const element = document.getElementById("backup");
         if (element) {
           setTimeout(() => {
             element.scrollIntoView({ behavior: "smooth", block: "center" });
           }, 200);
-          // Automatically trigger the data backup download files
-          handleExportBackup();
         }
       }
     };
-    handleScrollAndExport();
-    window.addEventListener("hashchange", handleScrollAndExport);
-    return () => window.removeEventListener("hashchange", handleScrollAndExport);
+    handleScrollToBackup();
+    window.addEventListener("hashchange", handleScrollToBackup);
+    return () => window.removeEventListener("hashchange", handleScrollToBackup);
   }, []);
+
+  const openChangePassword = async () => {
+    setPwError("");
+    setPwOtp("");
+    setPwToken("");
+    setPwNew("");
+    setPwConfirm("");
+    setPwStep("otp");
+    setPwLoading(true);
+    setPwModal(true);
+    try {
+      await fetchJson("/api/auth/owner/forgot-password/request-otp", {
+        method: "POST",
+        body: JSON.stringify({ loginId: owner.loginId })
+      });
+    } catch (err) {
+      setPwError(err?.body || err?.message || "Failed to send OTP. Try again.");
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  const verifyPwOtp = async () => {
+    if (!pwOtp || pwOtp.length !== 6) { setPwError("Enter the 6-digit OTP sent to your email."); return; }
+    setPwError("");
+    setPwLoading(true);
+    try {
+      const data = await fetchJson("/api/auth/owner/forgot-password/verify-otp", {
+        method: "POST",
+        body: JSON.stringify({ loginId: owner.loginId, otp: pwOtp })
+      });
+      setPwToken(data?.token || "");
+      setPwStep("reset");
+    } catch (err) {
+      setPwError(err?.body || err?.message || "Invalid OTP.");
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  const submitNewPassword = async () => {
+    if (!pwNew || pwNew.length < 6) { setPwError("Password must be at least 6 characters."); return; }
+    if (pwNew !== pwConfirm) { setPwError("Passwords do not match."); return; }
+    setPwError("");
+    setPwLoading(true);
+    try {
+      await fetchJson("/api/auth/owner/forgot-password/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ loginId: owner.loginId, token: pwToken, newPassword: pwNew })
+      });
+      setPwModal(false);
+      toast.success("Password changed successfully!");
+    } catch (err) {
+      setPwError(err?.body || err?.message || "Failed to reset password.");
+    } finally {
+      setPwLoading(false);
+    }
+  };
 
   const handleSave = () => {
     try {
@@ -344,6 +409,7 @@ export default function Settings() {
                 <p className="text-xs text-muted-foreground mt-0.5">Secure your account by updating your credentials regularly.</p>
               </div>
               <button type="button"
+                onClick={openChangePassword}
                 className="px-4 h-10 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl font-semibold text-xs transition-colors shrink-0 flex items-center gap-2 self-start sm:self-center">
                 <Lock className="w-3.5 h-3.5" />
                 Change Password
@@ -384,6 +450,90 @@ export default function Settings() {
             </button>
           </div>
         </div>
+      {/* Change Password Modal */}
+      {pwModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
+            <button onClick={() => setPwModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-[16px] text-slate-900">Change Password</h3>
+                <p className="text-[11.5px] text-slate-500">
+                  {pwStep === "otp" ? "An OTP has been sent to your registered email." : "Enter your new password below."}
+                </p>
+              </div>
+            </div>
+
+            {pwError && (
+              <div className="mb-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-xs font-semibold px-4 py-3">
+                {pwError}
+              </div>
+            )}
+
+            {pwStep === "otp" ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-slate-700 uppercase tracking-tight mb-2 block">6-Digit OTP</label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={pwOtp}
+                    onChange={e => setPwOtp(e.target.value.replace(/\D/g, ""))}
+                    placeholder="Enter OTP from email"
+                    className="w-full h-11 px-4 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 tracking-widest"
+                  />
+                </div>
+                <button
+                  onClick={verifyPwOtp}
+                  disabled={pwLoading}
+                  className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  {pwLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</> : "Verify OTP"}
+                </button>
+                <button onClick={openChangePassword} disabled={pwLoading} className="w-full text-center text-xs text-primary font-semibold hover:underline disabled:opacity-50">
+                  Resend OTP
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-slate-700 uppercase tracking-tight mb-2 block">New Password</label>
+                  <input
+                    type="password"
+                    value={pwNew}
+                    onChange={e => setPwNew(e.target.value)}
+                    placeholder="Min. 6 characters"
+                    className="w-full h-11 px-4 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-700 uppercase tracking-tight mb-2 block">Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={pwConfirm}
+                    onChange={e => setPwConfirm(e.target.value)}
+                    placeholder="Repeat new password"
+                    className="w-full h-11 px-4 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
+                  />
+                </div>
+                <button
+                  onClick={submitNewPassword}
+                  disabled={pwLoading}
+                  className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  {pwLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : <><Check className="w-4 h-4" /> Set New Password</>}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </PropertyOwnerLayout>
   );
 }

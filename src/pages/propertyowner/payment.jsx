@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
-import { Send, Plus, Search, Wallet, CheckCircle2, Clock, AlertTriangle, Phone, MessageCircle, RefreshCw, X, Receipt, Smartphone, CreditCard, Banknote, FileText } from "lucide-react";
+import { Send, Plus, Search, Wallet, CheckCircle2, Clock, AlertTriangle, Phone, MessageCircle, RefreshCw, X, Receipt, Smartphone, CreditCard, Banknote, FileText, Printer } from "lucide-react";
+import { RentReceiptModal } from "../../components/propertyowner/RentReceiptModal";
 import { MobileTabs, MobileEmptyState } from "../../components/propertyowner/MobileComponents";
 import {
   clearOwnerRuntimeSession,
@@ -243,10 +244,12 @@ export default function Payment() {
   const [genConfirmOpen, setGenConfirmOpen] = useState(false);
   const [historyModal, setHistoryModal] = useState(null); // { tenantName, billingMonth, payments[] }
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [viewingReceipt, setViewingReceipt] = useState(null);
   const [payModal, setPayModal] = useState(null); // { row }
   const [payModalMethod, setPayModalMethod] = useState("cash");
   const [payModalAmt, setPayModalAmt] = useState(0);
   const [payModalLoading, setPayModalLoading] = useState(false);
+  const isRecordingRef = useRef(false);
   const [showCalcHistory, setShowCalcHistory] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -264,7 +267,7 @@ export default function Payment() {
         fetchRentDashboard(session._id || session.loginId),
         fetchInvoices({ ownerId: session._id || session.loginId, limit: 100 }),
         fetchPenaltyConfigs(session._id || session.loginId),
-        fetchMissingContacts(),
+        fetchMissingContacts(session._id || session.loginId),
       ]);
       if (tenantsData.status === "fulfilled") setTenants(tenantsData.value || []);
       if (dashData.status === "fulfilled")   setDashStats(dashData.value?.stats);
@@ -299,14 +302,27 @@ export default function Payment() {
     return () => clearTimeout(t);
   }, [search]);
 
+  // Pre-index current-month invoices by tenantId to eliminate O(n²) find on every render
+  const invoiceMap = useMemo(() => {
+    const m = new Map();
+    const month = currentBillingMonth();
+    invoices.forEach(inv => {
+      if (inv.billingMonth === month) {
+        m.set(String(inv.tenantId?._id || inv.tenantId), inv);
+      }
+    });
+    return m;
+  }, [invoices]);
+
   // Active tenants with rent > 0 who haven't checked out — only these get invoices
-  const invoiceableTenants = tenants.filter(t => (t.agreedRent || t.rent || 0) > 0 && !t.checkoutDate);
-  const alreadyInvoicedCount = invoiceableTenants.filter(t =>
-    invoices.some(i =>
-      String(i.tenantId?._id || i.tenantId) === String(t._id || t.id) &&
-      i.billingMonth === currentBillingMonth()
-    )
-  ).length;
+  const invoiceableTenants = useMemo(
+    () => tenants.filter(t => (t.agreedRent || t.rent || 0) > 0 && !t.checkoutDate),
+    [tenants]
+  );
+  const alreadyInvoicedCount = useMemo(
+    () => invoiceableTenants.filter(t => invoiceMap.has(String(t._id || t.id))).length,
+    [invoiceableTenants, invoiceMap]
+  );
   const toGenerateCount = invoiceableTenants.length - alreadyInvoicedCount;
 
   const billingMonthLabel = () => {
@@ -315,12 +331,8 @@ export default function Payment() {
   };
 
   // Merge tenant list with invoice data; recalculate phase + charges live from current config
-  const rows = tenants.map(t => {
-    const inv = invoices.find(i =>
-      String(i.tenantId?._id || i.tenantId) === String(t._id || t.id) &&
-      i.billingMonth === currentBillingMonth()
-    );
-    // No invoice for this month — do not assume "paid"
+  const rows = useMemo(() => tenants.map(t => {
+    const inv = invoiceMap.get(String(t._id || t.id));
     if (!inv) return { ...t, payStatus: "no-invoice", phase: 0, invoice: null, outstandingAmount: 0 };
     const liveCalc = calcLivePenalties(inv, penaltyConfig);
     const due   = liveCalc.totalDue;
@@ -330,40 +342,39 @@ export default function Payment() {
       : due > 0 && phase >= 2 ? "overdue"
       : "due";
     return { ...t, payStatus, phase, invoice: inv, outstandingAmount: due };
-  });
+  }), [tenants, invoiceMap, penaltyConfig]);
 
   // Live phase breakdown computed from rows (not stale dashStats.phase1/2/3)
-  const livePhaseCounts = {
+  const livePhaseCounts = useMemo(() => ({
     phase1: rows.filter(r => r.payStatus !== "paid" && r.phase === 1).length,
     phase2: rows.filter(r => r.payStatus !== "paid" && r.phase === 2).length,
     phase3: rows.filter(r => r.payStatus !== "paid" && r.phase === 3).length,
-  };
+  }), [rows]);
 
-  const counts = {
+  const counts = useMemo(() => ({
     all:     rows.length,
     due:     rows.filter(r => r.payStatus === "due").length,
     partial: rows.filter(r => r.payStatus === "partial").length,
     paid:    rows.filter(r => r.payStatus === "paid").length,
     overdue: rows.filter(r => r.payStatus === "overdue").length,
-  };
+  }), [rows]);
 
-  const filtered = (
+  const filtered = useMemo(() => (
     tab === "Collection" ? rows :
     tab === "Pending" ? rows.filter(r => r.payStatus === "due" || r.payStatus === "partial" || r.payStatus === "overdue") :
     tab === "History" ? rows.filter(r => r.payStatus === "paid") :
     tab === "Receipts" ? rows.filter(r => r.payStatus === "paid") :
     rows
-  )
-    .filter(t =>
-      !debouncedSearch ||
-      (t.name || "").toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      (t.roomNo || "").toLowerCase().includes(debouncedSearch.toLowerCase())
-    );
+  ).filter(t =>
+    !debouncedSearch ||
+    (t.name || "").toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+    (t.roomNo || "").toLowerCase().includes(debouncedSearch.toLowerCase())
+  ), [rows, tab, debouncedSearch]);
 
   const fmt = (n) => "₹" + (n || 0).toLocaleString("en-IN");
-  const totalExpected  = rows.reduce((s, t) => s + ((t.invoice?.rentAmount) || t.agreedRent || t.rent || 0), 0);
-  const totalCollected = rows.reduce((s, t) => s + (t.invoice?.paidAmount || 0), 0);
-  const totalDue       = rows.reduce((s, t) => s + (t.outstandingAmount || 0), 0);
+  const totalExpected  = useMemo(() => rows.reduce((s, t) => s + ((t.invoice?.rentAmount) || t.agreedRent || t.rent || 0), 0), [rows]);
+  const totalCollected = useMemo(() => rows.reduce((s, t) => s + (t.invoice?.paidAmount || 0), 0), [rows]);
+  const totalDue       = useMemo(() => rows.reduce((s, t) => s + (t.outstandingAmount || 0), 0), [rows]);
   const totalPenalty   = dashStats?.totalPenalty || 0;
   const pctDone        = dashStats ? Math.round(((dashStats.paid || 0) / Math.max(1, (dashStats.total || 1))) * 100) : 0;
 
@@ -398,6 +409,8 @@ export default function Payment() {
 
   const handleMarkPaid = async () => {
     if (!payModal?.row) return;
+    if (isRecordingRef.current) return;
+    isRecordingRef.current = true;
     const { row } = payModal;
     setPayModalLoading(true);
     try {
@@ -411,6 +424,7 @@ export default function Payment() {
       showToast(err.message || "Failed to record payment", "error");
     } finally {
       setPayModalLoading(false);
+      isRecordingRef.current = false;
     }
   };
 
@@ -430,7 +444,10 @@ export default function Payment() {
         tenantName:   row.name,
         billingMonth: label,
         rentAmount:   data.invoice?.rentAmount || 0,
+        totalDue:     data.invoice?.totalDue   || data.invoice?.outstandingAmount || data.invoice?.rentAmount || 0,
         totalPaid:    data.invoice?.paidAmount || 0,
+        penalty:      data.invoice?.totalPenalty || data.live?.totalPenalty || 0,
+        electricity:  data.invoice?.electricityBill || 0,
         status:       data.invoice?.status,
         payments:     data.payments || [],
         row,
@@ -1011,25 +1028,48 @@ export default function Payment() {
               )}
             </div>
 
-            <div className="px-5 pb-4 flex flex-col gap-2">
-              {historyModal.row && (
-                <button
-                  onClick={() => handleGoToAddTenant(historyModal.row)}
-                  className="w-full h-10 rounded-xl bg-indigo-600 text-white text-[13px] font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
-                >
-                  <Plus className="size-3.5" />
-                  Add as New Tenant
-                </button>
-              )}
+            <div className="px-5 pb-4 flex gap-2">
+              <button
+                onClick={() => {
+                  const hm = historyModal;
+                  const lastPayment = hm.payments?.[0];
+                  setViewingReceipt({
+                    id:          lastPayment?.transactionId || hm.row?.invoice?._id?.toString().slice(-8).toUpperCase() || "RC" + Date.now(),
+                    tenant:      hm.tenantName,
+                    room:        hm.row?.roomNo || "—",
+                    phone:       (hm.row?.phone && hm.row.phone !== "-") ? hm.row.phone : null,
+                    email:       (hm.row?.email && hm.row.email !== "-") ? hm.row.email : null,
+                    date:        lastPayment?.paymentDate
+                      ? new Date(lastPayment.paymentDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                      : new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+                    period:      hm.billingMonth,
+                    amount:      hm.rentAmount || 0,
+                    totalDue:    hm.totalDue   || hm.rentAmount || 0,
+                    paid:        hm.totalPaid  || 0,
+                    penalty:     hm.penalty    || 0,
+                    electricity: hm.electricity || 0,
+                    type:        "Rent Only",
+                  });
+                }}
+                className="flex-1 h-10 rounded-xl bg-slate-900 text-white text-[13px] font-semibold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"
+              >
+                <Printer className="size-3.5" /> View Receipt
+              </button>
               <button
                 onClick={() => setHistoryModal(null)}
-                className="w-full h-10 rounded-xl border border-border text-[13px] font-medium hover:bg-muted transition-colors"
+                className="flex-1 h-10 rounded-xl border border-border text-[13px] font-medium hover:bg-muted transition-colors"
               >
                 Close
               </button>
             </div>
           </div>
         </div>
+      )}
+      {viewingReceipt && (
+        <RentReceiptModal
+          receipt={viewingReceipt}
+          onClose={() => setViewingReceipt(null)}
+        />
       )}
     </PropertyOwnerLayout>
   );

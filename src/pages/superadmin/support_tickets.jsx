@@ -375,7 +375,7 @@ export default function TicketsSystem() {
         </select>
         <select value={typeF} onChange={e => setTypeF(e.target.value)} className="bg-slate-50 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-600 outline-none border-none focus:ring-2 focus:ring-blue-100">
           <option value="All">All Types</option>
-          {["Tenant Complaint","Owner Complaint","Booking Dispute","Payment Issue","Property Issue","Move-in Issue","Refund Request","Technical Issue"].map(t => <option key={t}>{t}</option>)}
+          {["Tenant Complaint","Owner Complaint","Booking Dispute","Payment Issue","Property Issue","Move-in Issue","Refund Request","Technical Issue","Other"].map(t => <option key={t}>{t}</option>)}
         </select>
         <span className="text-xs font-bold text-slate-400 ml-auto">{filtered.length} tickets</span>
       </div>

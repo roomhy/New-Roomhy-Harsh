@@ -20,6 +20,7 @@ export default function OurPropertyPage() {
   const [nearbyAreas, setNearbyAreas] = useState([]);
   const [allColleges, setAllColleges] = useState([]);
   const [selectedColleges, setSelectedColleges] = useState([]);
+  const [availableCities, setAvailableCities] = useState([]);
   const [priceRange, setPriceRange] = useState({ min: 0, max: 0, average: 0, count: 0 });
   const [propertyNearbyColleges, setPropertyNearbyColleges] = useState({});
   
@@ -81,6 +82,7 @@ export default function OurPropertyPage() {
         const formattedProperties = allProperties.map(p => ({
           id: p._id,
           name: p.name,
+          city: p.city || p.propertyInfo?.city || '',
           location: p.location,
           area: p.locality || p.propertyInfo?.area || '',
           price: p.monthlyRent,
@@ -99,15 +101,19 @@ export default function OurPropertyPage() {
           longitude: p.longitude,
         }));
 
+        // Extract unique cities from all properties for the filter sidebar
+        const cities = [...new Set(formattedProperties.map(p => p.city).filter(Boolean))].sort();
+        setAvailableCities(cities);
+
         // Apply filters quickly
         let filtered = formattedProperties;
-        
+
         if (selectedCity && selectedCity !== 'All Cities') {
-            filtered = filtered.filter(p => 
-              (p.city && p.city.toLowerCase() === selectedCity.toLowerCase()) ||
-              (p.location && p.location.toLowerCase().includes(selectedCity.toLowerCase()))
-            );
-          }
+          filtered = filtered.filter(p =>
+            p.city?.toLowerCase() === selectedCity.toLowerCase() ||
+            p.location?.toLowerCase().includes(selectedCity.toLowerCase())
+          );
+        }
         
         if (selectedArea) {
           filtered = filtered.filter(p => 
@@ -157,26 +163,35 @@ export default function OurPropertyPage() {
           });
         }
         
+        // Apply sort
+        if (sortBy === 'Price: Low to High') {
+          filtered = [...filtered].sort((a, b) => a.price - b.price);
+        } else if (sortBy === 'Price: High to Low') {
+          filtered = [...filtered].sort((a, b) => b.price - a.price);
+        } else if (sortBy === 'Newest First') {
+          filtered = [...filtered].sort((a, b) => (b.id > a.id ? 1 : -1));
+        }
+
         // Store all filtered properties for pagination
         setTotalProperties(filtered);
-        
+
         // Fix: Use the filtered length for accurate pagination counts
         setTotalCount(filtered.length);
-        
+
         // Extract colleges from ALL filtered properties (not just current page)
         const collegesByProperty = {};
         const allCollegesSet = new Set();
-        
+
         filtered.forEach(prop => {
           if (prop.nearbyColleges && prop.nearbyColleges.length > 0) {
             collegesByProperty[prop.id] = prop.nearbyColleges.map(c => c.name || c);
             prop.nearbyColleges.forEach(c => allCollegesSet.add(c.name || c));
           }
         });
-        
+
         setPropertyNearbyColleges(collegesByProperty);
         setAllColleges(Array.from(allCollegesSet).sort());
-        
+
         // Get current page properties
         const indexOfLastProperty = currentPage * propertiesPerPage;
         const indexOfFirstProperty = indexOfLastProperty - propertiesPerPage;
@@ -234,7 +249,7 @@ export default function OurPropertyPage() {
     };
     
     loadData();
-  }, [typeFromUrl, cityFromUrl, searchFromUrl, latitudeFromUrl, longitudeFromUrl, currentPage, selectedCity, selectedType, selectedGender, minPrice, maxPrice, selectedRatings, selectedColleges]);
+  }, [typeFromUrl, cityFromUrl, searchFromUrl, latitudeFromUrl, longitudeFromUrl, currentPage, selectedCity, selectedType, selectedGender, minPrice, maxPrice, selectedRatings, selectedColleges, sortBy]);
 
 
   // Pagination handlers
@@ -379,14 +394,14 @@ export default function OurPropertyPage() {
                   <div className="py-6 border-b border-gray-100">
                     <label className="block text-sm font-bold text-gray-900 mb-4">Location</label>
                     <div className="space-y-4">
-                      {['Indore', 'Jaipur', 'Mumbai', 'Bhopal', 'Delhi'].map(city => (
+                      {(availableCities.length > 0 ? availableCities : ['Indore', 'Jaipur', 'Mumbai', 'Bhopal', 'Delhi']).map(city => (
                         <label key={city} className="flex items-center gap-3 cursor-pointer group">
                           <div className="relative flex items-center justify-center">
-                            <input 
-                              type="checkbox" 
-                              checked={selectedCity === city} 
-                              onChange={() => setSelectedCity(selectedCity === city ? '' : city)} 
-                              className="peer appearance-none w-5 h-5 border-2 border-gray-200 rounded checked:bg-white checked:border-[#EE2A24] transition-all cursor-pointer" 
+                            <input
+                              type="checkbox"
+                              checked={selectedCity === city}
+                              onChange={() => setSelectedCity(selectedCity === city ? '' : city)}
+                              className="peer appearance-none w-5 h-5 border-2 border-gray-200 rounded checked:bg-white checked:border-[#EE2A24] transition-all cursor-pointer"
                             />
                             <div className="absolute w-2.5 h-2.5 bg-[#EE2A24] rounded-sm opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none"></div>
                           </div>
@@ -396,18 +411,52 @@ export default function OurPropertyPage() {
                     </div>
                   </div>
 
-                  {/* Budget Filter - OYO STYLE */}
+                  {/* Budget Filter - Interactive Dual Range */}
                   <div className="py-6 border-b border-gray-100">
                     <label className="block text-sm font-bold text-gray-900 mb-6">Price</label>
                     <div className="px-2">
                       <div className="relative h-1 bg-gray-200 rounded-full mb-6">
-                        <div className="absolute h-full bg-[#EE2A24] rounded-full" style={{ left: '0%', right: '0%' }}></div>
-                        <div className="absolute w-4 h-4 bg-white border-2 border-[#EE2A24] rounded-full -top-1.5 left-[0%] shadow-md"></div>
-                        <div className="absolute w-4 h-4 bg-white border-2 border-[#EE2A24] rounded-full -top-1.5 right-[0%] shadow-md"></div>
+                        <div
+                          className="absolute h-full bg-[#EE2A24] rounded-full"
+                          style={{
+                            left: `${((parseInt(minPrice) || 0) / 50000) * 100}%`,
+                            right: `${100 - ((parseInt(maxPrice) || 50000) / 50000) * 100}%`
+                          }}
+                        ></div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="50000"
+                          step="500"
+                          value={parseInt(minPrice) || 0}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            if (val < (parseInt(maxPrice) || 50000)) {
+                              setMinPrice(val === 0 ? '' : String(val));
+                            }
+                          }}
+                          className="price-range-input"
+                          style={{ zIndex: (parseInt(minPrice) || 0) > 45000 ? 5 : 3 }}
+                        />
+                        <input
+                          type="range"
+                          min="0"
+                          max="50000"
+                          step="500"
+                          value={parseInt(maxPrice) || 50000}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            if (val > (parseInt(minPrice) || 0)) {
+                              setMaxPrice(val === 50000 ? '' : String(val));
+                            }
+                          }}
+                          className="price-range-input"
+                          style={{ zIndex: 4 }}
+                        />
                       </div>
                       <div className="flex justify-between text-xs font-bold text-gray-900">
-                        <span>₹0</span>
-                        <span>₹50,000+</span>
+                        <span>₹{(parseInt(minPrice) || 0).toLocaleString()}</span>
+                        <span>₹{(parseInt(maxPrice) || 50000).toLocaleString()}{!maxPrice ? '+' : ''}</span>
                       </div>
                     </div>
                   </div>

@@ -25,3 +25,8 @@ export function cacheInvalidate(prefix) {
 export function cacheClear() {
   store.clear();
 }
+
+// Aliases matching the getCache/setCache/invalidateCache naming convention used in pages
+export const getCache = cacheGet;
+export const setCache = cacheSet;
+export const invalidateCache = cacheInvalidate;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession, fetchOwnerTenants } from "../../utils/propertyowner";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
 import { 
   FileText, Search, Printer, Mail, IndianRupee, 
   ArrowUpRight, ArrowDownRight, ClipboardList, Plus

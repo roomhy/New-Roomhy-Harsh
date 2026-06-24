@@ -22,6 +22,7 @@ import { LayoutDashboard,
   Search, Lock, ChevronRight, Crown, Zap, Users, BookOpen, FileText, Smartphone, Wallet, PieChart, Shield, Target, Navigation, Megaphone, Coffee, Receipt, Sparkles, LinkIcon, UserPlus, AlertCircle, Calendar, HelpCircle, Building2 } from "lucide-react";
 import { SILVER_NAV, GOLD_NAV } from './navConfig';
 import { fetchOwnerProperties } from "../../utils/propertyowner";
+import { cacheGet, cacheSet, cacheInvalidate } from "../../utils/cache";
 import PropertyOwnerMobileLayout from "./PropertyOwnerMobileLayout";
 
 const DEFAULT_DESKTOP_ITEMS = [
@@ -84,8 +85,7 @@ export function getPropertyOwnerNavConfig(variant = "default") {
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
-const _notifCache = {};
-const _NOTIF_TTL = 30_000;
+const _NOTIF_TTL = 2 * 60 * 1000; // 2 minutes — shared with notifications.jsx page
 
 export default function PropertyOwnerLayout({
   owner,
@@ -104,6 +104,7 @@ export default function PropertyOwnerLayout({
   disableSubmenuStrip = false,
   rooms,
   loading,
+  skipNotificationFetch = false,
 }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -153,38 +154,40 @@ export default function PropertyOwnerLayout({
   const [globalNotifications, setGlobalNotifications] = useState([]);
   
   useEffect(() => {
-    if (owner?.loginId) {
-      const fetchNotifs = async () => {
-        const cacheKey = `notifs_${owner.loginId}`;
-        const cached = _notifCache[cacheKey];
-        if (cached && Date.now() - cached.ts < _NOTIF_TTL) {
-          setGlobalNotifications(cached.data);
-          return;
+    if (!owner?.loginId) return;
+    // If the dashboard (or parent page) already passed notifications via props, use them
+    // and skip the independent API call — the dashboard aggregation already fetched them.
+    if (skipNotificationFetch) return;
+    const fetchNotifs = async () => {
+      const cacheKey = `notifications:${owner.loginId}`;
+      const cached = cacheGet(cacheKey);
+      if (cached) {
+        setGlobalNotifications(cached);
+        return;
+      }
+      try {
+        const { fetchJson } = await import("../../utils/api");
+        const res = await fetchJson(`/api/notifications?toLoginId=${encodeURIComponent(owner.loginId)}`);
+        if (Array.isArray(res)) {
+          const formatted = res.map(n => {
+            const meta = typeof n.meta === 'string' ? JSON.parse(n.meta) : (n.meta || {});
+            return {
+              ...n,
+              title: meta.title || n.title || "Notification",
+              message: meta.message || n.message || "",
+              type: n.type || "system",
+              meta: meta
+            };
+          });
+          cacheSet(cacheKey, formatted, _NOTIF_TTL);
+          setGlobalNotifications(formatted);
         }
-        try {
-          const { fetchJson } = await import("../../utils/api");
-          const res = await fetchJson(`/api/notifications?toLoginId=${encodeURIComponent(owner.loginId)}`);
-          if (Array.isArray(res)) {
-            const formatted = res.map(n => {
-              const meta = typeof n.meta === 'string' ? JSON.parse(n.meta) : (n.meta || {});
-              return {
-                ...n,
-                title: meta.title || n.title || "Notification",
-                message: meta.message || n.message || "",
-                type: n.type || "system",
-                meta: meta
-              };
-            });
-            _notifCache[cacheKey] = { data: formatted, ts: Date.now() };
-            setGlobalNotifications(formatted);
-          }
-        } catch (e) {
-          console.error("Failed to fetch global notifications", e);
-        }
-      };
-      fetchNotifs();
-    }
-  }, [owner?.loginId]);
+      } catch (e) {
+        console.error("Failed to fetch global notifications", e);
+      }
+    };
+    fetchNotifs();
+  }, [owner?.loginId, skipNotificationFetch]);
 
   const displayNotifications = globalNotifications.length > 0 ? globalNotifications : notifications;
   const displayNotificationCount = globalNotifications.length > 0 
@@ -754,12 +757,13 @@ export default function PropertyOwnerLayout({
                   {displayNotifications.length > 0 && (
                     <button 
                       onClick={async () => {
-                        // Clear notifications visually
+                        // Clear notifications visually and invalidate shared cache
                         setGlobalNotifications([]);
                         if (owner?.loginId) {
+                          cacheInvalidate(`notifications:${owner.loginId}`);
                           try {
                             const { fetchJson } = await import("../../utils/api");
-                            await fetchJson(`/api/notifications/mark-all-read`, { 
+                            await fetchJson(`/api/notifications/mark-all-read`, {
                                 method: 'PUT',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ toLoginId: owner.loginId })

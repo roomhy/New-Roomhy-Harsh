@@ -12,8 +12,8 @@ export default function OwnerProfile() {
     return null; 
   }
 
-  const [name, setName] = useState(owner.name || owner.profile?.name || "Akash Gupta");
-  const [email, setEmail] = useState(owner.email || owner.profile?.email || "ad4012507@gmail.com");
+  const [name, setName] = useState(owner.name || owner.profile?.name || "");
+  const [email, setEmail] = useState(owner.email || owner.profile?.email || "");
   const [phone, setPhone] = useState(owner.phone || owner.profile?.phone || "");
   const [address, setAddress] = useState(owner.address || owner.profile?.address || "");
   const [success, setSuccess] = useState("");

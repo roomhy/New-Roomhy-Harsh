@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { 
-  Building2, Users, Shield, Clock, Search, 
-  ArrowUpRight, ArrowDownRight, MoreVertical, 
-  Filter, Globe, MapPin, Zap, Sheet, Trash2, 
-  ChevronRight, Phone, Mail, User, RefreshCw,
+  Building2, Users, Shield, Clock, Search,
+  ArrowUpRight, ArrowDownRight, MoreVertical,
+  Filter, Globe, MapPin, Zap, Sheet, Trash2,
+  ChevronRight, ChevronLeft, Phone, Mail, User, RefreshCw,
   LayoutGrid, CreditCard, Wallet, Download, Loader2,
   ShieldCheck, Banknote, Map, X, CheckCircle2, AlertCircle,
   Calendar, Fingerprint, Landmark, CreditCard as CardIcon,
@@ -676,7 +676,7 @@ export default function Owner() {
               <div className="px-10 py-10 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
                  <div className="flex items-center gap-6">
                     <div className="w-20 h-20 rounded-3xl bg-slate-900 text-white flex items-center justify-center font-bold text-3xl shadow-2xl">
-                       {selectedOwner.name?.[0].toUpperCase()}
+                       {selectedOwner.name?.[0]?.toUpperCase() ?? "?"}
                     </div>
                     <div>
                        <h3 className="text-3xl font-bold text-slate-800 tracking-tight">{selectedOwner.name}</h3>

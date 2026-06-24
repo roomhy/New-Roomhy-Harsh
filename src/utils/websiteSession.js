@@ -24,6 +24,10 @@ export const getStoredWebsiteToken = () => {
     return (
       localStorage.getItem(WEBSITE_TOKEN_KEY) ||
       sessionStorage.getItem(WEBSITE_TOKEN_KEY) ||
+      localStorage.getItem(ACCESS_TOKEN_KEY) ||
+      sessionStorage.getItem(ACCESS_TOKEN_KEY) ||
+      localStorage.getItem(TOKEN_KEY) ||
+      sessionStorage.getItem(TOKEN_KEY) ||
       ""
     );
   } catch {
@@ -44,10 +48,11 @@ const normalizeWebsiteUser = (user) => {
 
 export const getWebsiteUser = () => {
   try {
-    // Only read website-specific keys — ignore generic 'user'/'userData' used by superadmin/staff
     const user =
       safeParse(localStorage.getItem(WEBSITE_USER_KEY)) ||
       safeParse(sessionStorage.getItem(WEBSITE_USER_KEY)) ||
+      safeParse(localStorage.getItem(USER_KEY)) ||
+      safeParse(sessionStorage.getItem(USER_KEY)) ||
       null;
     return normalizeWebsiteUser(user);
   } catch {
@@ -60,13 +65,18 @@ export const setWebsiteSession = (user, token) => {
   if (!normalized) return null;
   const safeToken = (token || "").toString().trim();
   try {
-    // Only write to website-specific keys — do NOT touch generic 'user'/'token' keys
     localStorage.setItem(WEBSITE_USER_KEY, JSON.stringify(normalized));
     sessionStorage.setItem(WEBSITE_USER_KEY, JSON.stringify(normalized));
+    localStorage.setItem(USER_KEY, JSON.stringify(normalized));
+    sessionStorage.setItem(USER_KEY, JSON.stringify(normalized));
 
     if (safeToken) {
       localStorage.setItem(WEBSITE_TOKEN_KEY, safeToken);
       sessionStorage.setItem(WEBSITE_TOKEN_KEY, safeToken);
+      localStorage.setItem(ACCESS_TOKEN_KEY, safeToken);
+      sessionStorage.setItem(ACCESS_TOKEN_KEY, safeToken);
+      localStorage.setItem(TOKEN_KEY, safeToken);
+      sessionStorage.setItem(TOKEN_KEY, safeToken);
     }
   } catch (error) {
     console.error("Failed to store website session:", error);
@@ -76,11 +86,15 @@ export const setWebsiteSession = (user, token) => {
 
 export const clearWebsiteSession = () => {
   try {
-    // Only clear website-specific keys
-    localStorage.removeItem(WEBSITE_USER_KEY);
-    sessionStorage.removeItem(WEBSITE_USER_KEY);
-    localStorage.removeItem(WEBSITE_TOKEN_KEY);
-    sessionStorage.removeItem(WEBSITE_TOKEN_KEY);
+    const keys = [
+      WEBSITE_USER_KEY, WEBSITE_TOKEN_KEY, ACCESS_TOKEN_KEY, TOKEN_KEY, USER_KEY,
+      "staff_user", "staff_token", "manager_user", "owner_user",
+      "owner_session", "tenant_user", "userData"
+    ];
+    keys.forEach((k) => {
+      localStorage.removeItem(k);
+      sessionStorage.removeItem(k);
+    });
   } catch (error) {
     console.error("Failed to clear website session:", error);
   }

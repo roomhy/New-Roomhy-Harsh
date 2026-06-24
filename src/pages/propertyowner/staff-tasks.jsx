@@ -6,7 +6,7 @@ import {
   X, Trash2, ChevronDown, Building2, User, Calendar, Flag,
   Circle, PlayCircle, CheckCircle, XCircle, Filter
 } from "lucide-react";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
 
 const STATUS_CONFIG = {
   Pending:     { color: "bg-amber-100 text-amber-700 border-amber-200",    dot: "bg-amber-500",   icon: Circle },

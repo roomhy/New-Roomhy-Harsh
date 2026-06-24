@@ -5,7 +5,7 @@ import {
   Users, Search, ShieldCheck, MapPin, 
   Clock, CheckCircle2, PlayCircle, LogIn, LogOut
 } from "lucide-react";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
 
 export default function TenantAttendancePage() {
   const owner = getOwnerRuntimeSession();

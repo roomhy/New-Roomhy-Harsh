@@ -251,13 +251,15 @@ export default function Manager() {
 
     setEmployees(Array.isArray(merged) ? merged : []);
     try {
-      localStorage.setItem("roomhy_employees_cache", JSON.stringify(merged));
+      const safeCache = (Array.isArray(merged) ? merged : []).map(
+        ({ password: _pw, ...rest }) => rest
+      );
+      localStorage.setItem("roomhy_employees_cache", JSON.stringify(safeCache));
     } catch (_) {}
 
     try {
       const loginCredsArray = (Array.isArray(merged) ? merged : []).map((emp) => ({
         loginId: emp.loginId,
-        password: emp.password,
         name: emp.name,
         role: emp.role || "employee",
         team: emp.role || emp.team || "Employee",
@@ -518,27 +520,6 @@ export default function Manager() {
       if (res.ok) {
         await syncEmployeesFromBackend();
         closeEmployeeModal();
-
-        try {
-          const existingEmployees = JSON.parse(localStorage.getItem("roomhy_employees") || "[]");
-          const filtered = existingEmployees.filter((e) => (e.loginId || "").toUpperCase() !== finalLoginId.toUpperCase());
-          const newEmployee = {
-            loginId: finalLoginId,
-            password,
-            name,
-            email: email || "",
-            phone: phone || "",
-            role: finalRole,
-            team: finalRole,
-            area: area || "",
-            areaName: area || "",
-            areaCode: areaCode || "",
-            permissions: Array.from(selectedPerms),
-            createdAt: new Date().toISOString()
-          };
-          filtered.push(newEmployee);
-          localStorage.setItem("roomhy_employees", JSON.stringify(filtered));
-        } catch (_) {}
 
         setCredsData({ loginId: finalLoginId, password });
         setShowCredModal(true);

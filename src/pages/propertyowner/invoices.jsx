@@ -1,16 +1,19 @@
-import React from "react";
+import React, { useState } from "react";
+import toast from "react-hot-toast";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
-import { 
-  FileText, Search, Download, CheckCircle2, 
-  Eye, ShieldCheck, IndianRupee
+import {
+  FileText, Download, CheckCircle2,
+  Eye, ShieldCheck, IndianRupee, Loader2
 } from "lucide-react";
 
 export default function InvoicesPage() {
+  const [downloading, setDownloading] = useState({});
+
   const owner = getOwnerRuntimeSession();
-  if (!owner?.loginId && typeof window !== "undefined") { 
-    window.location.href = "/propertyowner/ownerlogin"; 
-    return null; 
+  if (!owner?.loginId && typeof window !== "undefined") {
+    window.location.href = "/propertyowner/ownerlogin";
+    return null;
   }
 
   const items = [
@@ -18,10 +21,31 @@ export default function InvoicesPage() {
     { name: "Roomhy Gold Software Subscription (April)", invoiceNo: "INV-2026-8022", date: "15 April 2026", amount: 4999 }
   ];
 
+  const downloadInvoice = async (invoiceNo) => {
+    setDownloading(prev => ({ ...prev, [invoiceNo]: true }));
+    try {
+      const res = await fetch(`/api/invoices/${encodeURIComponent(invoiceNo)}/pdf`);
+      if (!res.ok) throw new Error(`Server error (${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `invoice_${invoiceNo}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(err.message || "Failed to download invoice. Please try again.");
+    } finally {
+      setDownloading(prev => ({ ...prev, [invoiceNo]: false }));
+    }
+  };
+
   return (
-    <PropertyOwnerLayout 
-      owner={owner} 
-      title="Software Tax Invoices" 
+    <PropertyOwnerLayout
+      owner={owner}
+      title="Software Tax Invoices"
       onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
     >
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
@@ -52,8 +76,16 @@ export default function InvoicesPage() {
                   <td className="px-6 py-4 text-muted-foreground">{i.date}</td>
                   <td className="px-6 py-4 font-bold text-slate-850">₹{i.amount.toLocaleString("en-IN")}</td>
                   <td className="px-6 py-4 text-right space-x-2">
-                    <button onClick={() => alert("Downloading invoice...")} className="size-8 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors">
-                      <Download size={14} />
+                    <button
+                      onClick={() => downloadInvoice(i.invoiceNo)}
+                      disabled={!!downloading[i.invoiceNo]}
+                      title="Download PDF"
+                      className="size-8 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {downloading[i.invoiceNo]
+                        ? <Loader2 size={14} className="animate-spin" />
+                        : <Download size={14} />
+                      }
                     </button>
                   </td>
                 </tr>

@@ -5,7 +5,7 @@ import {
   DoorOpen, ShieldCheck, ToggleLeft, ToggleRight, 
   Clock, AlertTriangle, AlertCircle, Plus, Trash2
 } from "lucide-react";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
 
 export default function GateManagementPage() {
   const owner = getOwnerRuntimeSession();

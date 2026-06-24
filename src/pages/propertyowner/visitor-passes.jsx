@@ -5,7 +5,7 @@ import {
   QrCode, Search, Trash2, CheckCircle2, 
   AlertCircle, Calendar, Plus
 } from "lucide-react";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
 
 export default function VisitorPassesPage() {
   const owner = getOwnerRuntimeSession();

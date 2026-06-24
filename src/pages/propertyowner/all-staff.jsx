@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
 import {
@@ -6,7 +6,8 @@ import {
   Building2, Clock, Shield, MoreVertical, X, TrendingUp,
   Briefcase, UserCheck, UserX, Filter, ChevronDown, Eye, Edit3, Power
 } from "lucide-react";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
+import { cacheGet, cacheSet } from "../../utils/cache";
 
 const ROLE_COLORS = {
   Warden: "bg-blue-100 text-blue-700",
@@ -28,6 +29,18 @@ const ROLE_AVATAR_BG = {
   Custom: "bg-slate-600",
 };
 
+const StatCard = ({ icon: Icon, label, value, color }) => (
+  <div className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center gap-4 shadow-sm hover:shadow-md transition-all">
+    <div className={`w-12 h-12 rounded-2xl ${color} flex items-center justify-center shrink-0`}>
+      <Icon size={22} className="text-white" />
+    </div>
+    <div>
+      <p className="text-2xl font-black text-slate-900 leading-none">{value}</p>
+      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-1">{label}</p>
+    </div>
+  </div>
+);
+
 export default function AllStaffPage() {
   const owner = getOwnerRuntimeSession();
   if (!owner?.loginId && typeof window !== "undefined") {
@@ -44,8 +57,19 @@ export default function AllStaffPage() {
   const [detailStaff, setDetailStaff] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
 
-  const fetchStaff = useCallback(async () => {
-    setLoading(true);
+  const fetchStaff = useCallback(async ({ silent = false } = {}) => {
+    const CACHE_KEY = `staff:${owner.loginId}`;
+    if (!silent) {
+      const cached = cacheGet(CACHE_KEY);
+      if (cached) {
+        setStaff(cached.staff);
+        setStats(cached.stats);
+        setLoading(false);
+        fetchStaff({ silent: true });
+        return;
+      }
+      setLoading(true);
+    }
     try {
       const [empData, statsData, shiftsData] = await Promise.allSettled([
         apiFetch(`/api/employees?parentLoginId=${owner.loginId}`),
@@ -79,17 +103,19 @@ export default function AllStaffPage() {
         address: e.address || "",
       }));
 
-      setStaff(mapped);
-      setStats({
+      const newStats = {
         total: statsRes.total || mapped.length,
         active: statsRes.active || mapped.filter(s => s.status === "Active").length,
         inactive: statsRes.inactive || mapped.filter(s => s.status === "Inactive").length,
         presentToday: statsRes.presentToday || 0,
-      });
+      };
+      setStaff(mapped);
+      setStats(newStats);
+      cacheSet(`staff:${owner.loginId}`, { staff: mapped, stats: newStats }, 2 * 60 * 1000);
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [owner.loginId]);
 
@@ -111,26 +137,14 @@ export default function AllStaffPage() {
     finally { setActionLoading(null); }
   };
 
-  const roles = ["All", ...Array.from(new Set(staff.map(s => s.role)))];
-  const filtered = staff.filter(s => {
+  const roles = useMemo(() => ["All", ...Array.from(new Set(staff.map(s => s.role)))], [staff]);
+  const filtered = useMemo(() => staff.filter(s => {
     const q = search.toLowerCase();
     const matchSearch = !q || s.name.toLowerCase().includes(q) || s.role.toLowerCase().includes(q) || s.loginId.toLowerCase().includes(q) || s.phone.includes(q);
     const matchRole = roleFilter === "All" || s.role === roleFilter;
     const matchStatus = statusFilter === "All" || s.status === statusFilter;
     return matchSearch && matchRole && matchStatus;
-  });
-
-  const StatCard = ({ icon: Icon, label, value, color }) => (
-    <div className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center gap-4 shadow-sm hover:shadow-md transition-all">
-      <div className={`w-12 h-12 rounded-2xl ${color} flex items-center justify-center shrink-0`}>
-        <Icon size={22} className="text-white" />
-      </div>
-      <div>
-        <p className="text-2xl font-black text-slate-900 leading-none">{value}</p>
-        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-1">{label}</p>
-      </div>
-    </div>
-  );
+  }), [staff, search, roleFilter, statusFilter]);
 
   return (
     <PropertyOwnerLayout

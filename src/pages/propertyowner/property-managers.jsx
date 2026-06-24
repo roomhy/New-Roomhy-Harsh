@@ -16,6 +16,7 @@ export default function PropertyManagers() {
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [selectedManager, setSelectedManager] = useState(null);
   const [creatingManager, setCreatingManager] = useState(false);
+  const [resetPasswordModal, setResetPasswordModal] = useState({ open: false, password: "", copied: false });
   const [managerForm, setManagerForm] = useState({
     name: "",
     email: "",
@@ -150,10 +151,22 @@ export default function PropertyManagers() {
       const data = await response.json();
       if (!data.success) throw new Error(data.message);
       
-      alert(`New Password: ${data.newPassword}\n\nPlease save this password and share with the manager.`);
+      setResetPasswordModal({ open: true, password: data.newPassword, copied: false });
     } catch (e) {
       setErrorMsg(e?.message || "Failed to reset password");
     }
+  };
+
+  const handleCloseResetModal = () => {
+    setResetPasswordModal({ open: false, password: "", copied: false });
+  };
+
+  const handleCopyResetPassword = async () => {
+    try {
+      await navigator.clipboard.writeText(resetPasswordModal.password);
+      setResetPasswordModal((prev) => ({ ...prev, copied: true }));
+      setTimeout(() => setResetPasswordModal((prev) => ({ ...prev, copied: false })), 2000);
+    } catch (_) {}
   };
 
   return (
@@ -423,11 +436,56 @@ export default function PropertyManagers() {
               ⚠️ Please save these credentials. The password will not be shown again!
             </p>
             <button
-              onClick={() => setDetailsModalOpen(false)}
+              onClick={() => { setDetailsModalOpen(false); setSelectedManager(null); }}
               className="w-full h-10 rounded-lg bg-foreground text-background text-[13px] font-medium hover:opacity-90"
             >
               Close
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Reset Password Modal */}
+      <div
+        className={cn(
+          "fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/60 backdrop-blur-sm transition-all",
+          resetPasswordModal.open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+      >
+        <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div className="p-6 border-b border-border flex justify-between items-center">
+            <h2 className="text-[18px] font-semibold text-foreground">Password Reset</h2>
+            <button
+              onClick={handleCloseResetModal}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+              <p className="text-[11px] text-emerald-600 font-medium mb-1">New Password</p>
+              <p className="text-[18px] font-mono font-bold text-emerald-900 break-all">
+                {resetPasswordModal.password}
+              </p>
+            </div>
+            <p className="text-[12px] text-destructive font-medium">
+              ⚠️ This password will only be shown once. Please save it before closing.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleCopyResetPassword}
+                className="flex-1 h-10 rounded-lg border border-border bg-card text-[13px] font-medium hover:bg-muted"
+              >
+                {resetPasswordModal.copied ? "Copied!" : "Copy Password"}
+              </button>
+              <button
+                onClick={handleCloseResetModal}
+                className="flex-1 h-10 rounded-lg bg-foreground text-background text-[13px] font-medium hover:opacity-90"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       </div>

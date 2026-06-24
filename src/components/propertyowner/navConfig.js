@@ -67,6 +67,8 @@ export const PROPERTY_OWNER_NAV = [
     icon: IndianRupee,
     href: "/propertyowner/payment",
     submenus: [
+      { label: "Revenue Overview", href: "/propertyowner/revenue-overview", goldOnly: false },
+      { label: "Revenue Analytics", href: "/propertyowner/revenue-analytics", goldOnly: false },
       { label: "Rent Collection", href: "/propertyowner/payment", goldOnly: false },
       { label: "Pending Dues", href: "/propertyowner/dues-report", goldOnly: false },
       { label: "Late Payments", href: "/propertyowner/late-fine", goldOnly: false },
@@ -155,6 +157,7 @@ export const PROPERTY_OWNER_NAV = [
     submenus: [
       { label: "Profile Settings", href: "/propertyowner/ownerprofile", goldOnly: false },
       { label: "Bank Accounts", href: "/propertyowner/bank-accounts", goldOnly: false },
+      { label: "Data Backup", href: "/propertyowner/settings#backup", goldOnly: false },
     ]
   }
 ];

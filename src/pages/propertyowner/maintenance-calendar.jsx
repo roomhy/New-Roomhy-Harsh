@@ -1,137 +1,333 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
-import { 
-  Calendar, Clock, CheckCircle2, ChevronRight, 
-  MapPin, User, ChevronLeft, Plus
+import { fetchJson } from "../../utils/api";
+import { cacheGet, cacheSet, cacheInvalidate } from "../../utils/cache";
+import toast from "react-hot-toast";
+import {
+  Calendar, Clock, ChevronRight, User, ChevronLeft, Plus, X, Loader2, Trash2, AlertCircle
 } from "lucide-react";
-import { apiFetch } from "../../services/api";
+
+const FREQUENCIES = ["One-time", "Daily", "Weekly", "Monthly", "Quarterly", "Bi-Annually", "Yearly"];
+
+const STATUS_COLORS = {
+  Scheduled:   "bg-blue-50 text-blue-600 border-blue-100",
+  "In Progress": "bg-amber-50 text-amber-600 border-amber-100",
+  Completed:   "bg-emerald-50 text-emerald-600 border-emerald-100",
+  Cancelled:   "bg-slate-100 text-slate-500 border-slate-200",
+};
 
 export default function MaintenanceCalendarPage() {
   const owner = getOwnerRuntimeSession();
-  if (!owner?.loginId && typeof window !== "undefined") { 
-    window.location.href = "/propertyowner/ownerlogin"; 
-    return null; 
+  if (!owner?.loginId && typeof window !== "undefined") {
+    window.location.href = "/propertyowner/ownerlogin";
+    return null;
   }
 
-  const [currentMonth, setCurrentMonth] = useState(() => {
-    return new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  });
-
-  const [routines, setRoutines] = useState([]);
+  const today = new Date();
+  const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDay, setSelectedDay] = useState(null);
 
-  React.useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const data = await apiFetch(`/api/maintenance/owner/${owner.loginId}`);
-        if (data && data.tasks) {
-          const upcoming = data.tasks
-            .filter(t => t.status !== "Completed")
-            .map(t => ({
-              id: t._id,
-              title: t.title,
-              date: t.scheduledDate || "TBD",
-              time: "10:00 AM", // default since time isn't stored separately
-              staff: t.assignedStaffName || t.staff || "Unassigned",
-              status: t.status
-            }));
-          setRoutines(upcoming);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [form, setForm] = useState({ title: "", scheduledDate: "", frequency: "One-time", staff: "" });
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(null);
+
+  const fetchTasks = async () => {
+    const CACHE_KEY = `maintenance:${owner.loginId}`;
+    const cached = cacheGet(CACHE_KEY);
+    if (cached) { setTasks(cached); setLoading(false); return; }
+    try {
+      const data = await fetchJson(`/api/maintenance/owner/${owner.loginId}`);
+      const tasks = data?.tasks || [];
+      setTasks(tasks);
+      cacheSet(CACHE_KEY, tasks, 2 * 60 * 1000);
+    } catch {
+      toast.error("Failed to load maintenance tasks.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchTasks(); }, [owner.loginId]);
+
+  // Calendar helpers
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const monthLabel = viewDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0=Sun
+
+  // Map: day number → tasks for this month
+  const tasksByDay = useMemo(() => {
+    const map = {};
+    tasks.forEach(t => {
+      if (!t.scheduledDate) return;
+      const d = new Date(t.scheduledDate);
+      if (d.getFullYear() === year && d.getMonth() === month) {
+        const day = d.getDate();
+        if (!map[day]) map[day] = [];
+        map[day].push(t);
       }
-    };
-    fetchTasks();
-  }, [owner.loginId]);
+    });
+    return map;
+  }, [tasks, year, month]);
+
+  // Tasks for the selected day or all upcoming if none selected
+  const visibleTasks = useMemo(() => {
+    if (selectedDay) return tasksByDay[selectedDay] || [];
+    return tasks
+      .filter(t => t.status !== "Completed" && t.status !== "Cancelled")
+      .sort((a, b) => new Date(a.scheduledDate) - new Date(b.scheduledDate))
+      .slice(0, 10);
+  }, [selectedDay, tasksByDay, tasks]);
+
+  const prevMonth = () => {
+    setViewDate(new Date(year, month - 1, 1));
+    setSelectedDay(null);
+  };
+  const nextMonth = () => {
+    setViewDate(new Date(year, month + 1, 1));
+    setSelectedDay(null);
+  };
+
+  const openAdd = () => {
+    const prefill = selectedDay
+      ? `${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`
+      : "";
+    setForm({ title: "", scheduledDate: prefill, frequency: "One-time", staff: "" });
+    setModalOpen(true);
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!form.title.trim()) { toast.error("Task title is required."); return; }
+    if (!form.scheduledDate) { toast.error("Date is required."); return; }
+    setSaving(true);
+    try {
+      await fetchJson("/api/maintenance", {
+        method: "POST",
+        body: JSON.stringify({
+          ownerLoginId: owner.loginId,
+          title: form.title.trim(),
+          scheduledDate: form.scheduledDate,
+          frequency: form.frequency,
+          staff: form.staff.trim() || "TBD",
+        }),
+      });
+      toast.success("Task added!");
+      setModalOpen(false);
+      cacheInvalidate(`maintenance:`);
+      await fetchTasks();
+    } catch {
+      toast.error("Failed to add task.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (taskId) => {
+    setDeleting(taskId);
+    try {
+      await fetchJson(`/api/maintenance/${taskId}`, { method: "DELETE" });
+      toast.success("Task deleted.");
+      setTasks(prev => prev.filter(t => t._id !== taskId));
+    } catch {
+      toast.error("Failed to delete task.");
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   return (
-    <PropertyOwnerLayout 
-      owner={owner} 
-      title="Routines Calendar" 
+    <PropertyOwnerLayout
+      owner={owner}
+      title="Maintenance Calendar"
       onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
     >
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
         <div>
           <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Maintenance Calendar</h1>
-          <p className="mt-1.5 text-[13.5px] text-muted-foreground">Plan and track periodic repairs, safety tests, and housekeeping routines.</p>
+          <p className="mt-1.5 text-[13.5px] text-muted-foreground">Plan and track repairs, safety tests, and housekeeping routines.</p>
         </div>
-        <div className="flex items-center gap-2 md:mt-2">
-          <button onClick={() => alert("Add Event functionality coming soon...")} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-foreground text-background text-[13px] font-medium hover:opacity-90 transition-opacity">
-            <Plus className="size-4" /> Add Event
-          </button>
-        </div>
+        <button onClick={openAdd} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-foreground text-background text-[13px] font-medium hover:opacity-90 transition-opacity self-start md:mt-2">
+          <Plus className="size-4" /> Add Task
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Calendar View Mock */}
+
+        {/* Calendar */}
         <div className="lg:col-span-8 bg-card border border-border rounded-2xl p-6 shadow-soft">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="font-serif text-[20px] text-foreground">{currentMonth}</h3>
+            <h3 className="font-serif text-[20px] text-foreground">{monthLabel}</h3>
             <div className="flex gap-2">
-              <button className="p-2 border border-border rounded-xl hover:bg-muted/50">
-                <ChevronLeft size={16} />
-              </button>
-              <button className="p-2 border border-border rounded-xl hover:bg-muted/50">
-                <ChevronRight size={16} />
-              </button>
+              <button onClick={prevMonth} className="p-2 border border-border rounded-xl hover:bg-muted/50"><ChevronLeft size={16} /></button>
+              <button onClick={nextMonth} className="p-2 border border-border rounded-xl hover:bg-muted/50"><ChevronRight size={16} /></button>
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-2 text-center text-xs font-bold text-muted-foreground uppercase border-b border-border/60 pb-3 mb-3">
-            <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+          <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-bold text-muted-foreground uppercase border-b border-border/60 pb-3 mb-3">
+            {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => <span key={d}>{d}</span>)}
           </div>
 
-          <div className="grid grid-cols-7 gap-2">
-            {Array.from({ length: 31 }, (_, i) => {
+          <div className="grid grid-cols-7 gap-1.5">
+            {/* Empty cells before first day */}
+            {Array.from({ length: firstDayOfWeek }, (_, i) => (
+              <div key={`empty-${i}`} className="h-14" />
+            ))}
+            {/* Day cells */}
+            {Array.from({ length: daysInMonth }, (_, i) => {
               const day = i + 1;
-              const hasRoutine = day === 22 || day === 25;
+              const dayTasks = tasksByDay[day] || [];
+              const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+              const isSelected = day === selectedDay;
               return (
-                <div 
-                  key={i} 
-                  className={`h-16 rounded-xl border flex flex-col justify-between p-2 transition-all ${
-                    hasRoutine 
-                      ? "border-blue-200 bg-blue-50/20" 
-                      : "border-border/40 hover:bg-muted/20"
-                  }`}
+                <button
+                  key={day}
+                  onClick={() => setSelectedDay(isSelected ? null : day)}
+                  className={`h-14 rounded-xl border flex flex-col items-center justify-start pt-1.5 gap-1 transition-all text-left
+                    ${isSelected ? "border-blue-400 bg-blue-50 ring-1 ring-blue-300"
+                    : isToday ? "border-blue-200 bg-blue-50/30"
+                    : dayTasks.length > 0 ? "border-amber-200 bg-amber-50/20 hover:bg-amber-50/40"
+                    : "border-border/40 hover:bg-muted/20"}`}
                 >
-                  <span className={`text-xs font-bold ${hasRoutine ? "text-blue-600" : "text-slate-500"}`}>{day}</span>
-                  {hasRoutine && (
-                    <span className="w-2 h-2 rounded-full bg-blue-600 self-center mb-1" />
+                  <span className={`text-[11px] font-bold ${isSelected || isToday ? "text-blue-600" : dayTasks.length > 0 ? "text-amber-700" : "text-slate-500"}`}>
+                    {day}
+                  </span>
+                  {dayTasks.length > 0 && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
+
+          {selectedDay && (
+            <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {tasksByDay[selectedDay]?.length || 0} task{tasksByDay[selectedDay]?.length !== 1 ? "s" : ""} on {selectedDay} {monthLabel}
+              </p>
+              <button onClick={() => setSelectedDay(null)} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
+            </div>
+          )}
         </div>
 
-        {/* Schedule List */}
+        {/* Side panel */}
         <div className="lg:col-span-4 space-y-6">
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-soft space-y-6">
-            <h3 className="font-serif text-[18px] text-foreground">Upcoming Routines</h3>
-            <div className="space-y-4">
-              {loading ? (
-                <div className="text-center py-6 text-sm text-muted-foreground">Loading schedule...</div>
-              ) : routines.length === 0 ? (
-                <div className="text-center py-6 text-sm text-muted-foreground">No upcoming routines.</div>
-              ) : routines.map((item, idx) => (
-                <div key={item.id} className="border border-border p-4 rounded-xl space-y-3 bg-muted/10">
-                  <div className="flex justify-between items-start">
-                    <h4 className="text-[13px] font-bold text-slate-800 leading-snug">{item.title}</h4>
-                    <span className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">{item.status}</span>
+          <div className="bg-card border border-border rounded-2xl p-6 shadow-soft">
+            <h3 className="font-serif text-[18px] text-foreground mb-4">
+              {selectedDay ? `Tasks — ${selectedDay} ${monthLabel}` : "Upcoming Tasks"}
+            </h3>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="animate-spin text-muted-foreground" size={24} />
+              </div>
+            ) : visibleTasks.length === 0 ? (
+              <div className="text-center py-8">
+                <Calendar className="w-10 h-10 text-muted-foreground/40 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  {selectedDay ? "No tasks on this day." : "No upcoming tasks."}
+                </p>
+                <button onClick={openAdd} className="mt-3 text-xs font-bold text-blue-600 hover:text-blue-800">+ Add one</button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {visibleTasks.map((item) => (
+                  <div key={item._id} className="border border-border p-3.5 rounded-xl bg-muted/10 space-y-2">
+                    <div className="flex justify-between items-start gap-2">
+                      <p className="text-[13px] font-bold text-slate-800 leading-snug">{item.title}</p>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${STATUS_COLORS[item.status] || STATUS_COLORS.Scheduled}`}>
+                          {item.status}
+                        </span>
+                        <button
+                          onClick={() => handleDelete(item._id)}
+                          disabled={deleting === item._id}
+                          className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
+                        >
+                          {deleting === item._id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-1 text-[11px] text-muted-foreground">
+                      <p className="flex items-center gap-1.5">
+                        <Clock size={11} />
+                        {item.scheduledDate ? new Date(item.scheduledDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "TBD"}
+                        {item.frequency && item.frequency !== "One-time" && <span className="ml-1 text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{item.frequency}</span>}
+                      </p>
+                      <p className="flex items-center gap-1.5"><User size={11} /> {item.assignedStaffName || item.staff || "Unassigned"}</p>
+                    </div>
                   </div>
-                  <div className="space-y-1 text-xs text-muted-foreground">
-                    <p className="flex items-center gap-1.5"><Clock size={12} /> {item.date}</p>
-                    <p className="flex items-center gap-1.5"><User size={12} /> {item.staff}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Add Task Modal */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h2 className="text-[16px] font-bold text-slate-800">Add Maintenance Task</h2>
+              <button onClick={() => setModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleSave} className="p-6 space-y-4">
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">Work to be done <span className="text-rose-500">*</span></label>
+                <input
+                  required
+                  value={form.title}
+                  onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+                  placeholder="e.g. Plumbing check in Block A"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">Date <span className="text-rose-500">*</span></label>
+                <input
+                  required
+                  type="date"
+                  value={form.scheduledDate}
+                  onChange={e => setForm(p => ({ ...p, scheduledDate: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">Frequency</label>
+                <select
+                  value={form.frequency}
+                  onChange={e => setForm(p => ({ ...p, frequency: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                >
+                  {FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">Assigned Staff <span className="text-slate-400 font-normal">(optional)</span></label>
+                <input
+                  value={form.staff}
+                  onChange={e => setForm(p => ({ ...p, staff: e.target.value }))}
+                  placeholder="e.g. Ramesh Kumar"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={saving}
+                className="w-full h-11 rounded-xl bg-slate-900 text-white text-[13px] font-semibold hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {saving ? <><Loader2 size={16} className="animate-spin" /> Saving...</> : "Add Task"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </PropertyOwnerLayout>
   );
 }

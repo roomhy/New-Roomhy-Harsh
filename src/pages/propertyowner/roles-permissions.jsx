@@ -5,7 +5,8 @@ import {
   ShieldCheck, Search, Plus, ToggleLeft, ToggleRight, 
   Settings, CheckCircle2
 } from "lucide-react";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
+import { cacheGet, cacheSet } from "../../utils/cache";
 
 export default function RolesPermissionsPage() {
   const owner = getOwnerRuntimeSession();
@@ -22,9 +23,12 @@ export default function RolesPermissionsPage() {
   }, []);
 
   const fetchRoles = async () => {
+    const CACHE_KEY = `roles:${owner.loginId}`;
+    const cached = cacheGet(CACHE_KEY);
+    if (cached) { setRoles(cached); setLoading(false); return; }
     try {
-      const data = await apiFetch('/api/employees');
-      const myStaff = (data.data || []).filter(e => e.parentLoginId === owner.loginId);
+      const data = await apiFetch(`/api/employees?parentLoginId=${owner.loginId}`);
+      const myStaff = data.data || [];
       
       const roleMap = {};
       myStaff.forEach(emp => {
@@ -41,7 +45,9 @@ export default function RolesPermissionsPage() {
         roleMap[emp.role].loginIds.push(emp.loginId);
       });
       
-      setRoles(Object.values(roleMap));
+      const result = Object.values(roleMap);
+      setRoles(result);
+      cacheSet(CACHE_KEY, result, 2 * 60 * 1000);
     } catch (err) {
       console.error(err);
     } finally {

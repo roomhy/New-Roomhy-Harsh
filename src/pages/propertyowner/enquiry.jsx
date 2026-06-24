@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { MobileTabs, MobileEmptyState, MobileStatCard, cn } from "../../components/propertyowner/MobileComponents";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession, fetchOwnerProperties } from "../../utils/propertyowner";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
+import { cacheGet, cacheSet, cacheInvalidate } from "../../utils/cache";
 import { Search, Plus, Phone, MessageCircle, MoreHorizontal, X, Mail, MapPin, Loader2, Trash2, Users, TrendingUp, CalendarCheck, UserCheck, BookOpen } from "lucide-react";
 
 const Pill = ({ tone="muted", children }) => {
@@ -45,16 +46,26 @@ export default function Enquiry() {
     notes: ""
   });
 
-  const loadData = async () => {
-    try {
+  const loadData = async ({ silent = false } = {}) => {
+    const ENQ_KEY = `enquiries:${owner.loginId}`;
+    if (!silent) {
+      const cached = cacheGet(ENQ_KEY);
+      if (cached) {
+        setEnquiries(cached);
+        setLoading(false);
+        loadData({ silent: true });
+        return;
+      }
       setLoading(true);
+    }
+    try {
       const [enqRes, propRes] = await Promise.all([
         apiFetch(`/api/owners/${owner.loginId}/enquiries`),
         fetchOwnerProperties(owner.loginId).catch(() => [])
       ]);
-      
       if (enqRes) {
         setEnquiries(enqRes);
+        cacheSet(ENQ_KEY, enqRes, 3 * 60 * 1000);
       }
       if (propRes) {
         setProperties(propRes);
@@ -62,7 +73,7 @@ export default function Enquiry() {
     } catch (err) {
       console.error("Error fetching data:", err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -107,6 +118,7 @@ export default function Enquiry() {
         notes: ""
       });
       setShowModal(false);
+      cacheInvalidate(`enquiries:`);
       await loadData();
     } catch (err) {
       console.error("Error creating enquiry:", err);
@@ -125,6 +137,7 @@ export default function Enquiry() {
         method: "PATCH",
         body: JSON.stringify({ status: "rejected" })
       });
+      cacheInvalidate(`enquiries:`);
       await loadData();
     } catch (err) {
       console.error("Error deleting lead:", err);

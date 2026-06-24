@@ -1,11 +1,12 @@
 import React, { Suspense, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { TranslationProvider } from './contexts/TranslationContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import routes from "./routes";
 import { getOwnerSession } from "./utils/ownerSession";
 import SharedShell from "./components/SharedShell";
+import { OwnerPanelShell } from "./components/propertyowner/OwnerPanelErrorBoundary";
 import { Toaster } from "react-hot-toast";
 import InstallPWA from "./components/InstallPWA";
 
@@ -128,9 +129,11 @@ const ManagerRouteGuard = () => {
 
 const RouteRoleGuard = () => {
   const location = useLocation();
+  const { user: authUser, loading } = useAuth();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (loading) return;
 
     const path = location.pathname || '';
 
@@ -146,32 +149,18 @@ const RouteRoleGuard = () => {
       return;
     }
 
-    // No owner session — check staff role
-    const getRole = () => {
-      const keys = ['user', 'staff_user', 'manager_user'];
-      for (const key of keys) {
-        try {
-          const val = sessionStorage.getItem(key) || localStorage.getItem(key);
-          if (val) {
-            const parsed = JSON.parse(val);
-            if (parsed?.role) return String(parsed.role).toLowerCase();
-          }
-        } catch (_) {}
-      }
-      return '';
-    };
-
-    const role = getRole();
+    // Use backend-confirmed role from AuthContext — never trust localStorage role directly
+    const role = String(authUser?.role || '').toLowerCase();
 
     if (isAdminRoute && role !== 'superadmin' && role !== 'admin') {
       window.location.replace('/superadmin/index');
       return;
     }
 
-    if (isEmployeeRoute && role !== 'areamanager' && role !== 'employee' && role !== 'superadmin' && role !== 'admin') {
+    if (isEmployeeRoute && role !== 'areamanager' && role !== 'employee') {
       window.location.replace('/superadmin/index');
     }
-  }, [location.pathname]);
+  }, [location.pathname, authUser, loading]);
 
   return null;
 };
@@ -189,7 +178,6 @@ const DomainGuard = () => {
     if (isLocalhost) return;
 
     const path = location.pathname || "";
-    console.log("DomainGuard: host =", host, "path =", path);
 
     // 1. Admin / Superadmin Domain
     const isAdminDomain = host === "admin.roomhy.com" || host === "www.admin.roomhy.com";
@@ -220,12 +208,8 @@ const DomainGuard = () => {
     }
 
     // 3. Fallback for main website domain (roomhy.com) and others
-    if (path === "/" || path === "/index" || path === "" || path === "/website") {
-      window.location.replace("/coming-soon");
-      return;
-    }
-    const isAllowedWebsite = path.startsWith("/website") || path === "/coming-soon" || path.startsWith("/digital-checkin") || path.startsWith("/pay");
-    if (!isAllowedWebsite) {
+    // Show only coming-soon page
+    if (path !== "/coming-soon") {
       window.location.replace("/coming-soon");
     }
   }, [location.pathname]);
@@ -281,6 +265,8 @@ export default function App() {
   });
 
   const standaloneRoutes = routes.filter(r => !shellRoutes.find(sr => sr.path === r.path));
+  const ownerRoutes = standaloneRoutes.filter(r => r.path.startsWith("/propertyowner/"));
+  const otherStandaloneRoutes = standaloneRoutes.filter(r => !r.path.startsWith("/propertyowner/"));
 
   return (
     <AuthProvider>
@@ -302,8 +288,15 @@ export default function App() {
                   ))}
                 </Route>
 
-                {/* Standalone routes (Login pages, website, etc.) */}
-                {standaloneRoutes.map(route => (
+                {/* Owner Panel routes — wrapped in ErrorBoundary */}
+                <Route element={<OwnerPanelShell />}>
+                  {ownerRoutes.map(route => (
+                    <Route key={route.path} path={route.path} element={route.element} />
+                  ))}
+                </Route>
+
+                {/* Other standalone routes (tenant, website, staff, etc.) */}
+                {otherStandaloneRoutes.map(route => (
                   <Route key={route.path} path={route.path} element={route.element} />
                 ))}
 
@@ -313,7 +306,6 @@ export default function App() {
                 <Route path="/employee/superadmin" element={<Navigate to="/employee/areaadmin" replace />} />
                 <Route path="/propertyowner" element={<Navigate to="/propertyowner/index" replace />} />
                 <Route path="/website" element={<Navigate to="/website/index" replace />} />
-                <Route path="/pay" element={<Navigate to="/website/pay" replace />} />
                 <Route path="*" element={<HtmlRedirectOrHome />} />
               </Routes>
             </Suspense>

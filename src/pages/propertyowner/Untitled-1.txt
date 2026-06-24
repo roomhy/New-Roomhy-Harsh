@@ -1,3 +1,0 @@
-# 
-
-{"success":true,"message":"Seed completed!","results":[{"tenant":"Rahul Sharma","property":"Roomhy01","baseRent":15000,"agreedRent":12000,"paidAmt":12000,"dueAmt":0},{"tenant":"Priya Singh","property":"sddsfs","baseRent":12000,"agreedRent":10000,"paidAmt":5000,"dueAmt":5000},{"tenant":"Amit Kumar","property":"Property02","baseRent":10000,"agreedRent":9000,"paidAmt":10000,"dueAmt":-1000}]}

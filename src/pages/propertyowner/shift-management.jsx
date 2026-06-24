@@ -5,7 +5,7 @@ import {
   Clock, Search, Plus, Trash2, Edit3, 
   CheckCircle2, AlertCircle, ChevronRight
 } from "lucide-react";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
 
 export default function ShiftManagementPage() {
   const owner = getOwnerRuntimeSession();

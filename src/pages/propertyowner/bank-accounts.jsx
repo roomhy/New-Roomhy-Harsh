@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
-import { ownerApi } from "../../services/api";
+import { fetchJson } from "../../utils/api";
 import { Building, ShieldCheck, Eye, EyeOff, ExternalLink, Smartphone } from "lucide-react";
 
 function maskAccount(num) {
@@ -27,7 +27,7 @@ export default function BankAccountsPage() {
   const [successMsg, setSuccessMsg] = useState("");
 
   useEffect(() => {
-    ownerApi.getOwner(owner.loginId)
+    fetchJson(`/api/owners/${encodeURIComponent(owner.loginId)}`)
       .then(data => {
         const bankInfo = {
           accountHolder: data.checkinAccountHolderName || data.accountHolderName || "",

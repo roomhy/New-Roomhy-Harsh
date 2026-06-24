@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
 import { 
   Bell, Search, Plus, Trash2, Edit3, 
   CheckCircle2, AlertCircle, Pin, Loader2

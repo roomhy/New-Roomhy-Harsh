@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
+import { fetchJson } from "../../utils/api";
 import { 
   AlertOctagon, Search, Send, CheckCircle2, 
   Flame, ShieldAlert, Zap, AlertTriangle
@@ -13,24 +14,35 @@ export default function EmergencyAlertsPage() {
     return null; 
   }
 
-  const [alerts, setAlerts] = useState([
-    { id: "ALT-9011", type: "Power Outage scheduled", target: "All blocks", date: "15 May 2026", status: "Sent" }
-  ]);
-  const [success, setSuccess] = useState(false);
+  const [alerts, setAlerts] = useState([]);
+  const [dispatching, setDispatching] = useState(null);
+  const [alertStatus, setAlertStatus] = useState(null);
 
-  const triggerAlert = (type) => {
-    setSuccess(true);
-    const newAlert = {
-      id: `ALT-${Math.floor(1000 + Math.random() * 9000)}`,
-      type: type,
-      target: "All Residents & Staff",
-      date: "Just now",
-      status: "Dispatched"
-    };
-    setAlerts([newAlert, ...alerts]);
-    setTimeout(() => {
-      setSuccess(false);
-    }, 2000);
+  const triggerAlert = async (type) => {
+    if (dispatching) return;
+    setDispatching(type);
+    setAlertStatus(null);
+    try {
+      const resp = await fetchJson("/api/emergency/send", {
+        method: "POST",
+        body: JSON.stringify({ ownerLoginId: owner.loginId, type })
+      });
+      const alertId = resp?.alertId || resp?.alert?.id || resp?.id;
+      setAlerts((prev) => [{
+        id: alertId || "—",
+        type,
+        target: "All Residents & Staff",
+        date: new Date().toLocaleString(),
+        status: "Dispatched"
+      }, ...prev]);
+      setAlertStatus({ kind: "success", message: `Emergency alert dispatched successfully${alertId ? ` · ID: ${alertId}` : ""}` });
+      setTimeout(() => setAlertStatus(null), 4000);
+    } catch (e) {
+      setAlertStatus({ kind: "error", message: e?.message || "Failed to dispatch emergency alert. Please try again." });
+      setTimeout(() => setAlertStatus(null), 5000);
+    } finally {
+      setDispatching(null);
+    }
   };
 
   return (
@@ -46,9 +58,13 @@ export default function EmergencyAlertsPage() {
         </div>
       </div>
 
-      {success && (
-        <div className="rounded-xl border border-rose-100 bg-rose-50 p-4 text-rose-700 text-xs font-bold flex items-center gap-2 mb-6 animate-bounce">
-          <AlertOctagon size={16} /> EMERGENCY ALERT DISPATCHED TO ALL DEVICES!
+      {alertStatus && (
+        <div className={`rounded-xl border p-4 text-xs font-bold flex items-center gap-2 mb-6 ${
+          alertStatus.kind === "success"
+            ? "border-rose-100 bg-rose-50 text-rose-700 animate-bounce"
+            : "border-destructive/20 bg-destructive/10 text-destructive"
+        }`}>
+          <AlertOctagon size={16} /> {alertStatus.message}
         </div>
       )}
 
@@ -60,11 +76,12 @@ export default function EmergencyAlertsPage() {
             <h3 className="font-serif text-[18px] font-bold text-foreground">Fire Drill / Evacuation</h3>
             <p className="text-xs text-muted-foreground">Send safety guidelines, exit paths, and assembly point coordinates immediately.</p>
           </div>
-          <button 
+          <button
             onClick={() => triggerAlert("Fire Drill Alert")}
-            className="w-full h-10 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all"
+            disabled={!!dispatching}
+            className="w-full h-10 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Dispatch Evacuation Alert
+            {dispatching === "Fire Drill Alert" ? "Dispatching..." : "Dispatch Evacuation Alert"}
           </button>
         </div>
 
@@ -74,11 +91,12 @@ export default function EmergencyAlertsPage() {
             <h3 className="font-serif text-[18px] font-bold text-foreground">Power / Generator Repair</h3>
             <p className="text-xs text-muted-foreground">Broadcast scheduled electricity cuts or grid load maintenance schedules.</p>
           </div>
-          <button 
+          <button
             onClick={() => triggerAlert("Scheduled Power Cut Notice")}
-            className="w-full h-10 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all"
+            disabled={!!dispatching}
+            className="w-full h-10 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Dispatch Power Notice
+            {dispatching === "Scheduled Power Cut Notice" ? "Dispatching..." : "Dispatch Power Notice"}
           </button>
         </div>
 
@@ -88,11 +106,12 @@ export default function EmergencyAlertsPage() {
             <h3 className="font-serif text-[18px] font-bold text-foreground">Water Supply Shortage</h3>
             <p className="text-xs text-muted-foreground">Notify residents of tank pump issues or municipal supply restrictions.</p>
           </div>
-          <button 
+          <button
             onClick={() => triggerAlert("Water Shortage Warning")}
-            className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all"
+            disabled={!!dispatching}
+            className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Dispatch Water Alert
+            {dispatching === "Water Shortage Warning" ? "Dispatching..." : "Dispatch Water Alert"}
           </button>
         </div>
       </div>

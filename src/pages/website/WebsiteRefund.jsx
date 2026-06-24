@@ -1,6 +1,7 @@
 import WebsiteNavbar from "../../components/website/WebsiteNavbar";
 import WebsiteFooter from "../../components/website/WebsiteFooter";
 import { RefreshCcw, CreditCard, Calendar, GraduationCap, AlertCircle, Clock, Mail, Phone } from 'lucide-react';
+import { Link } from "react-router-dom";
 
 export default function WebsiteRefund() {
   const sections = [
@@ -117,16 +118,25 @@ export default function WebsiteRefund() {
             </div>
 
             {/* Contact */}
-            <div className="mt-12 p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-100">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Contact Us for Refund Requests</h3>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <a href="mailto:hello@roomhy.com" className="flex items-center gap-2 text-green-600 hover:text-green-700 font-medium">
-                  <Mail size={16} /> hello@roomhy.com
-                </a>
-                <a href="tel:+919983005030" className="flex items-center gap-2 text-green-600 hover:text-green-700 font-medium">
-                  <Phone size={16} /> +91-9983005030
-                </a>
+            <div className="mt-12 p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Need to submit a refund request?</h3>
+                <p className="text-sm text-gray-600 mb-4">You can submit your refund or alternative property request online using our automated system.</p>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <a href="mailto:hello@roomhy.com" className="flex items-center gap-2 text-green-600 hover:text-green-700 font-medium text-xs">
+                    <Mail size={14} /> hello@roomhy.com
+                  </a>
+                  <a href="tel:+919983005030" className="flex items-center gap-2 text-green-600 hover:text-green-700 font-medium text-xs">
+                    <Phone size={14} /> +91-9983005030
+                  </a>
+                </div>
               </div>
+              <Link 
+                to="/website/refund-request" 
+                className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded-xl transition-all shadow-md shadow-green-100 flex items-center justify-center gap-2 shrink-0 text-sm"
+              >
+                <RefreshCcw size={16} /> Raise Refund Online
+              </Link>
             </div>
           </div>
         </section>

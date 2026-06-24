@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
 import { 
   FileImage, Search, Download, CheckCircle2, 
   ArrowUpRight, Image as ImageIcon, Loader2, Plus, Trash2

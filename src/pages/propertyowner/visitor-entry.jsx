@@ -5,7 +5,8 @@ import {
   UserPlus, Search, LogOut, CheckCircle2, 
   Clock, ShieldAlert, Phone
 } from "lucide-react";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
+import { cacheGet, cacheSet, cacheInvalidate } from "../../utils/cache";
 
 export default function VisitorEntryPage() {
   const owner = getOwnerRuntimeSession();
@@ -30,19 +31,24 @@ export default function VisitorEntryPage() {
   }, [owner.loginId]);
 
   const fetchVisitors = async () => {
+    const CACHE_KEY = `visitors:active:${owner.loginId}`;
+    const cached = cacheGet(CACHE_KEY);
+    if (cached) { setVisitors(cached); setLoading(false); return; }
     try {
       setLoading(true);
       const data = await apiFetch(`/api/visitors/owner/${owner.loginId}?status=Inside`);
       if (data.success && data.visitors) {
-        setVisitors(data.visitors.map(v => ({
-           id: v._id,
-           name: v.name,
-           phone: v.phone,
-           host: v.hostName,
-           room: v.hostRoom,
-           purpose: v.purpose,
-           entryTime: `Today, ${new Date(v.entryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-        })));
+        const mapped = data.visitors.map(v => ({
+          id: v._id,
+          name: v.name,
+          phone: v.phone,
+          host: v.hostName,
+          room: v.hostRoom,
+          purpose: v.purpose,
+          entryTime: `Today, ${new Date(v.entryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+        }));
+        setVisitors(mapped);
+        cacheSet(CACHE_KEY, mapped, 60 * 1000);
       }
     } catch (err) {
       console.error(err);
@@ -70,7 +76,8 @@ export default function VisitorEntryPage() {
         })
       });
       if (data.success) {
-        fetchVisitors(); // Refresh list
+        cacheInvalidate(`visitors:`);
+        fetchVisitors();
         setVName("");
         setVPhone("");
         setVHost("");

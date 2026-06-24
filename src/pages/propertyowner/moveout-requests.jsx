@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
 import {
   LogOut, Search, Phone, CheckCircle2, AlertTriangle,
   Clock, XCircle, Loader2, CalendarDays, IndianRupee

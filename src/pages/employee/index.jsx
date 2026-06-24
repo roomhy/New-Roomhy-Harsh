@@ -74,21 +74,6 @@ export default function Index() {
   };
 
   const handleSuperAdminLogin = async (identifier, pass) => {
-    const dbStr = safeLocalStorageGet("roomhy_superadmin_db");
-    const db = dbStr ? JSON.parse(dbStr) : null;
-    if (!import.meta.env.PROD && !db && identifier === "roomhyadmin@gmail.com" && pass === "admin@123") {
-      const user = { id: "SUPER_ADMIN", loginId: "SUPER_ADMIN", email: identifier, name: "Super Admin", role: "superadmin" };
-      setStaffSession(user, "superadmin_token");
-      navigate(resolvePanelPath("superadmin", "superadmin"));
-      return true;
-    }
-    if (db && db.email === identifier && db.password === pass) {
-      const user = { ...db, loginId: db.loginId || db.id || "SUPER_ADMIN", role: "superadmin" };
-      setStaffSession(user, "superadmin_token");
-      navigate(resolvePanelPath("superadmin", "superadmin"));
-      return true;
-    }
-
     try {
       const data = await fetchJson("/api/auth/login", {
         method: "POST",
@@ -110,53 +95,6 @@ export default function Index() {
     return false;
   };
 
-  const handleAreaManagerLogin = (identifier, pass) => {
-    try {
-      const mgrs = JSON.parse(safeLocalStorageGet("roomhy_areamanagers_db") || "[]");
-      if (Array.isArray(mgrs)) {
-        const mgr = mgrs.find(
-          (m) => (m.loginId || "").toUpperCase() === identifier.toUpperCase() && m.password === pass
-        );
-        if (mgr) {
-          const user = { ...mgr, role: "areamanager" };
-          user.areaCode = user.areaCode || user.area || user.areaName || "";
-          user.areaName = user.areaName || user.area || "";
-          setStaffSession(user, "manager_token");
-          navigate(resolvePanelPath("employee", "areaadmin"));
-          return true;
-        }
-      }
-    } catch (_) {}
-    return false;
-  };
-
-  const handleEmployeeLogin = (identifier, pass) => {
-    try {
-      const emps = JSON.parse(safeLocalStorageGet("roomhy_employees") || "[]");
-      if (Array.isArray(emps)) {
-        const emp = emps.find(
-          (e) => (e.loginId || "").toUpperCase() === identifier.toUpperCase() && e.password === pass
-        );
-        if (emp) {
-          const user = {
-            loginId: emp.loginId,
-            name: emp.name,
-            role: "employee",
-            team: emp.team || emp.role || "Employee",
-            permissions: emp.permissions || [],
-            location: emp.location || emp.area || emp.areaName || "",
-            area: emp.area || emp.areaName || "",
-            areaName: emp.areaName || emp.area || "",
-            areaCode: emp.areaCode || ""
-          };
-          setStaffSession(user, "employee_token");
-          navigate(resolvePanelPath("employee", "areaadmin"));
-          return true;
-        }
-      }
-    } catch (_) {}
-    return false;
-  };
 
   const handleLogin = async () => {
     if (!loginId || !password) {
@@ -170,21 +108,10 @@ export default function Index() {
       sessionStorage.removeItem("user");
       localStorage.removeItem("owner_user");
 
-      const up = loginId.toUpperCase();
-
-      if (await handleAreaManagerLogin(loginId, password)) return;
-      if (await handleEmployeeLogin(loginId, password)) return;
-
       if (loginId.includes("@")) {
         if (await handleSuperAdminLogin(loginId, password)) return;
         setLoginError("Invalid credentials.");
         return;
-      }
-
-      if (up.startsWith("MGR")) {
-        if (await handleAreaManagerLogin(loginId, password)) return;
-      } else if (up.startsWith("RY") || up.startsWith("EMP")) {
-        if (await handleEmployeeLogin(loginId, password)) return;
       }
 
       const data = await fetchJson("/api/auth/login", {

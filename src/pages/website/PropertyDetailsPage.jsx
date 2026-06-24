@@ -362,15 +362,44 @@ export default function PropertyDetailsPage() {
 
   // Handle quick booking submission
   const handleQuickBookingSubmit = async (bookingData) => {
+    // Resolve user_id: prefer logged-in website user, fall back to email
+    let userId = bookingData.email;
     try {
-      // Here you would normally send the booking data to your backend
-      
-      // For now, show success message and navigate
-      alert('Booking request submitted successfully! We will contact you soon.');
-      navigate('/website/ourproperty');
-    } catch (error) {
-      throw new Error('Failed to submit booking request');
-    }
+      const raw = sessionStorage.getItem("website_user") || localStorage.getItem("website_user") ||
+                  sessionStorage.getItem("user") || localStorage.getItem("user");
+      if (raw) {
+        const u = JSON.parse(raw);
+        if (u?._id || u?.id) userId = u._id || u.id;
+      }
+    } catch (_) {}
+
+    const payload = {
+      property_id:   property?._id || property?.id || bookingData.propertyId,
+      property_name: property?.name || property?.property_name || bookingData.propertyName,
+      owner_id:      property?.owner_id || property?.ownerLoginId,
+      rent_amount:   property?.monthlyRent || property?.price || bookingData.propertyPrice,
+      area:          property?.location || property?.city,
+      city:          property?.city,
+      property_type: property?.propertyType,
+      request_type:  'direct',
+      user_id:       userId,
+      name:          bookingData.name,
+      email:         bookingData.email,
+      phone:         bookingData.phone,
+      message:       bookingData.message || '',
+    };
+
+    const { getApiBase } = await import('../../utils/api');
+    const res = await fetch(`${getApiBase()}/api/booking/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to submit booking request');
+    navigate('/website/ourproperty');
   };
   
   // Reviews state
@@ -567,6 +596,7 @@ export default function PropertyDetailsPage() {
             beds: foundProperty.propertyInfo?.totalSeats || foundProperty.bedrooms || foundProperty.beds || 0,
             gender: foundProperty.propertyInfo?.genderSuitability || foundProperty.gender || "Any",
             owner: foundProperty.generatedCredentials?.ownerName || foundProperty.ownerName || foundProperty.owner || "Owner",
+            owner_id: foundProperty.ownerLoginId || foundProperty.owner_id || foundProperty.generatedCredentials?.loginId || "",
             ownerPhone: foundProperty.ownerPhoneNumber || foundProperty.ownerPhone || "",
             ownerEmail: foundProperty.ownerEmail || "",
             

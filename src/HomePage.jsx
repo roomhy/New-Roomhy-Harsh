@@ -229,6 +229,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   // State for dynamic data
   const [cities, setCities] = useState([]);
+  const [cityAreasMap, setCityAreasMap] = useState(cityAreas);
   const [offerings, setOfferings] = useState([]);
   const [trendingProperties, setTrendingProperties] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -344,6 +345,22 @@ export default function HomePage() {
             return !name.includes('jhvhhjhjv') && !name.includes('test');
           });
           setTrendingProperties(filteredProperties);
+
+          // Build city → areas map from real property data
+          const areasMap = {};
+          filteredProperties.forEach(p => {
+            const cityName = p.city || '';
+            const area = p.area || p.locality || p.neighborhood || p.location || '';
+            if (cityName) {
+              if (!areasMap[cityName]) areasMap[cityName] = new Set();
+              if (area && area !== cityName) areasMap[cityName].add(area);
+            }
+          });
+          const builtMap = {};
+          for (const [city, areaSet] of Object.entries(areasMap)) {
+            builtMap[city] = [...areaSet].slice(0, 4);
+          }
+          if (Object.keys(builtMap).length > 0) setCityAreasMap(builtMap);
         } else {
           // Fallback to static if API fails
           setTrendingProperties(featuredProperties);
@@ -729,27 +746,32 @@ export default function HomePage() {
           <div className="max-w-none w-full mx-auto px-4 md:px-8 lg:px-12">
             <div className="flex items-center justify-center h-8 text-[13px] font-medium text-gray-600">
               <div className="flex items-center justify-center space-x-10 w-full">
-                {Object.keys(cityAreas).map((city) => (
+                {Object.keys(cityAreasMap).slice(0, 6).map((city) => {
+                  const areas = cityAreasMap[city] || [];
+                  return (
                   <div key={city} className="relative group h-full flex items-center">
-                    <Link to={`/website/ourproperty?city=${city}`} className="flex items-center space-x-1 hover:text-black cursor-pointer h-full">
+                    <Link to={`/website/ourproperty?city=${encodeURIComponent(city)}`} className="flex items-center space-x-1 hover:text-black cursor-pointer h-full">
                       <span>{city}</span>
                       <ChevronDown className="w-3.5 h-3.5 text-gray-400 group-hover:text-black transition-colors" />
                     </Link>
-                    
+
                     {/* Areas Dropdown on Hover */}
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 w-48 bg-white shadow-xl rounded-b-lg border border-gray-100 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100]">
-                      {cityAreas[city].map((area) => (
-                        <Link
-                          key={area}
-                          to={`/website/ourproperty?city=${city}&area=${area}`}
-                          className="block px-4 py-2 text-xs text-gray-600 hover:bg-teal-50 hover:text-teal-600 transition-colors"
-                        >
-                          {area}
-                        </Link>
-                      ))}
-                    </div>
+                    {areas.length > 0 && (
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 w-48 bg-white shadow-xl rounded-b-lg border border-gray-100 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100]">
+                        {areas.map((area) => (
+                          <Link
+                            key={area}
+                            to={`/website/ourproperty?city=${encodeURIComponent(city)}&area=${encodeURIComponent(area)}`}
+                            className="block px-4 py-2 text-xs text-gray-600 hover:bg-teal-50 hover:text-teal-600 transition-colors"
+                          >
+                            {area}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
                 <Link to="/website/ourproperty" className="flex items-center space-x-1 hover:text-black cursor-pointer group font-semibold h-full">
                   <span>All Cities</span>
                   <ChevronDown className="w-3.5 h-3.5 text-gray-400 group-hover:text-black transition-colors" />

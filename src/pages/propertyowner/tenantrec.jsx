@@ -64,7 +64,7 @@ const CameraModal = ({ onCapture, onClose }) => {
           videoRef.current.onloadedmetadata = () => setReady(true);
         }
       } catch (err) {
-        alert("Camera access denied or unavailable: " + err.message);
+        toast.error("Camera access denied or unavailable: " + err.message);
         onClose();
       }
     }
@@ -613,7 +613,9 @@ export default function TenantRec() {
     const newErrors = {};
     if (!basicDetails.fullName) newErrors.fullName = "Name is required";
     if (!basicDetails.email) newErrors.email = "Email is required";
-    if (!basicDetails.phone) newErrors.phone = "Phone is required";
+    const phoneDigits = (basicDetails.phone || "").replace(/\D/g, "");
+    if (!phoneDigits) newErrors.phone = "Phone is required";
+    else if (!/^[6-9]\d{9}$/.test(phoneDigits)) newErrors.phone = "Please enter a valid mobile number";
     if (!basicDetails.dob) newErrors.dob = "Date of Birth is required";
     if (!basicDetails.gender) newErrors.gender = "Gender is required";
     if (!basicDetails.idProofNumber) newErrors.idProofNumber = "ID Proof No is required";
@@ -629,7 +631,11 @@ export default function TenantRec() {
     if (!tenancyDetails.paymentFrequency) newErrors.paymentFrequency = "Payment frequency is required";
 
     if (!additionalDetails.emergencyName) newErrors.emergencyName = "Emergency name is required";
-    if (!additionalDetails.emergencyPhone) newErrors.emergencyPhone = "Emergency phone is required";
+    const emergencyDigits = (additionalDetails.emergencyPhone || "").replace(/\D/g, "");
+    if (!emergencyDigits) newErrors.emergencyPhone = "Emergency phone is required";
+    // validation of number yaha add hai //
+    else if (!/^[6-9]\d{9}$/.test(emergencyDigits)) newErrors.emergencyPhone = "Please enter a valid mobile number";
+    else if (emergencyDigits === phoneDigits) newErrors.emergencyPhone = "Emergency number cannot be the same as tenant's number";
     if (!additionalDetails.relationship) newErrors.relationship = "Relationship is required";
 
     setErrors(newErrors);
@@ -842,7 +848,7 @@ export default function TenantRec() {
                   label="Phone Number"
                   required
                   value={basicDetails.phone}
-                  onChange={e => setBasicDetails({ ...basicDetails, phone: e.target.value })}
+                  onChange={e => setBasicDetails({ ...basicDetails, phone: e.target.value.replace(/\D/g, "").slice(0, 10) })}
                   placeholder="Enter phone number"
                   prefix="+91"
                   error={errors.phone}
@@ -900,13 +906,17 @@ export default function TenantRec() {
               const matchesSelected = roomAssignment.roomUnit && (r.title === roomAssignment.roomUnit || r.number === roomAssignment.roomUnit || r.roomNo === roomAssignment.roomUnit);
               if (matchesSelected) return true;
 
-              // Filter out inactive, unavailable or deleted rooms
-              if (r.isAvailable === false || r.status === "inactive" || r.isDeleted === true) {
+              // Filter out unavailable or deleted rooms (status=inactive is the Room model default — it controls public listing, not assignability)
+              if (r.isAvailable === false || r.isDeleted === true) {
                 return false;
               }
               // Filter out rooms with no vacant beds
+              // A bed is vacant if it's not explicitly occupied and has no tenant assigned
               const bedsList = toLegacyBeds(r);
-              return bedsList.some(b => b.status === "available" && !b.tenantId);
+              return bedsList.some(b => {
+                const s = String(b.status || '').toLowerCase().trim();
+                return s !== 'occupied' && !b.tenantId;
+              });
             });
 
             const floorOptions = [...new Set(availableRooms.map(r => r.floor).filter(Boolean))].sort();
@@ -918,7 +928,10 @@ export default function TenantRec() {
             const bedsList = selectedRoom ? toLegacyBeds(selectedRoom) : [];
             const bedOptions = bedsList
               .map((b, i) => ({ label: `Bed ${i + 1}`, value: String(i + 1), status: b.status, tenantId: b.tenantId }))
-              .filter(opt => opt.status === "available" && !opt.tenantId);
+              .filter(opt => {
+                const s = String(opt.status || '').toLowerCase().trim();
+                return s !== 'occupied' && !opt.tenantId;
+              });
 
             const handleRoomSelect = (roomTitle) => {
               const room = rooms.find(r => (r.title || r.number || r.roomNo) === roomTitle);
@@ -1212,7 +1225,7 @@ export default function TenantRec() {
                   label="Emergency Contact Number"
                   required
                   value={additionalDetails.emergencyPhone}
-                  onChange={e => setAdditionalDetails({ ...additionalDetails, emergencyPhone: e.target.value })}
+                  onChange={e => setAdditionalDetails({ ...additionalDetails, emergencyPhone: e.target.value.replace(/\D/g, "").slice(0, 10) })}
                   placeholder="Enter phone number"
                   prefix="+91"
                   error={errors.emergencyPhone}

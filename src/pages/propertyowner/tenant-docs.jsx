@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession, fetchOwnerTenants, clearOwnerFetchCache } from "../../utils/propertyowner";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
 import {
   Search, Download, Eye, ChevronLeft, ChevronRight
 } from "lucide-react";
-import { API_URL } from "../../services/api";
+import { API_URL } from "../../utils/api";
 
 const PAGE_SIZE = 12;
 

@@ -339,36 +339,28 @@ export default function Tenantdashboard() {
         accent: "purple",
         actionLabel: "View Agreement",
         onView: () => {
+          const pdfUrl = tenant?.digitalCheckin?.agreement?.pdfUrl;
+          if (pdfUrl) {
+            window.open(pdfUrl, "_blank", "noopener,noreferrer");
+            return;
+          }
+          if (tenant?.agreementSigned && loginId) {
+            const base = getApiBase();
+            window.open(
+              `${base}/api/checkin/tenant/agreement/pdf/${encodeURIComponent(loginId)}`,
+              "_blank",
+              "noopener,noreferrer"
+            );
+            return;
+          }
           setDocumentViewer({
             title: "Rental Agreement",
             type: "agreement",
             body: (
               <div className="space-y-4 text-sm text-slate-600">
-                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Agreement Status</p>
-                  <p className="font-semibold text-slate-900">
-                    {tenant?.agreementSignedAt ? `Signed on ${formatDate(tenant.agreementSignedAt)}` : "Not signed yet"}
-                  </p>
-                </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="p-4 rounded-xl border border-slate-200">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Tenant</p>
-                    <p className="font-semibold text-slate-900">{tenantUser?.name || tenant?.name || "Tenant"}</p>
-                    <p>{tenantUser?.email || tenant?.email || "-"}</p>
-                  </div>
-                  <div className="p-4 rounded-xl border border-slate-200">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Property</p>
-                    <p className="font-semibold text-slate-900">{propertyName}</p>
-                    <p>{roomInfo}</p>
-                  </div>
-                </div>
-                <div className="p-4 rounded-xl border border-purple-100 bg-purple-50">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-purple-600 mb-2">Agreement Summary</p>
-                  <ul className="space-y-2 list-disc pl-5">
-                    <li>Monthly rent: {formatCurrency(tenant?.agreedRent || tenant?.rentAmount || rentAmount)}</li>
-                    <li>Move-in date: {formatDate(tenant?.moveInDate)}</li>
-                    <li>Status: {tenant?.agreementSignedAt ? "Completed" : "Pending signature"}</li>
-                  </ul>
+                <div className="p-4 rounded-xl border border-amber-100 bg-amber-50 text-center">
+                  <p className="font-semibold text-amber-800">Agreement not yet signed</p>
+                  <p className="text-xs mt-1 text-amber-600">Complete your digital check-in to generate the agreement.</p>
                 </div>
               </div>
             )
@@ -591,35 +583,20 @@ export default function Tenantdashboard() {
   // ─── Data fetchers ───────────────────────────────────────────────────────────
   const loadTenant = async () => {
     if (!loginId) { window.location.href = "/tenant/tenantlogin"; return null; }
-    const localTenant = readLocalTenants().find((i) => String(i.loginId || "").toUpperCase() === loginId);
-    if (localTenant) {
-      setTenant(localTenant);
-      if (localTenant.kyc?.aadhaarNumber) setAadhaarNumber(localTenant.kyc.aadhaarNumber);
-      if (localTenant.kyc?.panNumber) setPanNumber(localTenant.kyc.panNumber || "");
-      if (localTenant.kyc?.aadhaarFront) setAadhaarFrontUrl(localTenant.kyc.aadhaarFront);
-      if (localTenant.kyc?.aadhaarBack) setAadhaarBackUrl(localTenant.kyc.aadhaarBack);
-      if (localTenant.kyc?.addressProofFile) setAddressProofUrl(localTenant.kyc.addressProofFile);
-      if (localTenant.policeVerification?.receiptFile) setPoliceReceiptUrl(localTenant.policeVerification.receiptFile);
-    }
+    // SECURITY FIX: Replaced GET /api/tenants (returned all tenants, client-side
+    // filtered) with GET /api/tenants/me (returns only the authenticated tenant's
+    // own record, identity enforced server-side via JWT). This eliminates the mass
+    // PII exposure where every tenant's Aadhaar, phone, email and financials were
+    // visible in the browser's network tab.
     try {
-      const data = await fetchJson("/api/tenants");
-      const list = data?.tenants || data || [];
-      const match = list.find((i) => String(i.loginId || "").toUpperCase() === loginId);
+      const data = await fetchJson("/api/tenants/me");
+      const match = data?.tenant || null;
       if (match) {
-        upsertTenantRecord(match);
         setTenant(match);
-        if (match.kyc?.aadhaarNumber) setAadhaarNumber(match.kyc.aadhaarNumber);
-        if (match.kyc?.panNumber) setPanNumber(match.kyc.panNumber || "");
-        if (match.kyc?.aadhaarFront) setAadhaarFrontUrl(match.kyc.aadhaarFront);
-        if (match.kyc?.aadhaarBack) setAadhaarBackUrl(match.kyc.aadhaarBack);
-        if (match.kyc?.addressProofFile) setAddressProofUrl(match.kyc.addressProofFile);
-        if (match.policeVerification?.receiptFile) setPoliceReceiptUrl(match.policeVerification.receiptFile);
         return match;
       }
-      if (localTenant) return localTenant;
       throw new Error("Tenant profile not found.");
     } catch (err) {
-      if (localTenant) return localTenant;
       throw err;
     }
   };
@@ -2284,7 +2261,7 @@ export default function Tenantdashboard() {
                 </div>
               </div>
             )}
-
+{/* leave request tenant */}
             {/* TAB: LEAVE REQUEST */}
             {activeTab === "leave" && (
               <div className="max-w-5xl mx-auto space-y-8">

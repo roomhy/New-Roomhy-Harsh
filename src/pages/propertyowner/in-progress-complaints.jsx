@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
+import { cacheGet, cacheSet } from "../../utils/cache";
 import { AlertCircle, CheckCircle2, Clock, Plus, Search, Loader2 } from "lucide-react";
 
 const Pill = ({ tone="muted", children }) => {
@@ -34,19 +35,28 @@ export default function Complaints() {
 
   useEffect(() => {
     const fetchData = async () => {
+      const COMP_KEY = `complaints:${owner.loginId}`;
+      const EMP_KEY = `employees:${owner.loginId}`;
+      const cachedComp = cacheGet(COMP_KEY);
+      const cachedEmp = cacheGet(EMP_KEY);
+      if (cachedComp && cachedEmp) {
+        setComplaints(cachedComp);
+        setStaffList(cachedEmp);
+        setLoading(false);
+        return;
+      }
       try {
         setLoading(true);
         const [compData, empData] = await Promise.all([
-           apiFetch(`/api/complaints/owner/${owner.loginId}`),
-           apiFetch(`/api/employees`)
+          cachedComp ? Promise.resolve({ complaints: cachedComp }) : apiFetch(`/api/complaints/owner/${owner.loginId}`),
+          cachedEmp ? Promise.resolve({ data: cachedEmp }) : apiFetch(`/api/employees?parentLoginId=${owner.loginId}`),
         ]);
-        
-        if (compData && compData.complaints) {
-          setComplaints(compData.complaints);
-        }
-        if (empData && empData.data) {
-          setStaffList(empData.data.filter(e => e.parentLoginId === owner.loginId));
-        }
+        const complaints = compData?.complaints || [];
+        const staff = empData?.data || [];
+        setComplaints(complaints);
+        setStaffList(staff);
+        if (!cachedComp) cacheSet(COMP_KEY, complaints, 2 * 60 * 1000);
+        if (!cachedEmp) cacheSet(EMP_KEY, staff, 3 * 60 * 1000);
       } catch (err) {
         console.error("Error fetching data:", err);
       } finally {

@@ -5,7 +5,7 @@ import {
   UserPlus, CheckCircle2, AlertCircle, Camera, Building2,
   Clock, IndianRupee, Phone, Mail, Shield, Briefcase, Calendar, MapPin, User
 } from "lucide-react";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
 
 const ROLES = ["Warden", "Reception", "Accountant", "Housekeeping", "Maintenance", "Property Manager", "Custom"];
 const SHIFTS = [

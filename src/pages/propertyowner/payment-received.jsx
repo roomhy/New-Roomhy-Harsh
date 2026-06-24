@@ -41,7 +41,7 @@ export default function PaymentReceivedPage() {
   const [monthFilter, setMonthFilter] = useState("all");
 
   useEffect(() => {
-    fetchPayments(300)
+    fetchPayments(owner.loginId, 300)
       .then(data => setPayments(data?.payments || []))
       .catch(() => setPayments([]))
       .finally(() => setLoading(false));
@@ -179,7 +179,6 @@ export default function PaymentReceivedPage() {
                 <th className="px-6 py-3.5 font-semibold">Payment Channel</th>
                 <th className="px-6 py-3.5 font-semibold">Net Paid</th>
                 <th className="px-6 py-3.5 font-semibold">Status</th>
-                <th className="px-6 py-3.5 font-semibold text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -216,23 +215,7 @@ export default function PaymentReceivedPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => {
-                          const name = getTenantName(r);
-                          const email = r.tenantEmail || "";
-                          const phone = r.tenantPhone || "";
-                          const propertyId = r.propertyId || "";
-                          const paid = getAmount(r);
-                          const room = getRoomNo(r) !== "—" ? getRoomNo(r) : "";
-                          window.location.href = `/propertyowner/tenantrec?name=${encodeURIComponent(name === "—" ? "" : name)}&email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}&propertyId=${encodeURIComponent(propertyId)}&room=${encodeURIComponent(room)}&paidAmount=${encodeURIComponent(paid)}`;
-                        }}
-                        className="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11.5px] font-medium transition-colors"
-                        title="Onboard as Tenant"
-                      >
-                        Add Tenant
-                      </button>
-                    </td>
+                    <td className="px-6 py-4 text-right"></td>
                   </tr>
                 ))
               )}

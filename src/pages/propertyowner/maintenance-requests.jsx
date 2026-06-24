@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
+import { cacheGet, cacheSet, cacheInvalidate } from "../../utils/cache";
 import { 
   Wrench, Search, Plus, Trash2, Edit3, 
   CheckCircle2, AlertCircle, Calendar, Loader2
@@ -28,18 +30,28 @@ export default function MaintenanceRequestsPage() {
   const [formBusy, setFormBusy] = useState(false);
 
   const fetchTasksAndStaff = async () => {
+    const MAINT_KEY = `maintenance:${owner.loginId}`;
+    const EMP_KEY = `employees:${owner.loginId}`;
+    const cachedTasks = cacheGet(MAINT_KEY);
+    const cachedEmp = cacheGet(EMP_KEY);
+    if (cachedTasks && cachedEmp) {
+      setTasks(cachedTasks);
+      setStaffList(cachedEmp);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const [tasksData, empData] = await Promise.all([
-         apiFetch(`/api/maintenance/owner/${owner.loginId}`),
-         apiFetch(`/api/employees`)
+        cachedTasks ? Promise.resolve({ tasks: cachedTasks }) : apiFetch(`/api/maintenance/owner/${owner.loginId}`),
+        cachedEmp ? Promise.resolve({ data: cachedEmp }) : apiFetch(`/api/employees?parentLoginId=${owner.loginId}`),
       ]);
-      if (tasksData && tasksData.tasks) {
-        setTasks(tasksData.tasks);
-      }
-      if (empData && empData.data) {
-        setStaffList(empData.data.filter(e => e.parentLoginId === owner.loginId));
-      }
+      const tasks = tasksData?.tasks || [];
+      const staff = empData?.data || [];
+      setTasks(tasks);
+      setStaffList(staff);
+      if (!cachedTasks) cacheSet(MAINT_KEY, tasks, 2 * 60 * 1000);
+      if (!cachedEmp) cacheSet(EMP_KEY, staff, 3 * 60 * 1000);
     } catch (err) {
       console.error("Error fetching data:", err);
     } finally {
@@ -73,10 +85,11 @@ export default function MaintenanceRequestsPage() {
       setFrequency("Bi-Annually");
       setScheduledDate("");
       setAssignedStaffId("");
+      cacheInvalidate(`maintenance:`);
       fetchTasksAndStaff();
     } catch (err) {
       console.error("Error creating task:", err);
-      alert("Failed to create maintenance task");
+      toast.error("Failed to create maintenance task");
     } finally {
       setFormBusy(false);
     }
@@ -88,6 +101,7 @@ export default function MaintenanceRequestsPage() {
         method: "PUT",
         body: JSON.stringify({ status: "Completed" })
       });
+      cacheInvalidate(`maintenance:`);
       fetchTasksAndStaff();
     } catch (err) {
       console.error("Error updating task:", err);
@@ -120,17 +134,23 @@ export default function MaintenanceRequestsPage() {
       await apiFetch(`/api/maintenance/${id}`, {
         method: "DELETE"
       });
+      cacheInvalidate(`maintenance:`);
       fetchTasksAndStaff();
     } catch (err) {
       console.error("Error deleting task:", err);
     }
   };
 
-  const filteredTasks = tasks.filter(t => 
+  const staffOptions = useMemo(
+    () => staffList.map(s => <option key={s._id} value={s._id}>{s.name} ({s.role})</option>),
+    [staffList]
+  );
+
+  const filteredTasks = useMemo(() => tasks.filter(t =>
     t.title.toLowerCase().includes(search.toLowerCase()) ||
     (t.staff && t.staff.toLowerCase().includes(search.toLowerCase())) ||
     (t.assignedStaffName && t.assignedStaffName.toLowerCase().includes(search.toLowerCase()))
-  );
+  ), [tasks, search]);
 
   return (
     <PropertyOwnerLayout 
@@ -203,7 +223,7 @@ export default function MaintenanceRequestsPage() {
                         className="bg-muted border border-border text-[11px] rounded px-2 py-1 outline-none w-full"
                       >
                         <option value="">-- Assign Staff --</option>
-                        {staffList.map(s => <option key={s._id} value={s._id}>{s.name} ({s.role})</option>)}
+                        {staffOptions}
                       </select>
                     ) : (
                       <strong className="text-foreground">{t.assignedStaffName || t.staff || "Unassigned"}</strong>
@@ -258,7 +278,7 @@ export default function MaintenanceRequestsPage() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">Assign To Staff</label>
                 <select required value={assignedStaffId} onChange={e => setAssignedStaffId(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 cursor-pointer bg-white">
                   <option value="">-- Select Staff Member --</option>
-                  {staffList.map(s => <option key={s._id} value={s._id}>{s.name} ({s.role})</option>)}
+                  {staffOptions}
                 </select>
               </div>
               <div className="mt-6 flex justify-end gap-3">

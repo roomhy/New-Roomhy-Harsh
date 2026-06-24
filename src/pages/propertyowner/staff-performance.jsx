@@ -5,7 +5,8 @@ import {
   Sparkles, Search, Star, CheckCircle2, 
   MessageSquare, TrendingUp, ChevronRight
 } from "lucide-react";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
+import { cacheGet, cacheSet } from "../../utils/cache";
 
 export default function StaffPerformancePage() {
   const owner = getOwnerRuntimeSession();
@@ -22,12 +23,15 @@ export default function StaffPerformancePage() {
   }, []);
 
   const fetchPerformance = async () => {
+    const CACHE_KEY = `perf:${owner.loginId}`;
+    const cached = cacheGet(CACHE_KEY);
+    if (cached) { setPerformance(cached); setLoading(false); return; }
     try {
-      const empData = await apiFetch('/api/employees');
-      const myStaff = (empData.data || []).filter(e => e.parentLoginId === owner.loginId);
+      const empData = await apiFetch(`/api/employees?parentLoginId=${owner.loginId}`);
+      const myStaff = empData.data || [];
 
       const compData = await apiFetch(`/api/complaints/owner/${owner.loginId}`);
-      
+
       const maintData = await apiFetch(`/api/maintenance/owner/${owner.loginId}`);
 
       const perfMap = {};
@@ -68,6 +72,7 @@ export default function StaffPerformancePage() {
       });
 
       setPerformance(results);
+      cacheSet(CACHE_KEY, results, 2 * 60 * 1000);
     } catch (err) {
       console.error(err);
     } finally {

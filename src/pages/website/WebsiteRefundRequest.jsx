@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import WebsiteNavbar from "../../components/website/WebsiteNavbar";
 import WebsiteFooter from "../../components/website/WebsiteFooter";
-import { RefreshCcw } from 'lucide-react';
+import { RefreshCcw, Send, Loader2 } from 'lucide-react';
+import { fetchJson } from "../../utils/api";
 
 export default function WebsiteRefundRequest() {
   const [requestType, setRequestType] = useState("refund");
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     bookingId: "",
     userEmail: "",
@@ -24,23 +26,61 @@ export default function WebsiteRefundRequest() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Refund Request Submitted:", formData);
-    alert("Your refund request has been submitted. Our team will review it shortly.");
-    setFormData({
-      bookingId: "",
-      userEmail: "",
-      requestReason: "",
-      paymentMethod: "bank",
-      bankName: "",
-      accountHolder: "",
-      accountNumber: "",
-      ifscCode: "",
-      upiId: "",
-      preferredArea: "",
-      comments: ""
-    });
+    setSubmitting(true);
+    
+    // Prepare payload matching backend expectations
+    const payload = {
+      booking_id: formData.bookingId,
+      user_email: formData.userEmail,
+      request_type: requestType === "refund" ? "refund" : "alternative_property",
+      property_requirements: formData.comments,
+      other_details: formData.requestReason,
+    };
+
+    if (payload.request_type === "refund") {
+      payload.refund_method = formData.paymentMethod;
+      if (formData.paymentMethod === "bank") {
+        payload.bank_name = formData.bankName;
+        payload.bank_account_holder = formData.accountHolder;
+        payload.bank_account_number = formData.accountNumber;
+        payload.bank_ifsc_code = formData.ifscCode;
+      } else if (formData.paymentMethod === "upi") {
+        payload.upi_id = formData.upiId;
+      }
+    } else {
+      payload.preferred_area = formData.preferredArea;
+    }
+
+    try {
+      const response = await fetchJson('/api/booking/refund-request', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      
+      alert(response?.message || "Your refund/alternative request has been submitted successfully!");
+      
+      // Reset form
+      setFormData({
+        bookingId: "",
+        userEmail: "",
+        requestReason: "",
+        paymentMethod: "bank",
+        bankName: "",
+        accountHolder: "",
+        accountNumber: "",
+        ifscCode: "",
+        upiId: "",
+        preferredArea: "",
+        comments: ""
+      });
+    } catch (error) {
+      console.error("Error submitting refund request:", error);
+      alert(error.message || "Failed to submit request. Please verify the Booking ID and Email address.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -331,15 +371,27 @@ export default function WebsiteRefundRequest() {
                   <div className="pt-6 flex gap-4">
                     <button
                       type="submit"
-                      className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center justify-center gap-2"
+                      disabled={submitting}
+                      className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <i data-lucide="send" className="w-5 h-5"></i> Submit Request
+                      {submitting ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-5 h-5" />
+                          Submit Request
+                        </>
+                      )}
                     </button>
                     <button
                       type="reset"
-                      className="flex-1 bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-2"
+                      disabled={submitting}
+                      className="flex-1 bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                      <i data-lucide="refresh-cw" className="w-5 h-5"></i> Clear
+                      <RefreshCcw className="w-5 h-5" /> Clear
                     </button>
                   </div>
                 </form>

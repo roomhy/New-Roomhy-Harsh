@@ -4,6 +4,41 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===== Price Range Dual Slider ===== */
+.price-range-input {
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  top: 0;
+  left: 0;
+  cursor: pointer;
+}
+.price-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border: 2px solid #EE2A24;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  pointer-events: all;
+  cursor: pointer;
+}
+.price-range-input::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: white;
+  border: 2px solid #EE2A24;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  pointer-events: all;
+  cursor: pointer;
+}
 
 /* ===== Global Utilities ===== */
   :root {

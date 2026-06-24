@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
+import toast from "react-hot-toast";
 import { X, Plus, Building2, ChevronDown, UploadCloud, Loader2, Wind, Table as TableIcon, Tv, Bath, LayoutTemplate, Refrigerator, DoorClosed, Armchair, Utensils, Microwave, Flame, Shirt, Video, Fan, Check, Edit2, Trash2, BedDouble, Home } from "lucide-react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getApiBase, getAuthHeader } from "../../utils/api";
 import {
   assignTenant, clearOwnerFetchCache, clearOwnerRuntimeSession, createRoom, updateRoom, deleteRoom,
-  fetchOwnerProperties, fetchOwnerRooms, fetchOwnerTenants, getOwnerRuntimeSession, fetchRoomsByPropertyId
+  fetchOwnerProperties, fetchOwnerRooms, fetchOwnerTenants, getOwnerRuntimeSession
 } from "../../utils/propertyowner";
 
 const cn = (...c) => c.filter(Boolean).join(" ");
@@ -69,6 +71,7 @@ const compressImage = (file, maxWidth = 1200, quality = 0.75) =>
   });
 
 export default function Rooms() {
+  const location = useLocation();
   const [owner, setOwner] = useState(null);
   const [rooms, setRooms] = useState([]);
   const [properties, setProperties] = useState([]);
@@ -137,6 +140,7 @@ export default function Rooms() {
     
     if (currentPropRoomsCount < expectedRoomsCount && currentPropRoomsCount < totalPropRooms) {
       try {
+        const { fetchRoomsByPropertyId } = require("../../utils/propertyowner");
         const res = await fetchRoomsByPropertyId(propId, newPage, ROOMS_PER_PAGE);
         if (res.rooms && res.rooms.length > 0) {
           const normalizedNewRooms = res.rooms.map(r => normalizeRoom(r, owner?.loginId));
@@ -182,18 +186,17 @@ export default function Rooms() {
     const s = getOwnerRuntimeSession();
     if (!s?.loginId) { window.location.href = "/propertyowner/ownerlogin"; return; }
     setOwner(s);
-    clearOwnerFetchCache(s.loginId);
     load(s, 1, ROOMS_PER_PAGE);
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(location.search);
     if (params.get("action") === "add") {
       setRoomForm(defaultRoomForm);
       setRoomModalOpen(true);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [window.location.search]);
+  }, [location.search]);
 
   const openAssignModal = (room, bedIdx) => {
     const beds = toLegacyBeds(room);
@@ -240,12 +243,12 @@ const handleAddTenant = (room) => {
       setErrorMsg("");
       const bedCount = Number(roomForm.roomBeds || 1);
       
-      const payload = { 
-        propertyId: propId, 
-        title: roomForm.roomNo, 
-        type: roomForm.roomType, 
-        rent: Number(roomForm.roomRent || 0), 
-        beds: bedCount, 
+      const payload = {
+        propertyId: propId,
+        title: roomForm.roomNo,
+        type: roomForm.roomType,
+        price: Number(roomForm.roomRent || 0),
+        beds: bedCount,
         gender: roomForm.roomGender, 
         ownerLoginId: owner.loginId,
         unitType: roomForm.unitType,
@@ -328,11 +331,6 @@ const handleAddTenant = (room) => {
       
       const t = tenants.find(x => (x._id || x.id) === selectedTenantId);
       if (!t) { setErrorMsg("Select a tenant."); setIsAssigning(false); return; }
-      if (!t.email || t.email === "-") {
-        setErrorMsg("Tenant's email is missing. Email is required to assign a room.");
-        setIsAssigning(false);
-        return;
-      }
       
       const payload = { 
         name: t.name, 
@@ -350,15 +348,8 @@ const handleAddTenant = (room) => {
       setAssignModalOpen(false);
       clearOwnerFetchCache(owner.loginId);
       await load(owner);
-    } catch (e) {
-      // e.body may be a raw JSON string like {"success":false,"message":"..."}
-      let msg = "Failed.";
-      if (e?.body) {
-        try { msg = JSON.parse(e.body)?.message || e.body; } catch { msg = e.body; }
-      } else if (e?.message) {
-        try { msg = JSON.parse(e.message)?.message || e.message; } catch { msg = e.message; }
-      }
-      setErrorMsg(msg);
+    } catch (e) { 
+      setErrorMsg(e?.body || e?.message || "Failed."); 
     } finally {
       setIsAssigning(false);
     }
@@ -366,15 +357,10 @@ const handleAddTenant = (room) => {
 
   // Group rooms by property
   const grouped = useMemo(() => {
-    // g stores { propTitle: { rooms: [], propId: string } }
     const g = {};
-    // Build propId → title lookup from known properties
-    const propIdToTitle = {};
+    // Pre-fill properties so even properties with 0 rooms show up
     properties.forEach(p => {
-      const key = p.title || p.name || "Your Property";
-      const pid = String(p._id || p.id || "");
-      g[key] = { rooms: [], propId: pid };
-      if (pid) propIdToTitle[pid] = key;
+      g[p.title || p.name || "Your Property"] = [];
     });
 
     const filteredRooms = rooms.filter(r => {
@@ -389,14 +375,31 @@ const handleAddTenant = (room) => {
     });
 
     filteredRooms.forEach(r => {
-      const pid = String(r.propertyId || "");
-      // Use propId→title map first so rooms with empty propertyTitle still land in correct bucket
-      const k = (pid && propIdToTitle[pid]) || r.propertyTitle || pid || "Your Property";
-      if (!g[k]) g[k] = { rooms: [], propId: pid };
-      g[k].rooms.push(r);
+      const k = r.propertyTitle || r.propertyId || "Your Property";
+      if (!g[k]) g[k] = [];
+      g[k].push(r);
     });
     return g;
   }, [rooms, showFilter, floorFilter, sharingFilter, properties]);
+
+  const roomStats = useMemo(() => {
+    const totalBeds = rooms.reduce((s, r) => s + (r.beds?.length || 0), 0);
+    const vacantBeds = rooms.reduce((s, r) => s + r.beds.filter(b => b.status === 'available').length, 0);
+    const occupiedBeds = rooms.reduce((s, r) => s + r.beds.filter(b => b.status === 'occupied').length, 0);
+    const vacantRooms = rooms.filter(r => r.beds.filter(b => b.status === 'available').length > 0).length;
+    const occupiedRooms = rooms.filter(r => r.beds.filter(b => b.status === 'occupied').length > 0).length;
+    return { totalBeds, vacantBeds, occupiedBeds, vacantRooms, occupiedRooms };
+  }, [rooms]);
+
+  const floorOptions = useMemo(
+    () => Array.from(new Set(rooms.map(r => r.floor).filter(Boolean))),
+    [rooms]
+  );
+
+  const assignedIds = useMemo(
+    () => new Set(assignModalOpen ? rooms.flatMap(r => toLegacyBeds(r).map(b => b.tenantId).filter(Boolean)) : []),
+    [rooms, assignModalOpen]
+  );
 
   return (
     <PropertyOwnerLayout owner={owner} title="Rooms & Beds" rooms={rooms} loading={loading} onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }} contentClassName="max-w-7xl mx-auto">
@@ -419,7 +422,7 @@ const handleAddTenant = (room) => {
             <BedDouble size={20} />
           </div>
           <div className="mt-3">
-            <h3 className="text-[22px] font-black text-slate-900 leading-tight">{rooms.reduce((s,r)=> s+ (r.beds?.length||0),0)}</h3>
+            <h3 className="text-[22px] font-black text-slate-900 leading-tight">{roomStats.totalBeds}</h3>
             <p className="text-[12px] font-semibold text-slate-500 mt-0.5">Total Beds</p>
           </div>
         </div>
@@ -428,7 +431,7 @@ const handleAddTenant = (room) => {
             <BedDouble size={20} />
           </div>
           <div className="mt-3">
-            <h3 className="text-[22px] font-black text-slate-900 leading-tight">{rooms.reduce((s,r)=>s+ r.beds.filter(b=>b.status==='available').length,0)}</h3>
+            <h3 className="text-[22px] font-black text-slate-900 leading-tight">{roomStats.vacantBeds}</h3>
             <p className="text-[12px] font-semibold text-slate-500 mt-0.5">Vacant Beds</p>
           </div>
         </div>
@@ -437,7 +440,7 @@ const handleAddTenant = (room) => {
             <BedDouble size={20} />
           </div>
           <div className="mt-3">
-            <h3 className="text-[22px] font-black text-slate-900 leading-tight">{rooms.reduce((s,r)=>s+ r.beds.filter(b=>b.status==='occupied').length,0)}</h3>
+            <h3 className="text-[22px] font-black text-slate-900 leading-tight">{roomStats.occupiedBeds}</h3>
             <p className="text-[12px] font-semibold text-slate-500 mt-0.5">Occupied Beds</p>
           </div>
         </div>
@@ -446,7 +449,7 @@ const handleAddTenant = (room) => {
             <Home size={20} />
           </div>
           <div className="mt-3">
-            <h3 className="text-[22px] font-black text-slate-900 leading-tight">{rooms.filter(r=> r.beds.filter(b=>b.status==='available').length>0).length}</h3>
+            <h3 className="text-[22px] font-black text-slate-900 leading-tight">{roomStats.vacantRooms}</h3>
             <p className="text-[12px] font-semibold text-slate-500 mt-0.5">Vacant Rooms</p>
           </div>
         </div>
@@ -455,7 +458,7 @@ const handleAddTenant = (room) => {
             <Building2 size={20} />
           </div>
           <div className="mt-3">
-            <h3 className="text-[22px] font-black text-slate-900 leading-tight">{rooms.filter(r=> r.beds.filter(b=>b.status==='occupied').length>0).length}</h3>
+            <h3 className="text-[22px] font-black text-slate-900 leading-tight">{roomStats.occupiedRooms}</h3>
             <p className="text-[12px] font-semibold text-slate-500 mt-0.5">Occupied Rooms</p>
           </div>
         </div>
@@ -475,8 +478,7 @@ const handleAddTenant = (room) => {
             <span className="text-[12px] font-semibold text-muted-foreground">Floor:</span>
             <select value={floorFilter} onChange={e => setFloorFilter(e.target.value)} className="bg-card border border-border rounded-lg px-2 py-1 text-[12px] outline-none focus:ring-1 focus:ring-primary max-w-[100px]">
               <option value="all">All Floors</option>
-              {/* Dynamically generate floor options */}
-              {Array.from(new Set(rooms.map(r=>r.floor).filter(Boolean))).map(f=>(
+              {floorOptions.map(f=>(
                 <option key={f} value={f}>{f}</option>
               ))}
             </select>
@@ -537,17 +539,14 @@ const handleAddTenant = (room) => {
           </div>
           ) : (
             <>
-              {Object.entries(grouped).map(([propTitle, propData]) => {
-                const allPropRooms = propData.rooms || [];
+              {Object.entries(grouped).map(([propTitle, allPropRooms]) => {
                 const allBeds = allPropRooms.flatMap(r => toLegacyBeds(r));
                 const pOcc = allBeds.filter(b => b.status==="occupied"||b.tenantId).length;
                 const pTotal = allBeds.length;
                 const pct = pTotal ? Math.round((pOcc/pTotal)*100) : 0;
                 // Per-property pagination
-                const propId = propData.propId || "";
-                // Total rooms from backend (if paginated) or count rooms loaded for this property
-                const loadedForProp = rooms.filter(r => String(r.propertyId) === propId || r.propertyTitle === propTitle).length;
-                const totalPropRooms = (propId && propertyTotals[propId]) ? propertyTotals[propId] : loadedForProp;
+                const propId = allPropRooms[0]?.propertyId || "";
+                const totalPropRooms = propertyTotals[propId] || allPropRooms.length;
                 const propPage = propPages[propTitle] || 1;
                 const propTotalPages = Math.max(1, Math.ceil(totalPropRooms / ROOMS_PER_PAGE));
                 const safePropPage = Math.min(propPage, propTotalPages);
@@ -564,21 +563,9 @@ const handleAddTenant = (room) => {
                           {allPropRooms.length} rooms · {pOcc}/{pTotal} beds occupied
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRoomForm({ ...defaultRoomForm, propertyId: propId || (properties.find(p => p.title === propTitle || p.name === propTitle)?._id) });
-                            setRoomModalOpen(true);
-                          }}
-                          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-blue-600 text-white text-[12px] font-semibold hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20"
-                        >
-                          <Plus size={13} /> Add Room
-                        </button>
-                        <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold",
-                          pct > 90 ? "bg-blue-50 text-blue-600" : pct > 0 ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"
-                        )}>{pct}% full</span>
-                      </div>
+                      <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold",
+                        pct > 90 ? "bg-blue-50 text-blue-600" : pct > 0 ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"
+                      )}>{pct}% full</span>
                     </div>
 
                     {/* Room Cards Grid */}
@@ -646,7 +633,7 @@ const handleAddTenant = (room) => {
                                 <div>
                                   <h3 className="text-[14px] font-bold text-slate-900 leading-tight">Room {room.number||room.roomNo||room.title}</h3>
                                   <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1 font-medium">
-                                    {room.gender||"Co-Ed"} • {room.type||"AC"}
+                                    {room.gender||"Mixed"} • {room.type||"AC"}
                                   </p>
                                 </div>
                               </div>
@@ -710,7 +697,7 @@ const handleAddTenant = (room) => {
                   {propTotalPages > 1 && (
                     <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
                         <span className="text-[12px] text-slate-400 font-medium">
-                          Showing {Math.min((safePropPage-1)*ROOMS_PER_PAGE+1, totalPropRooms)}–{Math.min(safePropPage*ROOMS_PER_PAGE, totalPropRooms)} of {totalPropRooms} rooms
+                          Showing {(safePropPage-1)*ROOMS_PER_PAGE+1}–{Math.min(safePropPage*ROOMS_PER_PAGE, totalPropRooms)} of {totalPropRooms} rooms
                         </span>
                         <div className="flex items-center gap-1.5">
                           <button
@@ -720,38 +707,19 @@ const handleAddTenant = (room) => {
                           >
                             ←
                           </button>
-                          {(() => {
-                            // Smart pagination: show max 7 page buttons with ellipsis
-                            const pages = [];
-                            const delta = 2;
-                            const left = safePropPage - delta;
-                            const right = safePropPage + delta;
-                            let lastPushed = null;
-                            for (let i = 1; i <= propTotalPages; i++) {
-                              if (i === 1 || i === propTotalPages || (i >= left && i <= right)) {
-                                if (lastPushed !== null && i - lastPushed > 1) {
-                                  pages.push('...');
-                                }
-                                pages.push(i);
-                                lastPushed = i;
-                              }
-                            }
-                            return pages.map((p, idx) =>
-                              p === '...'
-                                ? <span key={`ellipsis-${idx}`} className="w-8 h-8 flex items-center justify-center text-[12px] text-slate-400">…</span>
-                                : <button
-                                    key={p}
-                                    onClick={() => setPropertyPage(p)}
-                                    className={cn("w-8 h-8 rounded-lg text-[12px] font-semibold transition-all",
-                                      p === safePropPage
-                                        ? "bg-blue-600 text-white"
-                                        : "bg-white border border-slate-200 text-slate-400 hover:bg-slate-50"
-                                    )}
-                                  >
-                                    {p}
-                                  </button>
-                            );
-                          })()}
+                          {Array.from({ length: propTotalPages }, (_, i) => i + 1).map(p => (
+                            <button
+                              key={p}
+                              onClick={() => setPropertyPage(p)}
+                              className={cn("w-8 h-8 rounded-lg text-[12px] font-semibold transition-all",
+                                p === safePropPage
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-white border border-slate-200 text-slate-400 hover:bg-slate-50"
+                              )}
+                            >
+                              {p}
+                            </button>
+                          ))}
                           <button
                             disabled={safePropPage >= propTotalPages}
                             onClick={() => setPropertyPage(safePropPage + 1)}
@@ -973,7 +941,7 @@ const handleAddTenant = (room) => {
                       const uploadedFiles = await Promise.all(uploadPromises);
                       setRoomForm(p => ({...p, media: [...(p.media || []), ...uploadedFiles]}));
                     } catch (err) {
-                      alert("Failed to upload media: " + err.message);
+                      toast.error("Failed to upload media: " + err.message);
                     } finally {
                       setIsUploadingMedia(false);
                     }
@@ -1057,11 +1025,7 @@ const handleAddTenant = (room) => {
                 <select required className="w-full bg-card border border-border rounded-lg px-4 py-2.5 text-[13.5px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20" value={selectedTenantId} onChange={e=>setSelectedTenantId(e.target.value)}>
                   <option value="">-- Select Tenant --</option>
                   {tenants
-                    .filter(t => {
-                      // Exclude tenants already assigned to any bed in any room
-                      const assignedIds = rooms.flatMap(r => toLegacyBeds(r).map(b => b.tenantId).filter(Boolean));
-                      return !assignedIds.includes(t._id || t.id);
-                    })
+                    .filter(t => !assignedIds.has(t._id || t.id))
                     .map(t=><option key={t._id||t.id} value={t._id||t.id}>{t.name} ({t.phone})</option>)
                   }
                 </select>

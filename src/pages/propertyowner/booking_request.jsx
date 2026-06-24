@@ -1,7 +1,11 @@
 import React, { useState } from "react";
+import toast from "react-hot-toast";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
-import { apiFetch } from "../../services/api";
+import { fetchJson } from "../../utils/api";
+import { cacheGet, cacheSet, cacheInvalidate } from "../../utils/cache";
+
+const BOOKING_TTL = 2 * 60 * 1000; // 2 minutes
 import { 
   Inbox, Search, MessageSquare, Phone, Calendar, 
   CheckCircle2, XCircle, Clock, CreditCard, ArrowRight, Loader2,
@@ -26,37 +30,47 @@ export default function BookingRequestPage() {
   const [paymentLink, setPaymentLink] = useState("");
   const [processingId, setProcessingId] = useState(null);
 
-  React.useEffect(() => {
-    let active = true;
-    const fetchRequests = async () => {
-      try {
-        setLoading(true);
-        const response = await apiFetch(`/api/booking?owner_id=${owner.loginId}&status=pending`);
-        if (active && response?.data) {
-          setRequests(response.data);
-        }
-      } catch (err) {
-        console.error("Error fetching booking requests:", err);
-      } finally {
-        if (active) setLoading(false);
+  const fetchRequests = React.useCallback(async (bustCache = false) => {
+    const cacheKey = `booking-requests:${owner.loginId}`;
+    if (!bustCache) {
+      const cached = cacheGet(cacheKey);
+      if (cached && cached.length > 0) {
+        setRequests(cached); setLoading(false);
+        return;
       }
-    };
-    fetchRequests();
-    return () => { active = false; };
+    } else {
+      cacheInvalidate(cacheKey);
+    }
+    try {
+      setLoading(true);
+      const response = await fetchJson(`/api/booking?owner_id=${encodeURIComponent(owner.loginId)}&status=pending`);
+      const data = response?.data || [];
+      if (data.length > 0) cacheSet(cacheKey, data, BOOKING_TTL);
+      setRequests(data);
+    } catch (err) {
+      console.error("Error fetching booking requests:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [owner.loginId]);
+
+  React.useEffect(() => {
+    fetchRequests();
+  }, [fetchRequests]);
 
   const handleAction = async (id, action) => {
     setProcessingId(id);
     try {
       if (action === "approve") {
-        await apiFetch(`/api/booking/requests/${id}/approve`, { method: "PUT" });
+        await fetchJson(`/api/booking/requests/${id}/approve`, { method: "PUT" });
       } else if (action === "reject") {
-        await apiFetch(`/api/booking/requests/${id}/reject`, { method: "PUT" });
+        await fetchJson(`/api/booking/requests/${id}/reject`, { method: "PUT" });
       }
+      cacheInvalidate(`booking-requests:${owner.loginId}`);
       setRequests(prev => prev.filter(r => r._id !== id));
     } catch (err) {
       console.error(`Error performing booking action ${action}:`, err);
-      alert(`Action failed: ${err.message}`);
+      toast.error(`Action failed: ${err.message}`);
     } finally {
       setProcessingId(null);
     }
@@ -66,17 +80,18 @@ export default function BookingRequestPage() {
     if (!approvingItem) return;
     setProcessingId(approvingItem._id);
     try {
-      await apiFetch(`/api/booking/requests/${approvingItem._id}/approve`, { 
+      await fetchJson(`/api/booking/requests/${approvingItem._id}/approve`, {
         method: "PUT",
-        body: JSON.stringify({ 
-           approved_amount: paymentAmount
+        body: JSON.stringify({
+          approved_amount: paymentAmount
         })
       });
+      cacheInvalidate(`booking-requests:${owner.loginId}`);
       setRequests(prev => prev.filter(r => r._id !== approvingItem._id));
       setShowApprovalModal(false);
-      alert(`Bid approved. Chat enabled and welcome message sent to tenant.`);
+      toast.success(`Bid approved. Chat enabled and welcome message sent to tenant.`);
     } catch(err) {
-      alert(`Action failed: ${err.message}`);
+      toast.error(`Action failed: ${err.message}`);
     } finally {
       setProcessingId(null);
     }
@@ -98,6 +113,14 @@ export default function BookingRequestPage() {
           <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Booking Requests</h1>
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">Approve incoming reservation requests, verify online token receipts, and allocate rooms.</p>
         </div>
+        <button
+          onClick={() => fetchRequests(true)}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card text-[13px] font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-50 shrink-0"
+        >
+          <Loader2 size={14} className={loading ? "animate-spin" : ""} />
+          Refresh
+        </button>
       </div>
 
       {/* Toolbar */}
@@ -123,6 +146,7 @@ export default function BookingRequestPage() {
           <Clock size={40} className="mx-auto text-muted-foreground mb-4" />
           <h3 className="font-serif text-[20px] font-bold text-foreground">No Pending Requests</h3>
           <p className="text-[13px] text-muted-foreground mt-1">There are no new booking requests at the moment.</p>
+          <button onClick={() => fetchRequests(true)} className="mt-4 text-[13px] text-primary underline underline-offset-2">Check for new requests</button>
         </div>
       ) : (
         /* Grid of Booking Requests */

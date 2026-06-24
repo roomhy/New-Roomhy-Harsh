@@ -5,7 +5,8 @@ import {
   LogOut, Search, Download, Filter, 
   FileText, Calendar
 } from "lucide-react";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
+import { cacheGet, cacheSet } from "../../utils/cache";
 
 export default function ExitLogsPage() {
   const owner = getOwnerRuntimeSession();
@@ -24,19 +25,23 @@ export default function ExitLogsPage() {
   }, [owner.loginId]);
 
   const fetchLogs = async () => {
+    const CACHE_KEY = `exitlogs:${owner.loginId}`;
+    const cached = cacheGet(CACHE_KEY);
+    if (cached) { setLogs(cached); setLoading(false); return; }
     try {
       setLoading(true);
       const data = await apiFetch(`/api/visitors/owner/${owner.loginId}`);
       if (data.success && data.visitors) {
-        // Filter those who have exited
         const exited = data.visitors.filter(v => v.exitTime);
-        setLogs(exited.map(v => ({
-           id: `EXT-${v._id.substring(v._id.length-4).toUpperCase()}`,
-           name: v.name,
-           type: "Visitor",
-           gate: "Main Gate",
-           time: new Date(v.exitTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
-        })));
+        const mapped = exited.map(v => ({
+          id: `EXT-${v._id.substring(v._id.length-4).toUpperCase()}`,
+          name: v.name,
+          type: "Visitor",
+          gate: "Main Gate",
+          time: new Date(v.exitTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+        }));
+        setLogs(mapped);
+        cacheSet(CACHE_KEY, mapped, 2 * 60 * 1000);
       }
     } catch (err) {
       console.error(err);

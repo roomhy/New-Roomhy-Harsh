@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getApiBase, getAuthHeader } from "../../utils/api";
+import { getApiBase, getAuthHeader, fetchJson } from "../../utils/api";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { MobileTabs, MobileEmptyState, cn } from "../../components/propertyowner/MobileComponents";
 import { requireOwnerSession } from "../../utils/ownerSession";
@@ -12,14 +12,6 @@ import {
   Wallet, FileText
 } from "lucide-react";
 
-// ─── Constants (same as AddPropertyWizard) ─────────────────────────────────────
-const AMENITY_CATEGORIES = [
-  { label: "Essentials", items: ["WiFi", "Power Backup", "24x7 Water", "RO Water", "Air Conditioning", "Heating"] },
-  { label: "Security & Safety", items: ["CCTV", "Security Guard", "Fire Extinguisher", "Smoke Detector", "First Aid Kit", "Secure Entry"] },
-  { label: "Room Amenities", items: ["Attached Bathroom", "Study Table", "Wardrobe", "Chair", "Bed with Mattress", "Mirror"] },
-  { label: "Facilities", items: ["Kitchen", "Refrigerator", "Microwave", "Induction Cooktop", "Geyser", "Utensils"] },
-  { label: "Common Areas", items: ["Living Room", "Dining Area", "Lounge", "Balcony / Terrace", "Garden", "Parking"] },
-];
 
 const PROPERTY_TYPES = ["hostel", "pg", "apartment", "co-living", "room"];
 const GENDER_OPTIONS = ["Co-ed", "Male Only", "Female Only", "any", "male", "female"];
@@ -131,28 +123,24 @@ function PropertyViewModal({ property, onClose }) {
   const [activeTab, setActiveTab] = useState("Overview");
   const [activeImg, setActiveImg] = useState(0);
   const [tenants, setTenants] = useState([]);
-  const [payments, setPayments] = useState([]);
   const [loadingExtras, setLoadingExtras] = useState(false);
-  
+  const [extrasError, setExtrasError] = useState("");
+
   const allImgs = [...(property.images || []), ...((property.propertyViews || []).flatMap(v => v.images || []))].filter(Boolean);
 
   useEffect(() => {
     if (activeTab === "Tenants" || activeTab === "Payments") {
-      // Fetch property specific tenants/payments (Mock or real if endpoint exists)
+      if (tenants.length > 0) return;
       setLoadingExtras(true);
-      fetchJson(`/api/owners/${property.ownerLoginId}/rooms`)
-        .then(async (data) => {
-          // If we had a direct property tenants endpoint we'd use it, 
-          // For now just simulate delay
-          setTimeout(() => {
-            setTenants([{ name: "John Doe", room: "101", status: "Active" }]);
-            setPayments([{ amount: 15000, status: "Paid", date: "12 Oct 2023" }]);
-            setLoadingExtras(false);
-          }, 500);
+      setExtrasError("");
+      fetchJson(`/api/owners/${encodeURIComponent(property.ownerLoginId)}/properties/${encodeURIComponent(property._id)}/tenants`)
+        .then((data) => {
+          setTenants(data.tenants || []);
         })
-        .catch(() => setLoadingExtras(false));
+        .catch(() => setExtrasError("Failed to load tenant data."))
+        .finally(() => setLoadingExtras(false));
     }
-  }, [activeTab, property]);
+  }, [activeTab, property._id]);
 
   const tabs = ["Overview", "Rooms", "Tenants", "Payments", "Documents"];
 
@@ -292,12 +280,45 @@ function PropertyViewModal({ property, onClose }) {
             <div className="space-y-4">
               {loadingExtras ? (
                 <div className="flex items-center justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
-              ) : (
+              ) : extrasError ? (
+                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-center">
+                  <AlertCircle className="w-8 h-8 text-rose-400 mx-auto mb-2" />
+                  <p className="text-sm text-rose-600">{extrasError}</p>
+                </div>
+              ) : tenants.length === 0 ? (
                 <div className="bg-white border border-slate-100 rounded-2xl p-6 text-center">
                   <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                  <h3 className="text-sm font-bold text-slate-700">Property Tenants</h3>
-                  <p className="text-xs text-slate-500 mt-1 mb-4">View and manage tenants residing in this property.</p>
-                  <button onClick={() => window.location.href = `/propertyowner/tenants?property=${property._id}`} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">Go to Tenants Dashboard</button>
+                  <h3 className="text-sm font-bold text-slate-700">No tenants yet</h3>
+                  <p className="text-xs text-slate-500 mt-1 mb-4">No tenants are currently assigned to this property.</p>
+                  <button onClick={() => window.location.href = `/propertyowner/tenantrec`} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">Add Tenant</button>
+                </div>
+              ) : (
+                <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
+                  <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+                    <h3 className="text-sm font-bold text-slate-700">{tenants.length} Tenant{tenants.length !== 1 ? "s" : ""}</h3>
+                    <button onClick={() => window.location.href = `/propertyowner/tenants`} className="text-xs font-bold text-indigo-600 hover:text-indigo-800">View All →</button>
+                  </div>
+                  <div className="divide-y divide-slate-50">
+                    {tenants.map((t) => (
+                      <div key={t._id} className="flex items-center justify-between px-5 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold">
+                            {(t.name || "?").charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-800">{t.name}</p>
+                            <p className="text-[11px] text-slate-400">Room {t.roomNo || "—"} · {t.phone || ""}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-slate-800">₹{(t.agreedRent || 0).toLocaleString("en-IN")}<span className="text-[10px] text-slate-400 font-normal">/mo</span></p>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${t.status === "active" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                            {t.status || "Active"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -308,12 +329,45 @@ function PropertyViewModal({ property, onClose }) {
             <div className="space-y-4">
               {loadingExtras ? (
                 <div className="flex items-center justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
-              ) : (
+              ) : extrasError ? (
+                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-center">
+                  <AlertCircle className="w-8 h-8 text-rose-400 mx-auto mb-2" />
+                  <p className="text-sm text-rose-600">{extrasError}</p>
+                </div>
+              ) : tenants.length === 0 ? (
                 <div className="bg-white border border-slate-100 rounded-2xl p-6 text-center">
                   <Wallet className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                  <h3 className="text-sm font-bold text-slate-700">Rent Ledger</h3>
-                  <p className="text-xs text-slate-500 mt-1 mb-4">Track payments and outstanding dues for this property.</p>
-                  <button onClick={() => window.location.href = `/propertyowner/payment?property=${property._id}`} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">View Ledger</button>
+                  <h3 className="text-sm font-bold text-slate-700">No payment data</h3>
+                  <p className="text-xs text-slate-500 mt-1 mb-4">No tenants assigned — no rent to track yet.</p>
+                </div>
+              ) : (
+                <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
+                  <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-700">Monthly Rent Summary</h3>
+                      <p className="text-[11px] text-slate-400">Expected from {tenants.length} tenant{tenants.length !== 1 ? "s" : ""} this month</p>
+                    </div>
+                    <p className="text-lg font-black text-slate-800">
+                      ₹{tenants.reduce((s, t) => s + (Number(t.agreedRent) || 0), 0).toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                  <div className="divide-y divide-slate-50">
+                    {tenants.map((t) => (
+                      <div key={t._id} className="flex items-center justify-between px-5 py-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">{t.name}</p>
+                          <p className="text-[11px] text-slate-400">Room {t.roomNo || "—"} · Move-in: {t.moveInDate ? new Date(t.moveInDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-emerald-700">₹{(t.agreedRent || 0).toLocaleString("en-IN")}<span className="text-[10px] text-slate-400 font-normal">/mo</span></p>
+                          <p className="text-[10px] text-slate-400">Deposit: ₹{(t.securityDepositPaid || 0).toLocaleString("en-IN")}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="px-5 py-3 border-t border-slate-100 text-right">
+                    <button onClick={() => window.location.href = `/propertyowner/payment`} className="text-xs font-bold text-indigo-600 hover:text-indigo-800">Full Ledger →</button>
+                  </div>
                 </div>
               )}
             </div>
@@ -358,9 +412,8 @@ function PropertyEditModal({ property, owner, apiBase, onClose, onSuccess }) {
   const STEPS = [
     { num: 1, label: "Basic Info" },
     { num: 2, label: "Property Details" },
-    { num: 3, label: "Amenities" },
-    { num: 4, label: "Photos" },
-    { num: 5, label: "Pricing & Policies" },
+    { num: 3, label: "Photos" },
+    { num: 4, label: "Pricing & Policies" },
   ];
 
   // Step 1 — Basic
@@ -410,13 +463,7 @@ function PropertyEditModal({ property, owner, apiBase, onClose, onSuccess }) {
   // Step 2 — Preferred For
   const [preferredFor, setPreferredFor] = useState(property.propertyDetails?.preferredFor || { students: false, professionals: false, both: false, family: false });
 
-  // Step 3 — Amenities
-  const [selectedAmenities, setSelectedAmenities] = useState(
-    new Set((property.amenities || []).map(a => typeof a === "string" ? a : a.name))
-  );
-  const [customAmenity, setCustomAmenity] = useState("");
-
-  // Step 4 — Images
+  // Step 3 — Images
   const [images, setImages] = useState(property.images || []);
   const [uploadingImgs, setUploadingImgs] = useState(false);
 
@@ -520,7 +567,6 @@ function PropertyEditModal({ property, owner, apiBase, onClose, onSuccess }) {
           additionalCharges,
         },
         policies:          houseRules,
-        amenities:         Array.from(selectedAmenities).map(name => ({ name })),
         images,
         roomTypes,
         tenantDescription: form.tenantDescription,
@@ -773,58 +819,8 @@ function PropertyEditModal({ property, owner, apiBase, onClose, onSuccess }) {
             </>
           )}
 
-          {/* ── STEP 3: Amenities ── */}
+          {/* ── STEP 3: Photos ── */}
           {step === 3 && (
-            <SectionCard title="Amenities" icon={CheckCircle2} colorClass="purple">
-              <div className="p-4 space-y-5">
-                {AMENITY_CATEGORIES.map(cat => (
-                  <div key={cat.label}>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">{cat.label}</p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      {cat.items.map(item => {
-                        const active = selectedAmenities.has(item);
-                        return (
-                          <button key={item} onClick={() => toggleAmenity(item)}
-                            className={cn("flex items-center gap-2 px-3 py-2.5 rounded-xl text-[11px] font-bold border transition-all text-left",
-                              active ? "bg-purple-50 border-purple-300 text-purple-700" : "bg-slate-50 border-slate-200 text-slate-600 hover:border-purple-200")}>
-                            <div className={cn("w-4 h-4 rounded-md border-2 flex items-center justify-center shrink-0 transition-all",
-                              active ? "bg-purple-600 border-purple-600" : "border-slate-300")}>
-                              {active && <Check className="w-2.5 h-2.5 text-white" />}
-                            </div>
-                            {item}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-                {/* Custom amenity */}
-                <div>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Custom Amenity</p>
-                  <div className="flex gap-2">
-                    <input value={customAmenity} onChange={e => setCustomAmenity(e.target.value)}
-                      placeholder="Type custom amenity..."
-                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:border-purple-400 transition-all" />
-                    <button onClick={() => { if (customAmenity.trim()) { toggleAmenity(customAmenity.trim()); setCustomAmenity(""); } }}
-                      className="px-4 py-2 bg-purple-600 text-white rounded-xl text-xs font-bold hover:bg-purple-700">
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {Array.from(selectedAmenities).map(am => (
-                    <span key={am} className="inline-flex items-center gap-1 px-3 py-1 bg-purple-50 text-purple-700 border border-purple-100 rounded-lg text-[11px] font-bold">
-                      {am}
-                      <button onClick={() => toggleAmenity(am)} className="ml-1 hover:text-rose-500"><X className="w-3 h-3" /></button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </SectionCard>
-          )}
-
-          {/* ── STEP 4: Photos ── */}
-          {step === 4 && (
             <SectionCard title="Property Photos" icon={ImageIcon} colorClass="teal">
               <div className="p-4">
                 <div className="grid grid-cols-3 md:grid-cols-5 gap-3 mb-4">
@@ -851,8 +847,8 @@ function PropertyEditModal({ property, owner, apiBase, onClose, onSuccess }) {
             </SectionCard>
           )}
 
-          {/* ── STEP 5: Policies & Pricing ── */}
-          {step === 5 && (
+          {/* ── STEP 4: Policies & Pricing ── */}
+          {step === 4 && (
             <>
               <SectionCard title="House Policies / Rules" icon={Shield} colorClass="rose">
                 <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -990,7 +986,7 @@ function PropertyEditModal({ property, owner, apiBase, onClose, onSuccess }) {
           </div>
           <div className="flex gap-3">
             <button onClick={onClose} disabled={sending} className="px-5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-slate-500 bg-slate-100 hover:bg-slate-200">Cancel</button>
-            {step < 5 ? (
+            {step < 4 ? (
               <button onClick={() => setStep(s => s + 1)} className="px-6 py-2.5 rounded-xl bg-blue-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-blue-700">
                 Next Step →
               </button>

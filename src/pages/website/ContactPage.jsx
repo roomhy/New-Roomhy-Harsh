@@ -3,19 +3,33 @@ import WebsiteNavbar from "../../components/website/WebsiteNavbar";
 import WebsiteFooter from "../../components/website/WebsiteFooter";
 import MobileBottomNav from "../../components/website/MobileBottomNav";
 import { Mail, Phone, MapPin, Send, Clock, MessageCircle, Headphones } from 'lucide-react';
+import { fetchJson } from "../../utils/api";
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    setTimeout(() => {
-      alert('Thank you for your message! We\'ll get back to you within 24 hours.');
+    try {
+      const response = await fetchJson('/api/booking/contact-submit', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          subject: formData.subject,
+          message: formData.message
+        })
+      });
+      alert(response?.message || 'Thank you for your message! We\'ll get back to you within 24 hours.');
       setFormData({ name: '', email: '', subject: '', message: '' });
+    } catch (error) {
+      console.error('Error submitting contact form:', error);
+      alert(error.message || 'Failed to submit message. Please try again later.');
+    } finally {
       setSubmitting(false);
-    }, 1500);
+    }
   };
 
   const contactCards = [

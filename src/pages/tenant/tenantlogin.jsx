@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useHtmlPage } from "../../utils/htmlPage";
 import { fetchJson } from "../../utils/api";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Home, User, KeyRound, ArrowRight, Lock, X } from "lucide-react";
 
 const resolvePanelPath = (folder, fileName) => {
   const path = (window.location.pathname || "").toLowerCase();
@@ -24,7 +24,7 @@ export default function Tenantlogin() {
       { href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap", rel: "stylesheet" },
       { rel: "stylesheet", href: "/tenant/assets/css/tenantlogin.css" }
     ],
-    scripts: [{ src: "https://cdn.tailwindcss.com" }, { src: "https://unpkg.com/lucide@latest" }],
+    scripts: [],
     inlineScripts: []
   });
 
@@ -48,14 +48,9 @@ export default function Tenantlogin() {
   const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
   const [forgotError, setForgotError] = useState("");
 
-  useEffect(() => {
-    if (window?.lucide) window.lucide.createIcons();
-  }, [step, forgotOpen, forgotStep]);
-
   const storeAuth = (data) => {
-    if (!data?.token || !data?.user) return;
-    localStorage.setItem("token", data.token);
-    sessionStorage.setItem("token", data.token);
+    if (!data?.user) return;
+    // Token is now in httpOnly cookie set by backend — never stored in JS storage.
     localStorage.setItem("user", JSON.stringify(data.user));
     sessionStorage.setItem("user", JSON.stringify(data.user));
     localStorage.setItem("tenant_user", JSON.stringify(data.user));
@@ -75,6 +70,10 @@ export default function Tenantlogin() {
       });
       if (data.requireReset) {
         setStep("setPassword");
+        return;
+      }
+      if (data.user?.role !== "tenant") {
+        setErrorMsg("Access denied. This portal is for tenants only.");
         return;
       }
       storeAuth(data);
@@ -200,11 +199,11 @@ export default function Tenantlogin() {
   };
 
   return (
-    <div className="html-page">
+    <div className="html-page min-h-screen flex items-center justify-center p-4">
       <div className="light-card w-full max-w-md p-8">
         <div className="text-center mb-8">
           <div className="bg-purple-100 w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-3">
-            <i data-lucide="home" className="w-6 h-6 text-purple-600"></i>
+            <Home className="w-6 h-6 text-purple-600" />
           </div>
           <h1 className="text-2xl font-bold text-gray-800">Roomhy</h1>
           <p className="text-xs text-gray-500 mt-1">TENANT PORTAL</p>
@@ -219,7 +218,7 @@ export default function Tenantlogin() {
               <label className="block text-sm font-medium text-gray-700 mb-2">Tenant ID</label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                  <i data-lucide="user" className="w-5 h-5"></i>
+                  <User className="w-5 h-5" />
                 </span>
                 <input
                   type="text"
@@ -235,7 +234,7 @@ export default function Tenantlogin() {
               <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                  <i data-lucide="key" className="w-5 h-5"></i>
+                  <KeyRound className="w-5 h-5" />
                 </span>
                 <input
                   type={showPassword ? "text" : "password"}
@@ -268,7 +267,7 @@ export default function Tenantlogin() {
               disabled={loading}
               className="w-full bg-purple-600 text-white font-bold py-3 rounded-lg hover:bg-purple-700 transition-colors flex justify-center items-center gap-2"
             >
-              {loading ? "Verifying..." : "Verify"} <i data-lucide="arrow-right" className="w-4 h-4"></i>
+              {loading ? "Verifying..." : "Verify"} <ArrowRight className="w-4 h-4" />
             </button>
 
             <p className="text-xs text-gray-500 text-center mt-6">
@@ -281,7 +280,7 @@ export default function Tenantlogin() {
           <div className="fade-in">
             <div className="flex justify-center mb-4">
               <div className="bg-green-100 p-3 rounded-full">
-                <i data-lucide="lock" className="w-8 h-8 text-green-600"></i>
+                <Lock className="w-8 h-8 text-green-600" />
               </div>
             </div>
             <h2 className="text-xl font-semibold text-gray-800 mb-1 text-center">Create Your Password</h2>
@@ -337,7 +336,7 @@ export default function Tenantlogin() {
               disabled={loading}
               className="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition-colors flex justify-center items-center gap-2"
             >
-              {loading ? "Saving..." : "Continue"} <i data-lucide="arrow-right" className="w-4 h-4"></i>
+              {loading ? "Saving..." : "Continue"} <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         )}
@@ -349,7 +348,7 @@ export default function Tenantlogin() {
         }}>
           <div className="bg-white w-full max-w-md rounded-xl border border-gray-200 shadow-xl p-6 relative">
             <button type="button" onClick={closeForgot} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
-              <i data-lucide="x" className="w-5 h-5"></i>
+              <X className="w-5 h-5" />
             </button>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Reset Password</h2>
             <p className="text-sm text-gray-500 mb-5">Follow the steps to reset your tenant password.</p>

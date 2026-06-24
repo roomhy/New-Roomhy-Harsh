@@ -5,7 +5,7 @@ import {
   FileText, Search, Download, CheckCircle2, 
   ArrowUpRight, IndianRupee, Tag
 } from "lucide-react";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
 
 export default function ServiceHistoryPage() {
   const owner = getOwnerRuntimeSession();

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { fetchJson } from "../../utils/api";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { MobileTabs, MobileEmptyState, cn } from "../../components/propertyowner/MobileComponents";
@@ -16,7 +16,7 @@ import {
   clearOwnerFetchCache,
   fetchOwnerRooms
 } from "../../utils/propertyowner";
-import { API_URL } from "../../services/api";
+import { API_URL } from "../../utils/api";
 
 const getFileUrl = (url) => {
   if (!url) return null;
@@ -42,6 +42,24 @@ const Pill = ({ tone = "muted", children }) => {
   );
 };
 
+const PAGE_SIZE = 30;
+
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+const val = (...sources) => sources.find(v => v !== undefined && v !== null && v !== "") || "—";
+
+const InfoField = ({ label, value, mono, wide }) => (
+  <div className={wide ? "col-span-2 sm:col-span-3" : ""}>
+    <div className="text-[11px] text-muted-foreground mb-0.5 uppercase tracking-wide">{label}</div>
+    <div className={`text-[13px] font-medium text-foreground break-words ${mono ? "font-mono" : ""}`}>{value || "—"}</div>
+  </div>
+);
+
+const SectionHead = ({ icon: Icon, title, color = "text-primary" }) => (
+  <h3 className={`text-[13.5px] font-semibold text-foreground mb-3 flex items-center gap-2`}>
+    <Icon size={15} className={color} /> {title}
+  </h3>
+);
+
 export default function Tenants() {
   const [owner, setOwner] = useState(null);
   const [tenants, setTenants] = useState([]);
@@ -66,6 +84,7 @@ export default function Tenants() {
     agreedRent: 0
   });
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(0);
 
   // Transfer room states
   const [rooms, setRooms] = useState([]);
@@ -177,12 +196,21 @@ export default function Tenants() {
     if (!session?.loginId) { window.location.href = "/propertyowner/ownerlogin"; return; }
     setOwner(session);
     const load = async () => {
+      // Show stale localStorage data instantly so the page never feels blank
+      try {
+        const stale = JSON.parse(localStorage.getItem("roomhy_tenants") || "[]");
+        if (Array.isArray(stale) && stale.length) {
+          setTenants(stale.filter(t => t.status !== "inactive"));
+          setLoading(false);
+        }
+      } catch (_) {}
+
+      // Fetch fresh data in background — updates UI when ready
       try {
         const [tenantsData, roomsData] = await Promise.all([
           fetchOwnerTenants(session.loginId),
           fetchOwnerRooms(session.loginId).catch(() => ({ rooms: [] }))
         ]);
-        // Filter out inactive soft-deleted tenants from main view
         const activeTenantsOnly = (tenantsData || []).filter(t => t.status !== "inactive");
         setTenants(activeTenantsOnly);
         setRooms(roomsData?.rooms || []);
@@ -200,14 +228,14 @@ export default function Tenants() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const counts = {
+  const counts = useMemo(() => ({
     all: tenants.length,
     active: tenants.filter(t => t.status === "active" || t.active).length,
     notice: tenants.filter(t => t.status === "notice" || t.status === "move-out").length,
     dues: tenants.filter(t => (t.dueAmount || t.dues || t.balance) > 0).length,
-  };
+  }), [tenants]);
 
-  const filtered = tenants.filter(t => {
+  const filtered = useMemo(() => tenants.filter(t => {
     const matchTab = tab === "all" || (tab === "active" && (t.status === "active" || t.active)) || (tab === "notice" && (t.status === "notice" || t.status === "move-out")) || (tab === "dues" && (t.dueAmount || t.dues || t.balance) > 0);
     const q = debouncedSearch.toLowerCase();
     const matchSearch = !debouncedSearch || (t.name || "").toLowerCase().includes(q) || (t.phone || "").includes(q) || (t.roomNo || "").toLowerCase().includes(q);
@@ -228,7 +256,14 @@ export default function Tenants() {
     if (valA < valB) return sortOrder === "asc" ? -1 : 1;
     if (valA > valB) return sortOrder === "asc" ? 1 : -1;
     return 0;
-  });
+  }), [tenants, tab, debouncedSearch, sortKey, sortOrder]);
+
+  useEffect(() => { setPage(0); }, [filtered]);
+
+  const paginated = useMemo(
+    () => filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    [filtered, page]
+  );
 
   const handleExportCSV = () => {
     const headers = ["Name,Phone,Room,Rent,Dues,Status,KYC"];
@@ -387,7 +422,7 @@ export default function Tenants() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {filtered.map((t) => (
+                    {paginated.map((t) => (
                       <tr key={t._id || t.id} className="hover:bg-muted/40 transition-colors">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
@@ -448,18 +483,18 @@ export default function Tenants() {
                 </table>
               </div>
               <div className="px-4 py-3 border-t border-border flex items-center justify-between text-[12px] text-muted-foreground">
-                <span>Showing {filtered.length} of {tenants.length}</span>
+                <span>Showing {Math.min(page * PAGE_SIZE + 1, filtered.length)}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}</span>
                 <div className="flex gap-1">
-                  <button className="h-8 px-2.5 rounded-md border border-border hover:bg-muted transition-colors">Prev</button>
-                  <button className="h-8 px-2.5 rounded-md border border-border bg-muted">1</button>
-                  <button className="h-8 px-2.5 rounded-md border border-border hover:bg-muted transition-colors">Next</button>
+                  <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="h-8 px-2.5 rounded-md border border-border hover:bg-muted transition-colors disabled:opacity-40">Prev</button>
+                  <button className="h-8 px-2.5 rounded-md border border-border bg-muted">{page + 1}</button>
+                  <button disabled={(page + 1) * PAGE_SIZE >= filtered.length} onClick={() => setPage(p => p + 1)} className="h-8 px-2.5 rounded-md border border-border hover:bg-muted transition-colors disabled:opacity-40">Next</button>
                 </div>
               </div>
             </div>
 
             {/* Mobile Cards (Redesigned) */}
             <div className="block md:hidden space-y-3 pb-12">
-              {filtered.map((t) => (
+              {paginated.map((t) => (
                 <div key={`mob-${t._id || t.id}`} className="bg-white rounded-2xl p-4 border border-slate-200/60 shadow-sm relative overflow-hidden">
                   
                   {/* Header Row: Avatar, Name, Room, Status */}
@@ -527,7 +562,7 @@ export default function Tenants() {
                 </div>
               ))}
               <div className="text-center text-[12px] font-semibold text-slate-400 py-2">
-                Showing {filtered.length} of {tenants.length} tenants
+                Showing {Math.min(page * PAGE_SIZE + 1, filtered.length)}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length} tenants
               </div>
             </div>
           </>
@@ -541,25 +576,9 @@ export default function Tenants() {
         const profile = t.digitalCheckin?.profile || {};
         const agr = t.digitalCheckin?.agreementDetails || {};
 
-        const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-        const val = (...sources) => sources.find(v => v !== undefined && v !== null && v !== "") || "—";
-
         const tenantPhoto = getFileUrl(t.photo || kyc.idProofFile);
         const aadhaarFront = getFileUrl(kyc.aadhaarFront);
         const aadhaarBack  = getFileUrl(kyc.aadhaarBack);
-
-        const InfoField = ({ label, value, mono, wide }) => (
-          <div className={wide ? "col-span-2 sm:col-span-3" : ""}>
-            <div className="text-[11px] text-muted-foreground mb-0.5 uppercase tracking-wide">{label}</div>
-            <div className={`text-[13px] font-medium text-foreground break-words ${mono ? "font-mono" : ""}`}>{value || "—"}</div>
-          </div>
-        );
-
-        const SectionHead = ({ icon: Icon, title, color = "text-primary" }) => (
-          <h3 className={`text-[13.5px] font-semibold text-foreground mb-3 flex items-center gap-2`}>
-            <Icon size={15} className={color} /> {title}
-          </h3>
-        );
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/60 backdrop-blur-sm">

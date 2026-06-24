@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession, fetchOwnerProperties } from "../../utils/propertyowner";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
 import {
   BarChart3, FileSpreadsheet, FileText, Download, Loader2,
   CheckCircle2, X, Calendar, Filter, Search, History,

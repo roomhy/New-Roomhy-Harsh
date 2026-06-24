@@ -10,6 +10,7 @@ import {
   IndianRupee, Headset, Briefcase, Globe, BarChart3, Database, History
 } from "lucide-react";
 import { SILVER_NAV, GOLD_NAV } from './navConfig';
+import { cacheInvalidate } from "../../utils/cache";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -458,9 +459,10 @@ export default function PropertyOwnerMobileLayout({
                 onClick={async () => {
                   setGlobalNotifications([]);
                   if (owner?.loginId) {
+                    cacheInvalidate(`notifications:${owner.loginId}`);
                     try {
                       const { fetchJson } = await import("../../utils/api");
-                      await fetchJson(`/api/notifications/mark-all-read`, { 
+                      await fetchJson(`/api/notifications/mark-all-read`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ toLoginId: owner.loginId })

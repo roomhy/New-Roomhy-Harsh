@@ -1,11 +1,12 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
 import { 
   IndianRupee, Search, Download, CheckCircle2, 
   CreditCard, Calendar, User, ChevronRight
 } from "lucide-react";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
+import { cacheGet, cacheSet } from "../../utils/cache";
 
 export default function StaffSalariesPage() {
   const owner = getOwnerRuntimeSession();
@@ -23,11 +24,14 @@ export default function StaffSalariesPage() {
   }, []);
 
   const fetchData = async () => {
+    const CACHE_KEY = `salaries:${owner.loginId}`;
+    const cached = cacheGet(CACHE_KEY);
+    if (cached) { setSalaries(cached); setLoading(false); return; }
     try {
       const month = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-      
-      const empData = await apiFetch('/api/employees');
-      const myStaff = (empData.data || []).filter(e => e.parentLoginId === owner.loginId);
+
+      const empData = await apiFetch(`/api/employees?parentLoginId=${owner.loginId}`);
+      const myStaff = empData.data || [];
 
       const salData = await apiFetch(`/api/hr/salaries/${owner.loginId}`);
       
@@ -57,6 +61,7 @@ export default function StaffSalariesPage() {
       });
 
       setSalaries(merged);
+      cacheSet(CACHE_KEY, merged, 3 * 60 * 1000);
     } catch (err) {
       console.error(err);
     } finally {
@@ -86,13 +91,13 @@ export default function StaffSalariesPage() {
     }
   };
 
-  const filteredSalaries = salaries.filter(s => 
+  const filteredSalaries = useMemo(() => salaries.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     s.role.toLowerCase().includes(search.toLowerCase())
-  );
+  ), [salaries, search]);
 
-  const totalPayroll = salaries.reduce((acc, s) => acc + s.net, 0);
-  const paidPayroll = salaries.filter(s => s.status === "Paid").reduce((acc, s) => acc + s.net, 0);
+  const totalPayroll = useMemo(() => salaries.reduce((acc, s) => acc + s.net, 0), [salaries]);
+  const paidPayroll = useMemo(() => salaries.filter(s => s.status === "Paid").reduce((acc, s) => acc + s.net, 0), [salaries]);
 
   return (
     <PropertyOwnerLayout 

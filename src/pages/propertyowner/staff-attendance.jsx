@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
 import {
   UserCheck, UserX, Clock, Calendar, CheckCircle2, AlertCircle,
   Search, Filter, Plus, X, ChevronLeft, ChevronRight
 } from "lucide-react";
-import { apiFetch } from "../../services/api";
+import { apiFetch } from "../../utils/api";
+import { cacheGet, cacheSet, cacheInvalidate } from "../../utils/cache";
 
 const STATUS_STYLES = {
   Present:   { bg: "bg-emerald-100 text-emerald-700 border-emerald-200",  dot: "bg-emerald-500" },
@@ -33,55 +34,68 @@ export default function StaffAttendancePage() {
   const [saving, setSaving]         = useState(false);
 
   const fetchData = useCallback(async () => {
+    const EMP_KEY = `employees:${owner.loginId}`;
+    const ATT_KEY = `attendance:${owner.loginId}`;
+    const cachedEmp = cacheGet(EMP_KEY);
+    const cachedAtt = cacheGet(ATT_KEY);
+    if (cachedEmp && cachedAtt) {
+      setStaff(cachedEmp);
+      setAttendance(cachedAtt);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [staffRes, attRes] = await Promise.allSettled([
-        apiFetch(`/api/employees?parentLoginId=${owner.loginId}&isActive=true`),
-        apiFetch(`/api/hr/attendance/${owner.loginId}`),
+        cachedEmp ? Promise.resolve({ data: cachedEmp }) : apiFetch(`/api/employees?parentLoginId=${owner.loginId}&isActive=true`),
+        cachedAtt ? Promise.resolve({ data: cachedAtt }) : apiFetch(`/api/hr/attendance/${owner.loginId}`),
       ]);
 
       const allStaff = staffRes.status === "fulfilled" ? staffRes.value?.data || [] : [];
       const allAtt = attRes.status === "fulfilled" ? attRes.value?.data || [] : [];
       setStaff(allStaff);
       setAttendance(allAtt);
+      if (!cachedEmp) cacheSet(EMP_KEY, allStaff, 3 * 60 * 1000);
+      if (!cachedAtt) cacheSet(ATT_KEY, allAtt, 2 * 60 * 1000);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }, [owner.loginId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Get attendance for selected date
-  const dateAtt = attendance.filter(a => {
+  const dateAtt = useMemo(() => attendance.filter(a => {
     const d = new Date(a.date);
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}` === selectedDate;
-  });
+  }), [attendance, selectedDate]);
 
-  const attMap = {};
-  dateAtt.forEach(a => {
-    const empId = a.employeeId?._id || a.employeeId;
-    if (empId) attMap[String(empId)] = a;
-  });
+  const attMap = useMemo(() => {
+    const m = {};
+    dateAtt.forEach(a => {
+      const empId = a.employeeId?._id || a.employeeId;
+      if (empId) m[String(empId)] = a;
+    });
+    return m;
+  }, [dateAtt]);
 
-  // Staff with attendance status
-  const staffWithAtt = staff.map(s => ({
+  const staffWithAtt = useMemo(() => staff.map(s => ({
     ...s,
     attendance: attMap[String(s._id)] || null,
-  }));
+  })), [staff, attMap]);
 
-  const filtered = staffWithAtt.filter(s =>
+  const filtered = useMemo(() => staffWithAtt.filter(s =>
     !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.role?.toLowerCase().includes(search.toLowerCase())
-  );
+  ), [staffWithAtt, search]);
 
-  const stats = {
+  const stats = useMemo(() => ({
     total: staff.length,
     present: dateAtt.filter(a => a.status === "Present" || a.status === "Late").length,
     absent: dateAtt.filter(a => a.status === "Absent").length,
     leave: dateAtt.filter(a => a.status === "Leave" || a.status === "Half Day").length,
     notMarked: staff.length - dateAtt.length,
-  };
+  }), [staff, dateAtt]);
 
   const handleMark = async () => {
     setSaving(true);
@@ -98,6 +112,7 @@ export default function StaffAttendancePage() {
           notes: markForm.notes,
         }),
       });
+      cacheInvalidate(`attendance:`);
       await fetchData();
       setMarkModal(null);
     } catch (err) { alert("Failed: " + err.message); }

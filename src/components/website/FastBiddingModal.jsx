@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { X, MapPin, Zap, Send, Loader, Info, Shield, Locate } from 'lucide-react';
+import { X, MapPin, Zap, Send, Loader, Info, Shield, Locate, Lock, CheckCircle, AlertTriangle } from 'lucide-react';
 import { fetchCities, fetchAreas, fetchJson } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import LocationMapPicker from './LocationMapPicker';
 
 export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) {
   const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [cities, setCities] = useState([]);
   const [areas, setAreas] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [toast, setToast] = useState(null);
   // Cache all properties after first fetch — never refetch
   const [allProperties, setAllProperties] = useState([]);
   const propertiesFetched = useRef(false);
@@ -151,19 +155,24 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
     setShowMapPicker(false);
   };
 
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isAuthenticated) {
-      alert('Please login to place a bid');
+      setShowLoginPrompt(true);
       return;
     }
     if (filteredProperties.length === 0) {
-      alert('No properties found matching your criteria. We will notify you when something matches!');
+      showToast('No properties found matching your criteria. We will notify you when something matches!', 'warning');
       return;
     }
 
     // Show success immediately, send all bids in parallel in background
-    alert(`Sending bids to ${filteredProperties.length} matching properties!`);
+    showToast(`Sending bids to ${filteredProperties.length} matching properties!`, 'success');
     onClose();
 
     const userId = user.loginId || user._id || user.id || '';
@@ -223,7 +232,46 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+      <div className="relative bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+
+        {/* Login Required Prompt Overlay */}
+        {showLoginPrompt && (
+          <div className="absolute inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm rounded-2xl">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 mx-4 max-w-sm w-full text-center">
+              <div className="w-16 h-16 rounded-full bg-[#EE4266]/10 flex items-center justify-center mx-auto mb-4">
+                <Lock className="w-8 h-8 text-[#EE4266]" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Login Required</h3>
+              <p className="text-gray-500 text-sm mb-6">Please login to your account to place a bid and connect with property owners.</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowLoginPrompt(false)}
+                  className="flex-1 py-2.5 rounded-lg border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { setShowLoginPrompt(false); onClose(); navigate('/website/login'); }}
+                  className="flex-1 py-2.5 rounded-lg bg-[#EE4266] text-white font-bold text-sm hover:bg-[#d63a5b] transition-colors"
+                >
+                  Login Now
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Toast Notification */}
+        {toast && (
+          <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-[110] flex items-center gap-3 px-5 py-3 rounded-xl shadow-lg text-sm font-semibold transition-all ${
+            toast.type === 'success' ? 'bg-green-500 text-white' :
+            toast.type === 'warning' ? 'bg-amber-500 text-white' : 'bg-red-500 text-white'
+          }`}>
+            {toast.type === 'success' ? <CheckCircle className="w-4 h-4 flex-shrink-0" /> : <AlertTriangle className="w-4 h-4 flex-shrink-0" />}
+            {toast.message}
+          </div>
+        )}
+
         {/* Header */}
         <div className="bg-gradient-to-r from-[#EE4266] to-[#FF6B6B] p-6 text-white flex items-center justify-between">
           <div>

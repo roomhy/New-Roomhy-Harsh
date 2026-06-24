@@ -1,11 +1,20 @@
 import React from 'react';
 import PropertyOwnerLayout from '../../../components/propertyowner/PropertyOwnerLayout';
+import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from '../../../utils/propertyowner';
 import { History, Search, Filter, Download, Plus } from 'lucide-react';
 const cn = (...classes) => classes.filter(Boolean).join(' ');
 
 export default function TenantPage() {
+  const owner = getOwnerRuntimeSession();
+  if (!owner?.loginId && typeof window !== "undefined") {
+    window.location.href = "/propertyowner/ownerlogin";
+    return null;
+  }
   return (
-    <PropertyOwnerLayout>
+    <PropertyOwnerLayout
+      owner={owner}
+      onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
+    >
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header Section */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
