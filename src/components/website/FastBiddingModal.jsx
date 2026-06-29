@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { X, MapPin, Zap, Send, Loader, Info, Shield, Locate, Lock, CheckCircle, AlertTriangle } from 'lucide-react';
+import { X, MapPin, Zap, Send, Loader, Info, Shield, Locate, Lock, CheckCircle, AlertTriangle, ChevronDown, Wallet } from 'lucide-react';
 import { fetchCities, fetchAreas, fetchJson } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -17,6 +17,25 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
   // Cache all properties after first fetch — never refetch
   const [allProperties, setAllProperties] = useState([]);
   const propertiesFetched = useRef(false);
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [showAreaDropdown, setShowAreaDropdown] = useState(false);
+  const cityDropdownRef = useRef(null);
+  const areaDropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (cityDropdownRef.current && !cityDropdownRef.current.contains(event.target)) {
+        setShowCityDropdown(false);
+      }
+      if (areaDropdownRef.current && !areaDropdownRef.current.contains(event.target)) {
+        setShowAreaDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const apiUrl = useMemo(() => (
     import.meta.env?.VITE_API_URL ||
@@ -331,41 +350,100 @@ export default function FastBiddingModal({ isOpen, onClose, initialData = {} }) 
             <div className="space-y-3 md:space-y-4">
               <div className="space-y-0.5 md:space-y-1">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Preferred City</label>
-                <div className="relative">
-                  <select
-                    name="city"
-                    value={form.city}
-                    onChange={handleInputChange}
-                    className="w-full max-w-full bg-gray-50 border-2 border-gray-100 rounded-lg md:rounded-xl px-3 md:px-4 py-2 md:py-3 appearance-none focus:border-[#EE4266] outline-none transition-all font-semibold text-sm md:text-base bg-white"
-                    required
-                    style={{maxWidth:'100%', boxSizing:'border-box'}}>
-                    <option value="">Select City</option>
-                    {cities.map(c => {
-                      const cityName = typeof c === 'object' ? c.name : c;
-                      return <option key={cityName} value={cityName}>{cityName}</option>;
-                    })}
-                  </select>
-                  <ChevronDown className="absolute right-3 md:right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                <div className="relative" ref={cityDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowCityDropdown(!showCityDropdown)}
+                    className="w-full bg-gray-50 border-2 border-gray-100 rounded-lg md:rounded-xl px-3 md:px-4 py-2 md:py-3 flex justify-between items-center focus:border-[#EE4266] outline-none transition-all font-semibold text-sm md:text-base bg-white text-left"
+                  >
+                    <span className={form.city ? "text-gray-800" : "text-gray-400"}>
+                      {form.city || "Select City"}
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                  </button>
+                  
+                  {showCityDropdown && (
+                    <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-[120] max-h-48 overflow-y-auto animate-in fade-in duration-200">
+                      <div
+                        onClick={() => {
+                          setForm(prev => ({ ...prev, city: '', area: '' }));
+                          setShowCityDropdown(false);
+                        }}
+                        className="px-4 py-2.5 hover:bg-[#EE4266]/10 hover:text-[#EE4266] cursor-pointer text-sm font-semibold text-gray-500 border-b border-gray-100"
+                      >
+                        Select City
+                      </div>
+                      {cities.map(c => {
+                        const cityName = typeof c === 'object' ? c.name : c;
+                        return (
+                          <div
+                            key={cityName}
+                            onClick={() => {
+                              setForm(prev => ({ ...prev, city: cityName, area: '' }));
+                              setShowCityDropdown(false);
+                            }}
+                            className={`px-4 py-2.5 hover:bg-[#EE4266]/10 hover:text-[#EE4266] cursor-pointer text-sm font-semibold ${
+                              form.city === cityName ? 'bg-[#EE4266]/5 text-[#EE4266]' : 'text-gray-700'
+                            }`}
+                          >
+                            {cityName}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div className="space-y-0.5 md:space-y-1">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Area / Locality</label>
-                <div className="relative">
-                  <select
-                    name="area"
-                    value={form.area}
-                    onChange={handleInputChange}
+                <div className="relative" ref={areaDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (form.city) {
+                        setShowAreaDropdown(!showAreaDropdown);
+                      }
+                    }}
                     disabled={!form.city}
-                    className="w-full max-w-full bg-gray-50 border-2 border-gray-100 rounded-lg md:rounded-xl px-3 md:px-4 py-2 md:py-3 appearance-none focus:border-[#EE4266] outline-none transition-all font-semibold disabled:opacity-50 text-sm md:text-base bg-white"
-                    style={{maxWidth:'100%', boxSizing:'border-box'}}>
-                    <option value="">All Areas</option>
-                    {areas.map(a => {
-                      const areaName = typeof a === 'object' ? a.name : a;
-                      return <option key={areaName} value={areaName}>{areaName}</option>;
-                    })}
-                  </select>
-                  <ChevronDown className="absolute right-3 md:right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    className="w-full bg-gray-50 border-2 border-gray-100 rounded-lg md:rounded-xl px-3 md:px-4 py-2 md:py-3 flex justify-between items-center focus:border-[#EE4266] outline-none transition-all font-semibold disabled:opacity-50 text-sm md:text-base bg-white text-left"
+                  >
+                    <span className={form.area ? "text-gray-800" : "text-gray-400"}>
+                      {form.area || "All Areas"}
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                  </button>
+
+                  {showAreaDropdown && form.city && (
+                    <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-[120] max-h-48 overflow-y-auto animate-in fade-in duration-200">
+                      <div
+                        onClick={() => {
+                          setForm(prev => ({ ...prev, area: '' }));
+                          setShowAreaDropdown(false);
+                        }}
+                        className="px-4 py-2.5 hover:bg-[#EE4266]/10 hover:text-[#EE4266] cursor-pointer text-sm font-semibold text-gray-500 border-b border-gray-100"
+                      >
+                        All Areas
+                      </div>
+                      {areas.map(a => {
+                        const areaName = typeof a === 'object' ? a.name : a;
+                        return (
+                          <div
+                            key={areaName}
+                            onClick={() => {
+                              setForm(prev => ({ ...prev, area: areaName }));
+                              setShowAreaDropdown(false);
+                            }}
+                            className={`px-4 py-2.5 hover:bg-[#EE4266]/10 hover:text-[#EE4266] cursor-pointer text-sm font-semibold ${
+                              form.area === areaName ? 'bg-[#EE4266]/5 text-[#EE4266]' : 'text-gray-700'
+                            }`}
+                          >
+                            {areaName}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -500,15 +578,3 @@ const parsePriceRange = (str) => {
   if (numbers.length >= 2) return { min: Math.min(...numbers), max: Math.max(...numbers) };
   return { min: null, max: numbers[0] };
 };
-
-const ChevronDown = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-  </svg>
-);
-
-const Wallet = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-  </svg>
-);

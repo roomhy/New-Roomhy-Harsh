@@ -18,7 +18,8 @@ import {
   Heart,
   Edit,
   MessageSquare,
-  Trash2
+  Trash2,
+  Loader
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { fetchJson, getApiBase } from "../../utils/api";
@@ -332,9 +333,9 @@ export default function WebsiteChat() {
       <main className="w-full">
         <div className="instagram-chat-container">
           {/* Left Sidebar - Chat List */}
-          <div className={`chat-sidebar ${activeChat && mobileChatOpen ? "hidden md:flex" : "flex"}`}>
+          <div className={`chat-sidebar ${activeChat && mobileChatOpen ? "sidebar-hidden" : ""}`}>
             <div className="chat-sidebar-header flex items-center justify-between">
-              <h2 className="capitalize font-extrabold text-xl tracking-tight text-gray-900">{user?.name || "messages"}</h2>
+              <h2>Messages</h2>
             </div>
 
             <div className="chat-search-container px-4">
@@ -373,7 +374,7 @@ export default function WebsiteChat() {
           </div>
 
           {/* Right Canvas - Chat Active */}
-          <div className={`chat-canvas ${activeChat && mobileChatOpen ? "flex" : "hidden md:flex"}`}>
+          <div className={`chat-canvas ${activeChat && mobileChatOpen ? "canvas-active" : ""}`}>
             {!activeChat ? (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
                 <div className="w-24 h-24 border-2 border-gray-900 rounded-full flex items-center justify-center mb-6">
@@ -383,18 +384,18 @@ export default function WebsiteChat() {
                 <p className="text-sm text-gray-500 max-w-xs">Select a contact to start messaging.</p>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col h-full bg-white">
+              <div className="flex-1 flex flex-col h-full">
                 {/* Chat Header */}
                 <div className="chat-canvas-header">
                   <div className="chat-header-user">
-                    <button className="md:hidden mr-4" onClick={() => setMobileChatOpen(false)}>
-                      <ArrowLeft className="w-6 h-6 text-gray-800" />
+                    <button className="md:hidden mr-3" onClick={() => setMobileChatOpen(false)}>
+                      <ArrowLeft className="w-6 h-6 text-white" />
                     </button>
-                    <div className="w-10 h-10 rounded-full bg-teal-500 text-white flex items-center justify-center font-bold mr-3">
+                    <div className="w-10 h-10 rounded-full bg-teal-500 text-white flex items-center justify-center font-bold mr-3 text-base flex-shrink-0">
                       {(activeChat.participant_name || "A").charAt(0).toUpperCase()}
                     </div>
                     <div className="chat-header-info">
-                      <h3 className="font-bold capitalize">{activeChat.participant_name || "Roomhy Admin"}</h3>
+                      <h3>{activeChat.participant_name || "Roomhy Admin"}</h3>
                       <p>Online Support</p>
                     </div>
                   </div>
@@ -480,7 +481,9 @@ export default function WebsiteChat() {
                       className="chat-input-field custom-scrollbar"
                     />
                     {messageText.trim() || isUploading ? (
-                      <button onClick={sendMessage} className="chat-send-btn" disabled={isUploading}>{isUploading ? "..." : "Send"}</button>
+                      <button onClick={sendMessage} className="chat-send-btn" disabled={isUploading}>
+                        {isUploading ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      </button>
                     ) : (
                       <div className="chat-input-actions">
                         <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />

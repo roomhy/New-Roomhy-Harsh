@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 export default function FloatingBidNowButton({ onOpenModal }) {
+  const location = useLocation();
   const [showFloatingButton, setShowFloatingButton] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
 
@@ -23,6 +24,10 @@ export default function FloatingBidNowButton({ onOpenModal }) {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, [lastScrollY]);
+
+  if (location.pathname === '/website/chat') {
+    return null;
+  }
 
   return (
     <>
