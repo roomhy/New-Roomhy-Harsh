@@ -75,7 +75,8 @@ const resolveHostHome = () => {
     }
     if (role === "areamanager" || role === "employee") return "/employee/areaadmin";
     if (owner?.loginId) return "/propertyowner/admin";
-    return "/coming-soon";
+    // On localhost — default to website homepage for normal users/visitors
+    return "/website/index";
   }
 
   return "/coming-soon";

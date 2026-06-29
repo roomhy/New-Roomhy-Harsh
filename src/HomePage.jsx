@@ -325,7 +325,7 @@ export default function HomePage() {
           // Map API data to component format - use imageUrl from backend
           const formattedCities = citiesData.map((city, index) => ({
             name: city.name || city,
-            properties: city.propertyCount ? `${city.propertyCount}+` : staticCities[index]?.properties || '1,000+',
+            properties: typeof city.propertyCount === 'number' ? `${city.propertyCount}` : staticCities[index]?.properties || '0',
             // Use imageUrl from backend, fallback to static images
             image: city.imageUrl || city.image || staticCities[index]?.image || getCityImage(city.name)
           }));

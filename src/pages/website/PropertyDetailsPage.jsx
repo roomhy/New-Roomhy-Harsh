@@ -595,10 +595,10 @@ export default function PropertyDetailsPage() {
             price: foundProperty.propertyInfo?.rent || foundProperty.monthlyRent || foundProperty.price || "0",
             beds: foundProperty.propertyInfo?.totalSeats || foundProperty.bedrooms || foundProperty.beds || 0,
             gender: foundProperty.propertyInfo?.genderSuitability || foundProperty.gender || "Any",
-            owner: foundProperty.generatedCredentials?.ownerName || foundProperty.ownerName || foundProperty.owner || "Owner",
+            owner: foundProperty.propertyInfo?.ownerName || foundProperty.contact?.name || foundProperty.generatedCredentials?.ownerName || foundProperty.ownerName || foundProperty.owner || "Owner",
             owner_id: foundProperty.ownerLoginId || foundProperty.owner_id || foundProperty.generatedCredentials?.loginId || "",
-            ownerPhone: foundProperty.ownerPhoneNumber || foundProperty.ownerPhone || "",
-            ownerEmail: foundProperty.ownerEmail || "",
+            ownerPhone: foundProperty.propertyInfo?.ownerPhone || foundProperty.ownerPhoneNumber || foundProperty.ownerPhone || foundProperty.contact?.number || "",
+            ownerEmail: foundProperty.propertyInfo?.ownerEmail || foundProperty.propertyInfo?.ownerGmail || foundProperty.ownerEmail || foundProperty.contact?.email || "",
             
             // Image fields - prioritize new fields
             image: foundProperty.featuredImage || foundProperty.propertyInfo?.photos?.[0] || foundProperty.propertyImage || foundProperty.image || `https://picsum.photos/800/600?random=${Math.floor(Math.random() * 100)}`,

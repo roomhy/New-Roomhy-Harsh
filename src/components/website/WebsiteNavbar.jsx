@@ -99,7 +99,7 @@ export default function WebsiteNavbar() {
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (showUserDropdown && !event.target.closest('.user-dropdown')) {
+      if (showUserDropdown && !event.target.closest('.user-dropdown') && !event.target.closest('.user-dropdown-mobile')) {
         setShowUserDropdown(false);
       }
     };
@@ -116,7 +116,7 @@ export default function WebsiteNavbar() {
           <div className="max-w-none w-full mx-auto px-4 md:px-8 lg:px-12">
             <div className="flex items-center justify-between h-16 w-full">
               {/* Left: Logo */}
-              <div className="flex-1 flex items-center h-full">
+              <div className="flex-1 flex items-center justify-between md:justify-start h-full">
                 <div className="flex items-center pr-6 md:border-r border-gray-200 h-full">
                   <Link to="/website/index" className="flex items-center space-x-2 group">
                     <img 
@@ -129,6 +129,47 @@ export default function WebsiteNavbar() {
                       }}
                     />
                   </Link>
+                </div>
+
+                {/* Mobile Login / User Dropdown */}
+                <div className="flex md:hidden items-center user-dropdown-mobile relative">
+                  {isAuthenticated && user ? (
+                    <>
+                      <button
+                        onClick={() => setShowUserDropdown(!showUserDropdown)}
+                        className="flex items-center gap-1 px-2.5 py-1 bg-gray-50 hover:bg-gray-150 rounded-full border border-gray-150 text-xs font-bold text-gray-700 transition-colors"
+                      >
+                        <User className="w-3.5 h-3.5 text-gray-500" />
+                        <span className="max-w-[70px] truncate">{user.name || user.firstName || 'User'}</span>
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showUserDropdown ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {showUserDropdown && (
+                        <div className="absolute right-0 mt-1 top-full w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-[120] overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
+                          <button onClick={() => { setShowUserDropdown(false); navigate('/website/profile'); }} className="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-3">
+                            <User className="w-4 h-4 text-gray-500" /> Profile
+                          </button>
+                          <button onClick={() => { setShowUserDropdown(false); navigate('/website/mystays'); }} className="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-3">
+                            <Home className="w-4 h-4 text-gray-500" /> My Stays
+                          </button>
+                          <button onClick={() => { setShowUserDropdown(false); navigate('/website/chat'); }} className="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-3">
+                            <MessageSquare className="w-4 h-4 text-gray-500" /> Chat
+                          </button>
+                          <button onClick={() => { setShowUserDropdown(false); navigate('/website/reviews'); }} className="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-3">
+                            <Star className="w-4 h-4 text-gray-500" /> My Reviews
+                          </button>
+                          <button onClick={handleLogout} className="w-full px-4 py-2 text-left text-xs text-red-650 hover:bg-red-50 flex items-center gap-3 border-t border-gray-50">
+                            <LogOut className="w-4 h-4 text-red-500" /> Logout
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <Link to="/website/login" className="flex items-center gap-1 px-3 py-1.5 bg-[#EE4266] text-white hover:bg-[#d63a5b] rounded-full text-xs font-bold transition-all shadow-md shadow-[#EE4266]/10 active:scale-[0.98]">
+                      <User className="w-3.5 h-3.5" />
+                      <span>Login / Signup</span>
+                    </Link>
+                  )}
                 </div>
               </div>
 
@@ -194,7 +235,7 @@ export default function WebsiteNavbar() {
                         <button onClick={() => { setShowUserDropdown(false); navigate('/website/reviews'); }} className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3">
                           <Star className="w-4 h-4 text-gray-500" /> My Reviews
                         </button>
-                        <button onClick={handleLogout} className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3">
+                        <button onClick={handleLogout} className="w-full px-4 py-2 text-left text-sm text-red-650 hover:bg-red-50 flex items-center gap-3">
                           <LogOut className="w-4 h-4 text-red-500" /> Logout
                         </button>
                       </div>

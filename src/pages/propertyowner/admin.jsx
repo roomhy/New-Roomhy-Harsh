@@ -490,7 +490,7 @@ export default function Admin() {
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
 
           {/* 1. Monthly Rent Expected */}
-          <div className="bg-card border border-border rounded-2xl p-5 shadow-soft hover:shadow-md transition-all group cursor-default">
+          <div className="bg-card border border-border rounded-2xl p-5 shadow-soft hover:shadow-md transition-all group cursor-default min-w-0">
             <div className="flex items-start justify-between mb-2">
               <div className="size-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
                 <IndianRupee className="size-4" />
@@ -500,28 +500,28 @@ export default function Admin() {
             {loading ? (
               <div className="h-9 w-28 bg-muted/70 animate-pulse rounded-lg mb-1" />
             ) : (
-              <p className="text-[30px] font-black text-foreground leading-none mb-1">
+              <p className="text-[20px] sm:text-[24px] xl:text-[30px] font-black text-foreground leading-none mb-1 truncate" title={`₹${monthlyRentExpected.toLocaleString('en-IN')}`}>
                 ₹{monthlyRentExpected.toLocaleString('en-IN')}
               </p>
             )}
-            <p className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-muted-foreground mb-3">
+            <p className="text-[10px] xl:text-[10.5px] font-bold uppercase tracking-[0.1em] text-muted-foreground mb-3 truncate">
               Monthly Rent Expected
             </p>
-            <div className="flex items-center justify-between pt-3 border-t border-border/50">
+            <div className="flex flex-wrap items-center justify-between gap-1 pt-3 border-t border-border/50">
               {growthPercent !== null ? (
-                <span className={`inline-flex items-center gap-0.5 text-[10.5px] font-bold ${growthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                <span className={`inline-flex items-center gap-0.5 text-[9.5px] xl:text-[10.5px] font-bold ${growthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
                   {growthPercent >= 0 ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
                   {growthPercent >= 0 ? '+' : ''}{growthPercent}% VS LAST WEEK
                 </span>
               ) : (
-                <span className="text-[10.5px] text-muted-foreground">No trend data</span>
+                <span className="text-[9.5px] xl:text-[10.5px] text-muted-foreground">No trend data</span>
               )}
-              <span className="text-[9.5px] font-semibold text-muted-foreground/50 uppercase tracking-wider">SOURCE: TENANTS</span>
+              <span className="text-[8.5px] xl:text-[9.5px] font-semibold text-muted-foreground/50 uppercase tracking-wider">SOURCE: TENANTS</span>
             </div>
           </div>
 
           {/* 2. Total Tenants */}
-          <div className="bg-card border border-border rounded-2xl p-5 shadow-soft hover:shadow-md transition-all group cursor-default">
+          <div className="bg-card border border-border rounded-2xl p-5 shadow-soft hover:shadow-md transition-all group cursor-default min-w-0">
             <div className="flex items-start justify-between mb-2">
               <div className="size-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
                 <Users className="size-4" />
@@ -531,22 +531,22 @@ export default function Admin() {
             {loading ? (
               <div className="h-9 w-16 bg-muted/70 animate-pulse rounded-lg mb-1" />
             ) : (
-              <p className="text-[30px] font-black text-foreground leading-none mb-1">{tenantsCount}</p>
+              <p className="text-[20px] sm:text-[24px] xl:text-[30px] font-black text-foreground leading-none mb-1 truncate">{tenantsCount}</p>
             )}
-            <p className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-muted-foreground mb-3">
+            <p className="text-[10px] xl:text-[10.5px] font-bold uppercase tracking-[0.1em] text-muted-foreground mb-3 truncate">
               Total Tenants
             </p>
-            <div className="flex items-center justify-between pt-3 border-t border-border/50">
-              <span className="inline-flex items-center gap-0.5 text-[10.5px] font-bold text-emerald-600">
+            <div className="flex flex-wrap items-center justify-between gap-1 pt-3 border-t border-border/50">
+              <span className="inline-flex items-center gap-0.5 text-[9.5px] xl:text-[10.5px] font-bold text-emerald-600">
                 <ArrowUpRight className="size-3" />
                 {moveInsToday > 0 ? `+${moveInsToday} TODAY` : 'STEADY'}
               </span>
-              <span className="text-[9.5px] font-semibold text-muted-foreground/50 uppercase tracking-wider">SOURCE: RECORDS</span>
+              <span className="text-[8.5px] xl:text-[9.5px] font-semibold text-muted-foreground/50 uppercase tracking-wider">SOURCE: RECORDS</span>
             </div>
           </div>
 
           {/* 3. Total Leads */}
-          <div className="bg-card border border-border rounded-2xl p-5 shadow-soft hover:shadow-md transition-all group cursor-default">
+          <div className="bg-card border border-border rounded-2xl p-5 shadow-soft hover:shadow-md transition-all group cursor-default min-w-0">
             <div className="flex items-start justify-between mb-2">
               <div className="size-8 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center shrink-0 group-hover:bg-violet-100 transition-colors">
                 <TrendingUp className="size-4" />
@@ -556,22 +556,22 @@ export default function Admin() {
             {loading ? (
               <div className="h-9 w-16 bg-muted/70 animate-pulse rounded-lg mb-1" />
             ) : (
-              <p className="text-[30px] font-black text-foreground leading-none mb-1">{enquiries.length}</p>
+              <p className="text-[20px] sm:text-[24px] xl:text-[30px] font-black text-foreground leading-none mb-1 truncate">{enquiries.length}</p>
             )}
-            <p className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-muted-foreground mb-3">
+            <p className="text-[10px] xl:text-[10.5px] font-bold uppercase tracking-[0.1em] text-muted-foreground mb-3 truncate">
               Total Leads
             </p>
-            <div className="flex items-center justify-between pt-3 border-t border-border/50">
-              <span className="inline-flex items-center gap-0.5 text-[10.5px] font-bold text-violet-600">
+            <div className="flex flex-wrap items-center justify-between gap-1 pt-3 border-t border-border/50">
+              <span className="inline-flex items-center gap-0.5 text-[9.5px] xl:text-[10.5px] font-bold text-violet-600">
                 <ArrowUpRight className="size-3" />
                 {newLeadsTodayCount > 0 ? `+${newLeadsTodayCount} TODAY` : `${newLeadsCount} PENDING`}
               </span>
-              <span className="text-[9.5px] font-semibold text-muted-foreground/50 uppercase tracking-wider">SOURCE: ENQUIRIES</span>
+              <span className="text-[8.5px] xl:text-[9.5px] font-semibold text-muted-foreground/50 uppercase tracking-wider">SOURCE: ENQUIRIES</span>
             </div>
           </div>
 
           {/* 4. Occupancy Rate */}
-          <div className="bg-card border border-border rounded-2xl p-5 shadow-soft hover:shadow-md transition-all group cursor-default">
+          <div className="bg-card border border-border rounded-2xl p-5 shadow-soft hover:shadow-md transition-all group cursor-default min-w-0">
             <div className="flex items-start justify-between mb-2">
               <div className="size-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:bg-amber-100 transition-colors">
                 <BedDouble className="size-4" />
@@ -581,14 +581,14 @@ export default function Admin() {
             {loading ? (
               <div className="h-9 w-20 bg-muted/70 animate-pulse rounded-lg mb-1" />
             ) : (
-              <p className="text-[30px] font-black text-foreground leading-none mb-1">{occupancyPercent}%</p>
+              <p className="text-[20px] sm:text-[24px] xl:text-[30px] font-black text-foreground leading-none mb-1 truncate">{occupancyPercent}%</p>
             )}
-            <p className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-muted-foreground mb-3">
+            <p className="text-[10px] xl:text-[10.5px] font-bold uppercase tracking-[0.1em] text-muted-foreground mb-3 truncate">
               Occupancy Rate
             </p>
-            <div className="flex items-center justify-between pt-3 border-t border-border/50">
-              <span className="text-[10.5px] font-bold text-amber-600">{tenantsCount}/{totalBedsCapacity} BEDS FILLED</span>
-              <span className="text-[9.5px] font-semibold text-muted-foreground/50 uppercase tracking-wider">SOURCE: BEDS</span>
+            <div className="flex flex-wrap items-center justify-between gap-1 pt-3 border-t border-border/50">
+              <span className="text-[9.5px] xl:text-[10.5px] font-bold text-amber-600">{tenantsCount}/{totalBedsCapacity} BEDS FILLED</span>
+              <span className="text-[8.5px] xl:text-[9.5px] font-semibold text-muted-foreground/50 uppercase tracking-wider">SOURCE: BEDS</span>
             </div>
           </div>
         </div>

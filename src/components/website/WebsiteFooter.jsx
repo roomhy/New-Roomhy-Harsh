@@ -59,36 +59,45 @@ export default function WebsiteFooter() {
         const [cities, areas] = await Promise.all([fetchCities(), fetchAreas()]);
         
         if (cities && cities.length > 0) {
-          // Group areas by city
+          // Group areas by city name
           const areasByCity = {};
           areas.forEach(area => {
             if (typeof area === 'object') {
-              // Get city name from area object (cityName field or populated city.name)
-              const cityName = area.cityName || (area.city?.name) || '';
-              const areaName = area.name || '';
+              // Handle both populated and non-populated city refs
+              const cityName = area.cityName || area.city?.name || '';
+              const areaName = area.name || area.areaName || '';
               if (cityName && areaName) {
-                if (!areasByCity[cityName]) areasByCity[cityName] = [];
-                areasByCity[cityName].push(areaName);
+                const key = cityName.toLowerCase();
+                if (!areasByCity[key]) areasByCity[key] = [];
+                areasByCity[key].push(areaName);
               }
             }
           });
           
-          const transformedCities = cities.map(city => {
-            const cityName = city.name || city.city || city;
-            const cityAreas = areasByCity[cityName] || areasByCity[cityName.toLowerCase()] || [];
-            
-            return {
-              name: cityName,
-              count: city.propertyCount ? `${city.propertyCount}+` : "1000+",
-              href: `/website/ourproperty?city=${encodeURIComponent(cityName.toLowerCase())}`,
-              areas: cityAreas.slice(0, 5) // Show top 5 areas
-            };
-          });
+          const transformedCities = cities
+            .map(city => {
+              const cityName = typeof city === 'string' ? city : (city.name || city.city || '');
+              const cityKey = cityName.toLowerCase();
+              const cityAreas = areasByCity[cityKey] || [];
+              const cityCount = typeof city.propertyCount === 'number' ? city.propertyCount : '—';
+              
+              return {
+                name: cityName,
+                count: cityCount,
+                href: `/website/ourproperty?city=${encodeURIComponent(cityName.toLowerCase())}`,
+                areas: cityAreas.slice(0, 5) // Show top 5 areas
+              };
+            })
+            .filter(city => city.name); // Only filter out entries with no name
           
-          setCityLinks(transformedCities);
+          // Use transformed cities if we got them, otherwise keep static fallback
+          if (transformedCities.length > 0) {
+            setCityLinks(transformedCities);
+          }
         }
       } catch (error) {
         console.error("Error fetching cities/areas for footer:", error);
+        // Keep static fallback on error
       }
     };
 

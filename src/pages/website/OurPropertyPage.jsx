@@ -99,6 +99,7 @@ export default function OurPropertyPage() {
           nearbyColleges: p.nearbyColleges || [],
           latitude: p.latitude,
           longitude: p.longitude,
+          originalPrice: p.originalPrice || null,
         }));
 
         // Extract unique cities from all properties for the filter sidebar
@@ -783,9 +784,10 @@ function PropertyCard({ property, onBidNow }) {
   const allImages = property.images || property.photos || property.propertyInfo?.photos || [property.image];
   const displayImages = allImages.length > 0 ? allImages : ['https://images.pexels.com/photos/1571468/pexels-photo-1571468.jpeg?auto=compress&cs=tinysrgb&w=600'];
   
-  // Calculate fake discount
-  const originalPrice = Math.round(property.price * 1.3);
-  const discountPercent = Math.round(((originalPrice - property.price) / originalPrice) * 100);
+  // Check if there is an actual discount
+  const hasDiscount = property.originalPrice && Number(property.originalPrice) > Number(property.price);
+  const originalPrice = hasDiscount ? Number(property.originalPrice) : property.price;
+  const discountPercent = hasDiscount ? Math.round(((originalPrice - property.price) / originalPrice) * 100) : 0;
 
   const amenityNames = (property.amenities || [])
     .map(a => (typeof a === 'string' ? a : a?.name || ''))
@@ -865,8 +867,12 @@ function PropertyCard({ property, onBidNow }) {
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-[18px] leading-none font-extrabold text-gray-950">₹{property.price?.toLocaleString()}</span>
-            <span className="text-[13px] text-gray-400 font-medium line-through">₹{originalPrice.toLocaleString()}</span>
-            <span className="text-[14px] font-bold text-[#1ab64f]">{discountPercent}% off</span>
+            {hasDiscount && (
+              <>
+                <span className="text-[13px] text-gray-400 font-medium line-through">₹{originalPrice.toLocaleString()}</span>
+                <span className="text-[14px] font-bold text-[#1ab64f]">{discountPercent}% off</span>
+              </>
+            )}
           </div>
           <p className="text-[11px] text-gray-400 font-medium">+ taxes & fees</p>
         </Link>
@@ -968,11 +974,11 @@ function PropertyCard({ property, onBidNow }) {
           <div className="w-full lg:w-[210px] flex flex-col items-end justify-between border-l border-gray-100 p-4 bg-gray-50/30">
             <div className="text-right">
               <div className="flex items-baseline justify-end gap-2">
-                <span className="text-xs text-gray-400 line-through font-medium">₹{originalPrice.toLocaleString()}</span>
+                {hasDiscount && <span className="text-xs text-gray-400 line-through font-medium">₹{originalPrice.toLocaleString()}</span>}
                 <div className="text-2xl font-black text-gray-900 tracking-tight">₹{property.price?.toLocaleString()}</div>
               </div>
               <div className="flex items-center justify-end gap-2 mt-1">
-                <div className="text-xs font-bold text-[#1AB64F] bg-[#E8F7EE] px-1.5 py-0.5 rounded">{discountPercent}% off</div>
+                {hasDiscount && <div className="text-xs font-bold text-[#1AB64F] bg-[#E8F7EE] px-1.5 py-0.5 rounded">{discountPercent}% off</div>}
                 <p className="text-[10px] text-gray-400 font-medium">+ taxes & fees</p>
               </div>
             </div>
@@ -997,7 +1003,7 @@ function PropertyCard({ property, onBidNow }) {
                 }}
                 className="flex-1 py-2 bg-[#EE4266] text-white font-bold rounded text-[10px] hover:bg-[#d63a5b] transition-all shadow-sm whitespace-nowrap"
               >
-                Bid Now
+                Book Now
               </button>
             </div>
           </div>

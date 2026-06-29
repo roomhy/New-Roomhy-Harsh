@@ -91,6 +91,7 @@ const NAV = [
         { label: "Employee Property Approvals", path: "/superadmin/employee-properties" },
         { label: "Pending Properties", path: "/superadmin/property/pending" },
         { label: "All Properties List", path: "/superadmin/properties?view=list" },
+        { label: "Rooms Management", path: "/superadmin/rooms" },
         { label: "Online Leads", path: "/superadmin/enquiry" },
         { label: "Web Enquiries", path: "/superadmin/websiteenq" },
         { label: "Property Categories", path: "/superadmin/property/categories" },

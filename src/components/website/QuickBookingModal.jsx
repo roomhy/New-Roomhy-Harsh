@@ -1,7 +1,9 @@
-import { useState } from 'react';
-import { X, Mail, Phone, User, Calendar, MapPin } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Mail, Phone, User, Calendar, MapPin, CheckCircle } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function QuickBookingModal({ property, isOpen, onClose, onSubmit }) {
+  const { user, isAuthenticated } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -10,6 +12,17 @@ export default function QuickBookingModal({ property, isOpen, onClose, onSubmit 
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen && isAuthenticated && user) {
+      setFormData({
+        name: user.name || user.firstName || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        message: ''
+      });
+    }
+  }, [isOpen, isAuthenticated, user]);
 
   if (!isOpen || !property) return null;
 
@@ -57,7 +70,9 @@ export default function QuickBookingModal({ property, isOpen, onClose, onSubmit 
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">Quick Booking</h2>
+          <h2 className="text-xl font-bold text-gray-900">
+            {isAuthenticated ? 'Confirm Booking' : 'Quick Booking'}
+          </h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -80,7 +95,7 @@ export default function QuickBookingModal({ property, isOpen, onClose, onSubmit 
           </div>
         </div>
 
-        {/* Form */}
+        {/* Form or Confirmation Page */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
@@ -88,81 +103,140 @@ export default function QuickBookingModal({ property, isOpen, onClose, onSubmit 
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Full Name *
-            </label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                placeholder="Enter your full name"
-                required
-              />
+          {isAuthenticated ? (
+            // DIRECT BOOKING FOR LOGGED-IN USERS
+            <div className="space-y-4">
+              <div className="bg-green-50/50 border border-green-100 rounded-xl p-4 text-center">
+                <CheckCircle className="w-10 h-10 text-green-500 mx-auto mb-2" />
+                <p className="text-gray-800 font-semibold text-base">
+                  Do you want to book this property?
+                </p>
+                <p className="text-gray-500 text-xs mt-1">
+                  Your booking request will be shared with the owner immediately.
+                </p>
+              </div>
+
+              {/* Registered details preview */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-2.5 border border-gray-100">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Your Registered Details
+                </div>
+                <div className="flex items-center gap-2.5 text-sm text-gray-700">
+                  <User className="w-4 h-4 text-gray-400" />
+                  <span className="font-semibold">{formData.name}</span>
+                </div>
+                <div className="flex items-center gap-2.5 text-sm text-gray-700">
+                  <Mail className="w-4 h-4 text-gray-400" />
+                  <span>{formData.email}</span>
+                </div>
+                <div className="flex items-center gap-2.5 text-sm text-gray-700">
+                  <Phone className="w-4 h-4 text-gray-400" />
+                  <span>{formData.phone}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                  Special Notes (Optional)
+                </label>
+                <textarea
+                  name="message"
+                  value={formData.message}
+                  onChange={handleInputChange}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+                  placeholder="E.g. move-in date, roommate preference..."
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white font-bold py-3.5 rounded-xl transition-colors disabled:cursor-not-allowed text-base shadow-lg shadow-orange-500/20 active:scale-[0.98]"
+              >
+                {loading ? 'Submitting Request...' : 'Confirm Booking'}
+              </button>
             </div>
-          </div>
+          ) : (
+            // STANDARD FORM FOR NON-LOGGED-IN USERS
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Full Name *
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-350 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    placeholder="Enter your full name"
+                    required
+                  />
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address *
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                placeholder="Enter your email"
-                required
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Address *
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-350 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    placeholder="Enter your email"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number *
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-350 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    placeholder="Enter your phone number"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Message (Optional)
+                </label>
+                <textarea
+                  name="message"
+                  value={formData.message}
+                  onChange={handleInputChange}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  placeholder="Any special requirements or questions..."
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white font-bold py-3 rounded-lg transition-colors disabled:cursor-not-allowed"
+              >
+                {loading ? 'Submitting...' : 'Book Now'}
+              </button>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Phone Number *
-            </label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleInputChange}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                placeholder="Enter your phone number"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Message (Optional)
-            </label>
-            <textarea
-              name="message"
-              value={formData.message}
-              onChange={handleInputChange}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              placeholder="Any special requirements or questions..."
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white font-bold py-3 rounded-lg transition-colors disabled:cursor-not-allowed"
-          >
-            {loading ? 'Submitting...' : 'Book Now'}
-          </button>
+          )}
         </form>
       </div>
     </div>

@@ -5,9 +5,10 @@ export default function StickyCTA({ property, onBookNow }) {
 
   const price = property.price || 0;
   const discountPercent = parseInt(property.discountPercent) || 0;
+  // Only show original price if there's a real discount (not a fake 10%)
   const originalPrice = discountPercent > 0 
     ? Math.round(price / (1 - (discountPercent / 100)))
-    : Math.round(price * 1.1);
+    : null;
   const discount = discountPercent;
 
   return (
@@ -20,7 +21,7 @@ export default function StickyCTA({ property, onBookNow }) {
           <div>
             <div className="flex items-baseline gap-1.5">
               <span className="text-xl font-extrabold text-gray-900">₹{price}</span>
-              {discount > 0 && (
+              {originalPrice && (
                 <span className="text-sm text-gray-400 line-through">₹{originalPrice}</span>
               )}
             </div>
@@ -58,7 +59,7 @@ export default function StickyCTA({ property, onBookNow }) {
           <div className="px-7 py-8 border-b border-gray-100">
             <div className="flex items-baseline gap-2">
               <span className="text-[36px] font-black text-[#222]">₹{price}</span>
-              {discount > 0 && (
+              {originalPrice && (
                 <span className="text-lg text-[#6d787d] line-through decoration-gray-400">₹{originalPrice}</span>
               )}
             </div>
@@ -74,11 +75,13 @@ export default function StickyCTA({ property, onBookNow }) {
 
           {/* 3. Pricing Breakdown */}
           <div className="px-7 py-6 space-y-4 border-b border-gray-100 bg-gray-50/50">
-            <div className="flex justify-between text-sm">
-              <span className="text-[#6d787d] font-medium">Base Rent</span>
-              <span className="text-[#222] font-bold">₹{originalPrice}</span>
-            </div>
-            {discount > 0 && (
+            {originalPrice && (
+              <div className="flex justify-between text-sm">
+                <span className="text-[#6d787d] font-medium">Base Rent</span>
+                <span className="text-[#222] font-bold">₹{originalPrice}</span>
+              </div>
+            )}
+            {discount > 0 && originalPrice && (
               <div className="flex justify-between text-sm">
                 <span className="text-[#1ab64f] font-bold flex items-center gap-1.5">
                   <BadgePercent size={15} />
@@ -88,7 +91,7 @@ export default function StickyCTA({ property, onBookNow }) {
               </div>
             )}
             <div className="pt-4 mt-2 flex justify-between border-t border-dashed border-gray-300">
-              <span className="text-[#222] font-extrabold text-base">Total Amount</span>
+              <span className="text-[#222] font-extrabold text-base">Monthly Rent</span>
               <span className="text-[#222] font-black text-2xl">₹{price}</span>
             </div>
           </div>
@@ -149,18 +152,30 @@ export default function StickyCTA({ property, onBookNow }) {
                 <Users size={20} />
               </div>
               <div>
-                <p className="text-[10px] text-gray-400 uppercase font-black tracking-wider">Owner</p>
-                <p className="text-sm text-gray-900 font-bold">{property.owner}</p>
+                <p className="text-[10px] text-gray-400 uppercase font-black tracking-wider">Property Owner</p>
+                <p className="text-sm text-gray-900 font-bold">
+                  {property.owner && property.owner !== 'Owner' ? property.owner : 'Registered Owner'}
+                </p>
+                {property.owner_id && (
+                  <p className="text-[10px] text-gray-400 mt-0.5">ID: {property.owner_id}</p>
+                )}
               </div>
             </div>
             <div className="flex gap-2">
-              {property.ownerPhone && (
+              {property.ownerPhone ? (
                 <a
                   href={`tel:${property.ownerPhone}`}
                   className="flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 text-gray-700 font-bold text-xs hover:border-[#EE4266] hover:text-[#EE4266] transition-all"
                 >
-                  <Phone size={14} /> Call
+                  <Phone size={14} /> Call Owner
                 </a>
+              ) : (
+                <button
+                  onClick={onBookNow}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-lg bg-[#EE4266]/10 text-[#EE4266] font-bold text-xs hover:bg-[#EE4266] hover:text-white transition-all"
+                >
+                  <Phone size={14} /> Book to Connect
+                </button>
               )}
               {property.ownerEmail && (
                 <a

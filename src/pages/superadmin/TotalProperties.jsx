@@ -18,8 +18,16 @@ const STATUS_COLORS = {
 };
 
 const TYPE_MAP = { pg:"PG", hostel:"Hostel", "co-living":"Co-Living", apartment:"Apartment", room:"Room" };
-const GENDER_MAP = { male:"Boys", female:"Girls", any:"Unisex" };
+const GENDER_MAP = { male:"Boys", female:"Girls", any:"Co-ed" };
 const GENDER_COLOR = { male:"bg-blue-50 text-blue-600", female:"bg-pink-50 text-pink-600", any:"bg-purple-50 text-purple-600" };
+
+const normalizeGender = (g) => {
+  if (!g) return "any";
+  const s = String(g).toLowerCase().trim();
+  if (s.includes("female") || s.includes("girl") || s === "pink") return "female";
+  if (s.includes("male") || s.includes("boy") || s === "blue") return "male";
+  return "any";
+};
 
 function Avatar({ name="" }) {
   const i = name.split(" ").map(n=>n[0]).join("").slice(0,2).toUpperCase()||"?";
@@ -105,7 +113,7 @@ export default function TotalProperties() {
           title:      p.title || p.propertyInfo?.name || "Unnamed",
           image:      p.featuredImage || p.images?.[0] || "",
           type:       p.propertyType || p.propertyInfo?.propertyType || "pg",
-          gender:     p.gender || p.propertyInfo?.genderSuitability || "any",
+          gender:     normalizeGender(p.gender || p.propertyInfo?.genderSuitability || "any"),
           city:       p.propertyInfo?.city || p.city || "-",
           locality:   p.locality || p.propertyInfo?.area || "-",
           ownerName:  p.owner?.name || p.propertyInfo?.ownerName || p.ownerName || p.contact?.name || "-",
@@ -322,7 +330,7 @@ export default function TotalProperties() {
                           <p className="text-[10px] text-slate-400 font-semibold mt-0.5">ID: {p.propId}</p>
                           <div className="flex gap-1 mt-1.5 flex-wrap">
                             <span className="text-[9px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-600">{TYPE_MAP[p.type]||p.type}</span>
-                            {p.gender!=="any" && <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-md", GENDER_COLOR[p.gender]||"")}>{GENDER_MAP[p.gender]||p.gender}</span>}
+                            <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-md", GENDER_COLOR[p.gender]||"")}>{GENDER_MAP[p.gender]||p.gender}</span>
                           </div>
                         </div>
                       </div>

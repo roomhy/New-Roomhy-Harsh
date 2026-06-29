@@ -4,6 +4,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===== Global: Prevent horizontal overflow on mobile ===== */
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 /* ===== Price Range Dual Slider ===== */
 .price-range-input {
   pointer-events: none;
