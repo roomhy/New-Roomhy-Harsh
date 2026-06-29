@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   Building2, Users, IndianRupee, Clock, 
   ArrowUpRight, ArrowDownRight, ChevronRight, 
@@ -17,48 +18,19 @@ import { PageHeader } from "../../components/superadmin/PageHeader";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
-// --- STATIC DATA FOR UI CONSISTENCY ---
+// --- STATIC FALLBACK for revenue chart (used only when API returns no data) ---
 const revenueLineData = [
-  { name: "May 1", revenue: 12000 },
-  { name: "May 8", revenue: 28000 },
-  { name: "May 15", revenue: 24000 },
-  { name: "May 22", revenue: 42000 },
-  { name: "May 29", revenue: 48000 },
-];
-
-const propertiesByStatus = [
-  { name: "Occupied", value: 1480, color: "#10B981", percent: "63.2%" },
-  { name: "Vacant", value: 520, color: "#3B82F6", percent: "22.2%" },
-  { name: "Maintenance", value: 180, color: "#F59E0B", percent: "7.7%" },
-  { name: "Others", value: 160, color: "#6366F1", percent: "6.8%" },
-];
-
-const tenantsByType = [
-  { name: "Family", value: 6250, color: "#3B82F6", percent: "48.7%" },
-  { name: "Bachelor", value: 4320, color: "#10B981", percent: "33.6%" },
-  { name: "Commercial", value: 1650, color: "#F59E0B", percent: "12.9%" },
-  { name: "Others", value: 625, color: "#6366F1", percent: "4.8%" },
-];
-
-const pendingRentAlerts = [
-  { name: "John Smith", prop: "Ocean View Apartment - A101", amount: "$1,200", due: "5 days overdue", initial: "JS" },
-  { name: "Priya Wilson", prop: "Green Park Residency - B203", amount: "$950", due: "3 days overdue", initial: "PW" },
-  { name: "Ravi Mehta", prop: "Sunrise Heights - C301", amount: "$1,500", due: "2 days overdue", initial: "RM" },
-  { name: "Ankit Kumar", prop: "Lake View Towers - D404", amount: "$1,100", due: "1 day overdue", initial: "AK" },
-  { name: "Sneha Patel", prop: "Prime City Homes - E502", amount: "$800", due: "Today", initial: "SP" },
-];
-
-const recentActivities = [
-  { title: "New property added", desc: "Sunset Villa has been added.", time: "10 min ago", icon: Building2, color: "bg-blue-50 text-blue-600" },
-  { title: "New tenant registered", desc: "Arjun Sharma has registered.", time: "25 min ago", icon: UserCircle, color: "bg-emerald-50 text-emerald-600" },
-  { title: "Rent collected", desc: "$2,450 collected from 3 tenants.", time: "1 hour ago", icon: DollarSign, color: "bg-amber-50 text-amber-600" },
-  { title: "Maintenance request", desc: "New request from A101 - Ocean View Apartment.", time: "2 hours ago", icon: MessageSquare, color: "bg-purple-50 text-purple-600" },
+  { name: "No Data", revenue: 0 },
 ];
 
 export default function HomeOverview() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({ properties: 0, tenants: 0, revenue: 0, alerts: 0 });
   const [revenueTrend, setRevenueTrend] = useState([]);
   const [pendingAlerts, setPendingAlerts] = useState([]);
+  const [propStatusData, setPropStatusData] = useState([]);
+  const [tenantTypeData, setTenantTypeData] = useState([]);
+  const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -76,6 +48,11 @@ export default function HomeOverview() {
           });
           if (res.revenueTrend) setRevenueTrend(res.revenueTrend);
           if (res.pendingAlerts) setPendingAlerts(res.pendingAlerts);
+          if (res.propertiesByStatus) setPropStatusData(res.propertiesByStatus);
+          if (res.tenantsByType) setTenantTypeData(res.tenantsByType);
+          if (res.activities && res.activities.length > 0) {
+            setRecentActivities(res.activities);
+          }
         } else {
            console.warn("Home Stats API returned failure or empty summary");
         }
@@ -108,10 +85,10 @@ export default function HomeOverview() {
 
       {/* Stats Row - LIVE CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-         <HomeStatCard label="Total Properties" value={loading ? "..." : stats.properties.toLocaleString()} trend="+ 8.3% from last week" icon={Building2} color="blue" up loading={loading} />
-         <HomeStatCard label="Total Tenants" value={loading ? "..." : stats.tenants.toLocaleString()} trend="+ 12.5% from last week" icon={Users} color="emerald" up loading={loading} />
-         <HomeStatCard label="Revenue Overview" value={loading ? "..." : `$${stats.revenue.toLocaleString()}`} trend="+ 18.6% from last week" icon={DollarSign} color="purple" up loading={loading} />
-         <HomeStatCard label="Alerts (Pending Rent)" value={loading ? "..." : stats.alerts.toString()} trend="Tenants with pending rent" icon={Bell} color="amber" up loading={loading} />
+         <HomeStatCard label="Total Properties" value={loading ? "..." : stats.properties.toLocaleString()} trend="Live from database" icon={Building2} color="blue" up loading={loading} onClick={() => navigate('/superadmin/properties')} />
+         <HomeStatCard label="Total Tenants" value={loading ? "..." : stats.tenants.toLocaleString()} trend="Live from database" icon={Users} color="emerald" up loading={loading} onClick={() => navigate('/superadmin/tenant')} />
+         <HomeStatCard label="Revenue Overview" value={loading ? "..." : `₹${stats.revenue.toLocaleString('en-IN')}`} trend="Commission + Service Fee" icon={DollarSign} color="purple" up loading={loading} onClick={() => navigate('/superadmin/accounting')} />
+         <HomeStatCard label="Alerts (Pending Rent)" value={loading ? "..." : stats.alerts.toString()} trend="Active tenants only" icon={Bell} color="amber" up loading={loading} onClick={() => navigate('/superadmin/rentcollection')} />
       </div>
 
       <div className="grid grid-cols-12 gap-6 mb-8">
@@ -152,7 +129,7 @@ export default function HomeOverview() {
          <div className="col-span-12 lg:col-span-4 bg-white rounded-3xl p-8 border border-slate-100 shadow-sm flex flex-col">
             <div className="flex items-center justify-between mb-8">
                <h3 className="text-lg font-bold text-slate-900">Pending Rent Alerts</h3>
-               <button className="text-xs font-bold text-blue-600 hover:underline">View All</button>
+               <button onClick={() => navigate('/superadmin/rentcollection')} className="text-xs font-bold text-blue-600 hover:underline">View All</button>
             </div>
             <div className="space-y-6 flex-1">
                {pendingAlerts.length > 0 ? pendingAlerts.map((alert, i) => (
@@ -183,7 +160,7 @@ export default function HomeOverview() {
                  </div>
                )}
             </div>
-            <button className="w-full mt-8 py-3 text-xs font-bold text-blue-600 border border-blue-100 rounded-xl hover:bg-blue-50 transition-all uppercase tracking-widest">
+            <button onClick={() => navigate('/superadmin/rentcollection')} className="w-full mt-8 py-3 text-xs font-bold text-blue-600 border border-blue-100 rounded-xl hover:bg-blue-50 transition-all uppercase tracking-widest">
                View All Alerts
             </button>
          </div>
@@ -196,8 +173,8 @@ export default function HomeOverview() {
             <div className="relative h-48 flex items-center justify-center mb-8">
                <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                     <Pie data={propertiesByStatus} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
-                        {propertiesByStatus.map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                     <Pie data={propStatusData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
+                        {propStatusData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
                      </Pie>
                   </PieChart>
                </ResponsiveContainer>
@@ -207,7 +184,7 @@ export default function HomeOverview() {
                </div>
             </div>
             <div className="space-y-3">
-               {propertiesByStatus.map((item) => (
+               {propStatusData.map((item) => (
                   <div key={item.name} className="flex items-center justify-between">
                      <div className="flex items-center gap-3">
                         <div className="w-2 h-2 rounded-full" style={{backgroundColor: item.color}} />
@@ -227,8 +204,8 @@ export default function HomeOverview() {
             <div className="relative h-48 flex items-center justify-center mb-8">
                <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                     <Pie data={tenantsByType} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
-                        {tenantsByType.map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                     <Pie data={tenantTypeData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
+                        {tenantTypeData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
                      </Pie>
                   </PieChart>
                </ResponsiveContainer>
@@ -238,7 +215,7 @@ export default function HomeOverview() {
                </div>
             </div>
             <div className="space-y-3">
-               {tenantsByType.map((item) => (
+               {tenantTypeData.map((item) => (
                   <div key={item.name} className="flex items-center justify-between">
                      <div className="flex items-center gap-3">
                         <div className="w-2 h-2 rounded-full" style={{backgroundColor: item.color}} />
@@ -256,17 +233,22 @@ export default function HomeOverview() {
          <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm flex flex-col h-full">
             <div className="flex items-center justify-between mb-8">
                <h3 className="text-lg font-bold text-slate-900">Recent Activities</h3>
-               <button className="text-xs font-bold text-blue-600 hover:underline">View All</button>
+               <button onClick={() => navigate('/superadmin/log')} className="text-xs font-bold text-blue-600 hover:underline">View All</button>
             </div>
-            <div className="space-y-6 flex-1 overflow-y-auto">
-               {recentActivities.map((act, i) => (
+             <div className="space-y-6 flex-1 overflow-y-auto">
+               {recentActivities.length === 0 ? (
+                 <div className="flex flex-col items-center justify-center py-10 text-slate-300">
+                   <Activity size={28} className="mb-2 opacity-30" />
+                   <p className="text-[10px] font-bold uppercase tracking-widest opacity-40">No Recent Activity</p>
+                 </div>
+               ) : recentActivities.map((act, i) => (
                   <div key={i} className="flex items-center gap-4 group">
-                     <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shadow-sm shrink-0", act.color)}>
-                        <act.icon size={18} />
+                     <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shadow-sm shrink-0", act.color || "bg-blue-50 text-blue-600")}>
+                        {act.icon ? <act.icon size={18} /> : <Activity size={18} />}
                      </div>
                      <div className="flex-1 min-w-0">
                         <h4 className="text-[13px] font-bold text-slate-900 leading-none mb-1">{act.title}</h4>
-                        <p className="text-[11px] text-slate-400 font-medium">{act.desc}</p>
+                        <p className="text-[11px] text-slate-400 font-medium">{act.desc || act.description || ""}</p>
                      </div>
                      <span className="text-[10px] font-bold text-slate-300 shrink-0">{act.time}</span>
                   </div>
@@ -280,7 +262,7 @@ export default function HomeOverview() {
 
 // --- UTILITY COMPONENTS ---
 
-function HomeStatCard({ label, value, trend, icon: Icon, color, up, loading }) {
+function HomeStatCard({ label, value, trend, icon: Icon, color, up, loading, onClick }) {
   const iconBg = {
     blue: "bg-blue-50 text-blue-600",
     emerald: "bg-emerald-50 text-emerald-600",
@@ -289,7 +271,7 @@ function HomeStatCard({ label, value, trend, icon: Icon, color, up, loading }) {
   };
 
   return (
-    <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex items-center gap-5 transition-all hover:translate-y-[-4px] hover:shadow-md group">
+    <div onClick={onClick} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex items-center gap-5 transition-all hover:translate-y-[-4px] hover:shadow-md group cursor-pointer">
        <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110", iconBg[color])}>
           <Icon size={24} />
        </div>

@@ -66,15 +66,18 @@ export default function SuperadminAccountingDashboard() {
     loadDashboard();
   }, []);
 
+  const totalPayoutVolume = (stats.paidPayouts || 0) + (stats.pendingPayouts || 0);
+  const paidPct = totalPayoutVolume > 0 ? Math.round((stats.paidPayouts / totalPayoutVolume) * 100) : 0;
+  const unpaidPct = totalPayoutVolume > 0 ? (100 - paidPct) : 100;
   const dueRentData = [
-    { name: "Paid", value: stats.paidPayouts > 0 ? 75 : 0, color: "#10b981" },
-    { name: "Unpaid", value: stats.pendingPayouts > 0 ? 25 : 100, color: "#f59e0b" },
+    { name: "Paid", value: paidPct, color: "#10b981" },
+    { name: "Unpaid", value: unpaidPct, color: "#f59e0b" },
   ];
 
   const revenueDistData = [
-    { name: "Service Fees", value: 45, color: "#2563eb" },
-    { name: "Rent Commission", value: 35, color: "#10b981" },
-    { name: "Other Charges", value: 20, color: "#f59e0b" },
+    { name: "Service Fees", value: stats.commissionEarned > 0 ? 45 : 0, color: "#2563eb" },
+    { name: "Rent Commission", value: stats.commissionEarned > 0 ? 35 : 0, color: "#10b981" },
+    { name: "Other Charges", value: stats.commissionEarned > 0 ? 20 : 100, color: "#f59e0b" },
   ];
 
   if (loading) {
@@ -168,11 +171,11 @@ export default function SuperadminAccountingDashboard() {
 
       {/* Mini Insights Bar */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-         <MiniStatCard label="Invoices" value="1,248" icon={Receipt} color="blue" />
-         <MiniStatCard label="Payouts" value="342" icon={Briefcase} color="emerald" />
-         <MiniStatCard label="Fees" value="₹4.2L" icon={Database} color="indigo" />
-         <MiniStatCard label="Refunds" value="14" icon={RotateCcw} color="rose" />
-         <MiniStatCard label="GST" value="₹2.1L" icon={FileText} color="amber" />
+         <MiniStatCard label="Invoices" value={stats.invoicesCount !== undefined ? stats.invoicesCount.toLocaleString('en-IN') : "0"} icon={Receipt} color="blue" />
+         <MiniStatCard label="Payouts" value={stats.payoutsCount !== undefined ? stats.payoutsCount.toLocaleString('en-IN') : "0"} icon={Briefcase} color="emerald" />
+         <MiniStatCard label="Fees" value={stats.commissionEarned !== undefined ? `₹${(stats.commissionEarned/1000).toFixed(1)}K` : "₹0.0K"} icon={Database} color="indigo" />
+         <MiniStatCard label="Refunds" value={stats.refundsCount !== undefined ? stats.refundsCount.toLocaleString('en-IN') : "0"} icon={RotateCcw} color="rose" />
+         <MiniStatCard label="GST" value={stats.gstCollected !== undefined ? `₹${(stats.gstCollected/1000).toFixed(1)}K` : "₹0.0K"} icon={FileText} color="amber" />
       </div>
 
       {/* Bottom Distribution Grid */}

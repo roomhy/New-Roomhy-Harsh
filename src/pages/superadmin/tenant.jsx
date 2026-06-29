@@ -450,6 +450,28 @@ export default function Tenant() {
                        )}
                     </div>
                  </section>
+
+                 {/* Rental Agreement */}
+                 <section className="bg-slate-50/50 p-8 rounded-[2.5rem] border border-slate-100">
+                    <div className="flex items-center gap-4 mb-10">
+                       <div className="w-10 h-10 rounded-2xl bg-violet-600 text-white flex items-center justify-center font-bold shadow-lg shadow-violet-200">
+                          <FileText size={20} />
+                       </div>
+                       <h4 className="text-lg font-bold text-slate-800 uppercase tracking-widest">Rental Agreement</h4>
+                    </div>
+                    <div className="grid grid-cols-2 gap-8">
+                       <DetailItem icon={ShieldCheck} label="Agreement Status" value={selectedTenant.agreementStatus || (selectedTenant.agreementSigned ? "Signed" : "Not Signed")} highlight />
+                       <DetailItem icon={User} label="e-Signature Name" value={selectedTenant.agreementESignName || selectedTenant.digitalCheckin?.agreement?.eSignName || "N/A"} />
+                       <DetailItem icon={Calendar} label="Accepted At" value={formatDate(selectedTenant.agreementSignedAt || selectedTenant.digitalCheckin?.agreement?.acceptedAt)} />
+                       <DetailItem icon={Hash} label="Agreement Request ID" value={selectedTenant.agreementRequestId || "N/A"} />
+                    </div>
+                    {(selectedTenant.digitalCheckin?.agreement?.signatureDataUrl) && (
+                       <div className="mt-8 space-y-3">
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Signature Preview</p>
+                          <img src={selectedTenant.digitalCheckin.agreement.signatureDataUrl} className="h-20 object-contain rounded-xl bg-white border p-2 animate-in fade-in" alt="Signature" />
+                       </div>
+                    )}
+                 </section>
               </div>
 
                <div className="px-10 py-10 border-t border-slate-50 bg-slate-50/50 flex justify-between items-center">

@@ -1,41 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { 
-  Building2, CheckCircle2, Clock, XCircle, 
-  ArrowUpRight, ArrowDownRight, ChevronRight, 
-  MoreVertical, Search, Calendar, Plus,
-  MapPin, User, ListFilter, LayoutGrid,
-  ClipboardCheck, Eye, Trash2, Edit3,
+  Building2, CheckCircle2, Clock,
+  ChevronRight, Calendar,
+  ClipboardCheck,
   Users, MessageSquare, List
 } from "lucide-react";
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip
+  PieChart, Pie, Cell, ResponsiveContainer
 } from "recharts";
-import { fetchPropertyOverviewStats } from "../../utils/api";
+import { fetchPropertyOverviewStats, fetchJson } from "../../utils/api";
 import { PageHeader } from "../../components/superadmin/PageHeader";
 import { StatCard } from "../../components/superadmin/StatCard";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
-
-const propertyStatusData = [
-  { name: "Approved", value: 1783, color: "hsl(var(--chart-1))", percent: "76.2%" },
-  { name: "Pending", value: 324, color: "hsl(var(--chart-2))", percent: "13.8%" },
-  { name: "Rejected", value: 233, color: "hsl(var(--chart-3))", percent: "9.9%" },
-];
-
-const recentProperties = [
-  { name: "Ocean View Apartment", owner: "John Doe", loc: "Mumbai", status: "Approved", date: "May 28, 2024" },
-  { name: "Green Valley Villa", owner: "Priya Sharma", loc: "Bangalore", status: "Pending", date: "May 27, 2024" },
-  { name: "Sunrise Heights", owner: "Amit Patel", loc: "Pune", status: "Approved", date: "May 27, 2024" },
-  { name: "Lake View Residency", owner: "Neha Singh", loc: "Hyderabad", status: "Rejected", date: "May 26, 2024" },
-];
-
-const actionCards = [
-  { title: "Add Properties", desc: "Add new properties to the platform", count: "142", sub: "Added this month", btn: "Add New Property", icon: Building2, color: "blue" },
-  { title: "Approve / Reject", desc: "Review and take action on submitted properties", count: "324", sub: "Pending review", btn: "Review Now", icon: ClipboardCheck, color: "green" },
-  { title: "Pending Properties", desc: "Properties waiting for approval", count: "324", sub: "Pending approval", btn: "View Pending", icon: Clock, color: "yellow" },
-  { title: "All Properties List", desc: "View and manage all properties", count: "2,340", sub: "Total properties", btn: "View All Properties", icon: List, color: "purple" },
-  { title: "Online Leads", desc: "Manage all incoming online leads", count: "1,256", sub: "This month", btn: "View Online Leads", icon: Users, color: "cyan" },
-];
 
 const COLORS = {
   blue: "bg-info-soft text-info",
@@ -46,30 +23,61 @@ const COLORS = {
 };
 
 export default function PropertyOverview() {
-  const [stats, setStats] = useState({ total: 0, active: 0, pending: 0, leads: 0 });
+  const [stats, setStats] = useState({ total: 0, active: 0, pending: 0, rejected: 0, leads: 0 });
+  const [recentProperties, setRecentProperties] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadStats = async () => {
+    const loadData = async () => {
       setLoading(true);
       try {
-        const res = await fetchPropertyOverviewStats();
-        if (res.success && res.summary) {
+        const [statsRes, propsRes] = await Promise.all([
+          fetchPropertyOverviewStats().catch(() => null),
+          fetchJson("/api/properties?limit=5&sort=-createdAt").catch(() => null)
+        ]);
+
+        if (statsRes?.success && statsRes.summary) {
           setStats({
-            total: res.summary.totalProperties || 2340,
-            active: res.summary.activeProperties || 1783,
-            pending: res.summary.pendingReview || 324,
-            leads: 1256
+            total: statsRes.summary.totalProperties || 0,
+            active: statsRes.summary.activeProperties || statsRes.summary.approvedProperties || 0,
+            pending: statsRes.summary.pendingReview || statsRes.summary.pendingProperties || 0,
+            rejected: statsRes.summary.rejectedProperties || 0,
+            leads: statsRes.summary.totalLeads || 0
           });
         }
+
+        if (propsRes) {
+          const propList = Array.isArray(propsRes) ? propsRes : (propsRes.properties || propsRes.data || []);
+          setRecentProperties(propList.slice(0, 5).map(p => ({
+            name: p.title || p.propertyName || p.name || "Unnamed Property",
+            owner: p.ownerName || p.owner?.name || "—",
+            location: p.city || p.locationCode || "—",
+            status: p.status === "approved" ? "Approved" : p.status === "rejected" ? "Rejected" : "Pending",
+            date: p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : "—"
+          })));
+        }
       } catch (error) {
-        console.error("Property Stats Error:", error);
+        console.error("Property Dashboard Error:", error);
       } finally {
         setLoading(false);
       }
     };
-    loadStats();
+    loadData();
   }, []);
+
+  const propertyStatusData = [
+    { name: "Approved", value: stats.active || 0, color: "#10B981" },
+    { name: "Pending", value: stats.pending || 0, color: "#F59E0B" },
+    { name: "Rejected", value: stats.rejected || 0, color: "#EF4444" },
+  ];
+
+  const actionCards = [
+    { title: "Add Properties", desc: "Add new properties to the platform", count: stats.total, sub: "Total properties", btn: "Add New Property", icon: Building2, color: "blue" },
+    { title: "Approve / Reject", desc: "Review and take action on submitted properties", count: stats.pending, sub: "Pending review", btn: "Review Now", icon: ClipboardCheck, color: "green" },
+    { title: "Pending Properties", desc: "Properties waiting for approval", count: stats.pending, sub: "Pending approval", btn: "View Pending", icon: Clock, color: "yellow" },
+    { title: "All Properties List", desc: "View and manage all properties", count: stats.total, sub: "Total properties", btn: "View All Properties", icon: List, color: "purple" },
+    { title: "Online Leads", desc: "Manage all incoming online leads", count: stats.leads, sub: "This month", btn: "View Online Leads", icon: Users, color: "cyan" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -79,25 +87,22 @@ export default function PropertyOverview() {
         actions={
           <div className="flex items-center gap-3 bg-white border border-border/60 px-4 py-2 rounded-xl shadow-sm text-xs font-bold text-slate-600">
             <Calendar className="w-4 h-4 text-slate-400" />
-            <span>May 2025</span>
+            <span>{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
           </div>
         }
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-         <StatCard label="Total Properties" value={stats.total.toLocaleString()} delta="+8.3%" trend="up" icon={Building2} iconColor="blue" loading={loading} />
-         <StatCard label="Approved" value={stats.active.toLocaleString()} delta="+12.5%" trend="up" icon={CheckCircle2} iconColor="green" loading={loading} />
-         <StatCard label="Pending Review" value={stats.pending.toLocaleString()} delta="+5.2%" trend="up" icon={Clock} iconColor="yellow" loading={loading} />
-         <StatCard label="Incoming Leads" value={stats.leads.toLocaleString()} delta="+18.6%" trend="up" icon={MessageSquare} iconColor="purple" loading={loading} />
+         <StatCard label="Total Properties" value={stats.total.toLocaleString()} delta="" trend="up" icon={Building2} iconColor="blue" loading={loading} />
+         <StatCard label="Approved" value={stats.active.toLocaleString()} delta="" trend="up" icon={CheckCircle2} iconColor="green" loading={loading} />
+         <StatCard label="Pending Review" value={stats.pending.toLocaleString()} delta="" trend="up" icon={Clock} iconColor="yellow" loading={loading} />
+         <StatCard label="Incoming Leads" value={stats.leads.toLocaleString()} delta="" trend="up" icon={MessageSquare} iconColor="purple" loading={loading} />
       </div>
 
       <div className="grid grid-cols-12 gap-6">
          <div className="col-span-12 lg:col-span-5 panel">
             <div className="flex items-center justify-between mb-10">
                <h3 className="text-lg font-bold text-slate-900">Status Overview</h3>
-               <select className="h-9 px-3 rounded-xl border border-border bg-slate-50 text-xs font-bold text-slate-500 outline-none">
-                  <option>This Month</option>
-               </select>
             </div>
             <div className="flex flex-col items-center justify-center">
                <div className="relative h-56 w-56 flex items-center justify-center mb-8">
@@ -109,7 +114,7 @@ export default function PropertyOverview() {
                      </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                     <p className="text-3xl font-black text-slate-900">2,340</p>
+                     <p className="text-3xl font-black text-slate-900">{loading ? "—" : stats.total.toLocaleString()}</p>
                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Total</p>
                   </div>
                </div>
@@ -122,7 +127,9 @@ export default function PropertyOverview() {
                         </div>
                         <div className="flex items-center gap-3">
                            <span className="text-sm font-black text-slate-900">{item.value.toLocaleString()}</span>
-                           <span className="text-[10px] font-bold text-slate-400 px-2 py-0.5 bg-slate-50 rounded-lg">{item.percent}</span>
+                           <span className="text-[10px] font-bold text-slate-400 px-2 py-0.5 bg-slate-50 rounded-lg">
+                             {stats.total > 0 ? `${((item.value / stats.total) * 100).toFixed(1)}%` : "0%"}
+                           </span>
                         </div>
                      </div>
                   ))}
@@ -133,7 +140,7 @@ export default function PropertyOverview() {
          <div className="col-span-12 lg:col-span-7 panel">
             <div className="flex items-center justify-between mb-8">
                <h3 className="text-lg font-bold text-slate-900">Recent Listings</h3>
-               <button className="text-xs font-bold text-blue-600 hover:underline">View All</button>
+               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Live Database</span>
             </div>
             <div className="overflow-x-auto">
                <table className="w-full">
@@ -143,11 +150,14 @@ export default function PropertyOverview() {
                         <th className="text-left pb-4 font-bold">Owner</th>
                         <th className="text-left pb-4 font-bold">Status</th>
                         <th className="text-left pb-4 font-bold">Date</th>
-                        <th className="text-right pb-4"></th>
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                     {recentProperties.map((prop, i) => (
+                     {loading ? (
+                       <tr><td colSpan="4" className="py-10 text-center text-xs font-bold text-slate-300">Loading...</td></tr>
+                     ) : recentProperties.length === 0 ? (
+                       <tr><td colSpan="4" className="py-10 text-center text-xs font-bold text-slate-300">No properties found</td></tr>
+                     ) : recentProperties.map((prop, i) => (
                         <tr key={i} className="group hover:bg-slate-50 transition-colors">
                            <td className="py-4">
                               <div className="flex items-center gap-3">
@@ -156,7 +166,7 @@ export default function PropertyOverview() {
                                  </div>
                                  <div className="min-w-0">
                                     <div className="text-[13px] font-bold text-slate-900 truncate">{prop.name}</div>
-                                    <div className="text-[11px] text-slate-400 font-medium">{prop.loc}</div>
+                                    <div className="text-[11px] text-slate-400 font-medium">{prop.location}</div>
                                  </div>
                               </div>
                            </td>
@@ -169,11 +179,6 @@ export default function PropertyOverview() {
                               )}>{prop.status}</span>
                            </td>
                            <td className="py-4 text-[11px] text-slate-400 font-bold uppercase tracking-tight">{prop.date}</td>
-                           <td className="py-4 text-right">
-                              <button className="p-1.5 rounded-lg hover:bg-white hover:shadow-sm transition-all text-slate-300 hover:text-slate-600">
-                                 <MoreVertical size={16} />
-                              </button>
-                           </td>
                         </tr>
                      ))}
                   </tbody>
@@ -192,13 +197,15 @@ export default function PropertyOverview() {
                <p className="text-[10px] text-slate-400 font-medium leading-relaxed mb-5">{card.desc}</p>
                
                <div className="mb-6 mt-auto">
-                  <p className="text-2xl font-black text-slate-900 tracking-tight leading-none mb-1">{card.count}</p>
+                  <p className="text-2xl font-black text-slate-900 tracking-tight leading-none mb-1">
+                    {loading ? "—" : card.count.toLocaleString()}
+                  </p>
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{card.sub}</p>
                </div>
 
                <button className={cn(
                  "w-full py-2.5 rounded-xl text-[10px] font-bold transition-all flex items-center justify-center gap-2 uppercase tracking-widest",
-                 card.color === "blue" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" :
+                 card.color === "blue" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700" :
                  "bg-slate-100 text-slate-600 hover:bg-slate-200"
                )}>
                   {card.btn}

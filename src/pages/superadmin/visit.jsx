@@ -362,7 +362,7 @@ export default function Visit() {
                {currentView === "addOwner" ? "Back to Visits" : "Add Property Owner"}
             </button>
             {currentView === "list" && (
-              <button className="bg-slate-800 text-white px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest shadow-lg shadow-slate-800/10 hover:bg-slate-900 transition-all flex items-center gap-2">
+              <button onClick={() => setCurrentView("addOwner")} className="bg-slate-800 text-white px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest shadow-lg shadow-slate-800/10 hover:bg-slate-900 transition-all flex items-center gap-2">
                  <Plus className="w-3.5 h-3.5" /> Add New Visit
               </button>
             )}

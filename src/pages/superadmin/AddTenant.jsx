@@ -284,8 +284,18 @@ export default function AddTenant() {
   const validateForm = () => {
     const newErrors = {};
     if (!basicDetails.fullName) newErrors.fullName = "Name is required";
-    if (!basicDetails.email) newErrors.email = "Email is required";
-    if (!basicDetails.phone) newErrors.phone = "Phone is required";
+    if (!basicDetails.email) {
+      newErrors.email = "Email is required";
+    } else if (!/\S+@\S+\.\S+/.test(basicDetails.email)) {
+      newErrors.email = "Invalid email format";
+    }
+    
+    if (!basicDetails.phone) {
+      newErrors.phone = "Phone is required";
+    } else if (basicDetails.phone.replace(/[^0-9]/g, "").length < 10) {
+      newErrors.phone = "Phone must be at least 10 digits";
+    }
+    
     if (!basicDetails.dob) newErrors.dob = "Date of Birth is required";
     if (!basicDetails.gender) newErrors.gender = "Gender is required";
     if (!basicDetails.idProofNumber) newErrors.idProofNumber = "ID Proof No is required";
@@ -303,7 +313,12 @@ export default function AddTenant() {
     if (!tenancyDetails.paymentFrequency) newErrors.paymentFrequency = "Payment frequency is required";
 
     if (!additionalDetails.emergencyName) newErrors.emergencyName = "Emergency name is required";
-    if (!additionalDetails.emergencyPhone) newErrors.emergencyPhone = "Emergency phone is required";
+    if (!additionalDetails.emergencyPhone) {
+      newErrors.emergencyPhone = "Emergency phone is required";
+    } else if (additionalDetails.emergencyPhone.replace(/[^0-9]/g, "").length < 10) {
+      newErrors.emergencyPhone = "Phone must be at least 10 digits";
+    }
+    
     if (!additionalDetails.relationship) newErrors.relationship = "Relationship is required";
 
     setErrors(newErrors);
@@ -399,7 +414,7 @@ export default function AddTenant() {
   };
 
   return (
-    <div className="min-h-full bg-white p-8">
+    <div className="space-y-6">
       <PageHeader 
         title="Add Tenant" 
         subtitle="Add tenant details, assign room and set tenancy information. After saving, an E-KYC link will be sent to the tenant."

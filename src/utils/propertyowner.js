@@ -29,12 +29,17 @@ const _getCached = (key) => { const e = _fetchCache[key]; return e && Date.now()
 const _setCached = (key, data) => { _fetchCache[key] = { data, ts: Date.now() }; };
 
 export const clearOwnerFetchCache = (loginId) => {
+  const id = String(loginId || "").trim().toUpperCase();
+  delete _fetchCache[`props_${id}_false`];
+  delete _fetchCache[`props_${id}_true`];
   delete _fetchCache[`props_${loginId}_false`];
   delete _fetchCache[`props_${loginId}_true`];
+  delete _fetchCache[`tenants_${id}`];
   delete _fetchCache[`tenants_${loginId}`];
+  delete _fetchCache[`active_tenants_${id}`];
   delete _fetchCache[`active_tenants_${loginId}`];
   Object.keys(_fetchCache).forEach(k => {
-    if (k.startsWith(`rooms_${loginId}`) || k.startsWith(`rooms_prop_`)) {
+    if (k.startsWith(`rooms_${id}`) || k.startsWith(`rooms_${loginId}`) || k.startsWith("rooms_prop_")) {
       delete _fetchCache[k];
     }
   });
@@ -278,12 +283,15 @@ export const fetchOwnerProperties = async (loginId, bypassFilter = false) => {
   return properties;
 };
 
-export const fetchOwnerRooms = async (loginId, page = 1, limit = 50) => {
-  const _cacheKey = `rooms_${loginId}_${page}_${limit}`;
-  const _hit = _getCached(_cacheKey);
-  if (_hit) return _hit;
+export const fetchOwnerRooms = async (loginId, page = 1, limit = 50, skipCache = false) => {
+  const normalizedId = String(loginId || "").trim().toUpperCase();
+  const _cacheKey = `rooms_${normalizedId}_${page}_${limit}`;
+  if (!skipCache) {
+    const _hit = _getCached(_cacheKey);
+    if (_hit) return _hit;
+  }
   try {
-    const response = await fetchJson(`/api/owners/${encodeURIComponent(loginId)}/rooms?page=${page}&limit=${limit}`);
+    const response = await fetchJson(`/api/owners/${encodeURIComponent(normalizedId)}/rooms?page=${page}&limit=${limit}`);
     let backendRooms = response?.rooms || response?.data || [];
     
     backendRooms = filterByActiveProperty(backendRooms);
@@ -425,17 +433,12 @@ export const fetchPropertyMap = async () => {
 };
 
 export const createRoom = async (payload) => {
-  try {
-    const response = await fetchJson("/api/rooms", {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
-    return response?.room || response?.data || response;
-  } catch (error) {
-    // If API fails, still return success for local storage
-    console.warn('Room API failed, saved locally:', error.message);
-    return { success: true, local: true };
-  }
+  const response = await fetchJson("/api/rooms", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  clearOwnerFetchCache(payload?.ownerLoginId);
+  return response?.room || response?.data || response;
 };
 
 export const updateRoom = async (roomId, payload) => fetchJson(`/api/rooms/${encodeURIComponent(roomId)}`, {
@@ -443,9 +446,13 @@ export const updateRoom = async (roomId, payload) => fetchJson(`/api/rooms/${enc
   body: JSON.stringify(payload)
 });
 
-export const deleteRoom = async (roomId) => fetchJson(`/api/rooms/${encodeURIComponent(roomId)}`, {
-  method: "DELETE"
-});
+export const deleteRoom = async (roomId, ownerLoginId) => {
+  const response = await fetchJson(`/api/rooms/${encodeURIComponent(roomId)}`, {
+    method: "DELETE"
+  });
+  if (ownerLoginId) clearOwnerFetchCache(ownerLoginId);
+  return response;
+};
 
 export const assignTenant = async (payload) => fetchJson("/api/tenants/assign", {
   method: "POST",

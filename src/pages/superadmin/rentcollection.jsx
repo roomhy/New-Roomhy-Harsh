@@ -51,10 +51,14 @@ export default function RentHistory() {
     owners.forEach(o => { ownerMap[o.loginId] = o; });
 
     const tenantMap = {};
-    tenants.forEach(t => { tenantMap[t.loginId] = t; });
+    tenants.filter(t => !t.isDeleted && t.status !== 'inactive' && t.status !== 'suspended').forEach(t => {
+      if (t.loginId) tenantMap[t.loginId] = t;
+      if (t._id) tenantMap[String(t._id)] = t;
+    });
 
     return rents.map(r => {
-      const tenant = tenantMap[r.tenantLoginId];
+      const tenant = tenantMap[r.tenantLoginId] || tenantMap[String(r.tenantId || "")];
+      if (!tenant) return null;
       const owner = ownerMap[r.ownerLoginId];
       return {
         ...r,
@@ -62,7 +66,7 @@ export default function RentHistory() {
         owner,
         bankInfo: owner?.bankDetails || owner?.checkinBankName || "Not Linked"
       };
-    });
+    }).filter(Boolean);
   }, [rents, tenants, owners]);
 
   const filteredData = useMemo(() => {
@@ -82,13 +86,21 @@ export default function RentHistory() {
   }, [mergedData, filterStatus, searchTerm]);
 
   const stats = useMemo(() => {
-    const total = rents.reduce((acc, r) => acc + (Number(r.totalDue) || 0), 0);
-    const collected = rents.reduce((acc, r) => acc + (Number(r.paidAmount) || 0), 0);
+    const activeRents = mergedData;
+    const total = activeRents.reduce((acc, r) => acc + (Number(r.totalDue || r.rentAmount) || 0), 0);
+    const collected = activeRents.reduce((acc, r) => acc + (Number(r.paidAmount) || 0), 0);
     const pending = total - collected;
     const rate = total > 0 ? Math.round((collected / total) * 100) : 0;
     
     return { total, collected, pending, rate };
-  }, [rents]);
+  }, [mergedData]);
+
+  const formatMoney = (n) => {
+    const v = Number(n) || 0;
+    if (v >= 100000) return `₹${(v / 100000).toFixed(1)}L`;
+    if (v >= 1000) return `₹${(v / 1000).toFixed(1)}K`;
+    return `₹${v.toLocaleString('en-IN')}`;
+  };
 
   const chartData = [
     { name: "Collected", value: stats.collected, color: "#10B981" },
@@ -105,10 +117,12 @@ export default function RentHistory() {
 
   const exportToExcel = () => {
     const data = filteredData.map(r => ({
-      "Tenant": r.tenantName,
+      "Tenant ID": r.tenant?.loginId || r.tenantLoginId || r.tenant?._id || "N/A",
+      "Tenant Mongo ID": r.tenant?._id || r.tenantId || "N/A",
+      "Tenant": r.tenantName || r.tenant?.name || "N/A",
       "Property": r.propertyName,
       "Month": r.collectionMonth,
-      "Total Due": r.totalDue,
+      "Total Due": r.totalDue || r.rentAmount,
       "Paid": r.paidAmount,
       "Status": r.paymentStatus,
       "Method": r.paymentMethod,
@@ -121,7 +135,7 @@ export default function RentHistory() {
   };
 
   return (
-    <div className="p-8 space-y-10 bg-[#F8FAFC] min-h-full">
+    <div className="space-y-10">
       {/* Header Area */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
          <div className="flex flex-col gap-2">
@@ -146,9 +160,9 @@ export default function RentHistory() {
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCardHorizontal label="Gross Receivables" value={`₹${(stats.total / 100000).toFixed(1)}L`} trend="Contractual" up icon={IndianRupee} color="blue" />
-        <StatCardHorizontal label="Collected Pulse" value={`₹${(stats.collected / 100000).toFixed(1)}L`} trend="Realized" up icon={CheckCircle2} color="emerald" />
-        <StatCardHorizontal label="Pending Risk" value={`₹${(stats.pending / 100000).toFixed(1)}L`} trend="Exposure" up={false} icon={AlertCircle} color="amber" />
+        <StatCardHorizontal label="Gross Receivables" value={formatMoney(stats.total)} trend="Contractual" up icon={IndianRupee} color="blue" />
+        <StatCardHorizontal label="Collected Pulse" value={formatMoney(stats.collected)} trend="Realized" up icon={CheckCircle2} color="emerald" />
+        <StatCardHorizontal label="Pending Risk" value={formatMoney(stats.pending)} trend="Exposure" up={false} icon={AlertCircle} color="amber" />
         <StatCardHorizontal label="Collection Rate" value={`${stats.rate}%`} trend="Velocity" up icon={Activity} color="indigo" />
       </div>
 
@@ -170,7 +184,7 @@ export default function RentHistory() {
                  </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                 <p className="text-3xl font-black text-slate-800 tracking-tighter leading-none">₹{(stats.collected / 100000).toFixed(1)}L</p>
+                 <p className="text-3xl font-black text-slate-800 tracking-tighter leading-none">{formatMoney(stats.collected)}</p>
                  <p className="text-[8px] text-slate-400 font-bold uppercase mt-2 tracking-widest">Realized Yield</p>
               </div>
            </div>
@@ -251,8 +265,11 @@ export default function RentHistory() {
                                   {(r.tenantName || "T").charAt(0).toUpperCase()}
                                </div>
                                <div>
-                                  <p className="text-sm font-bold text-slate-800 tracking-tight">{r.tenantName || "Unknown Resident"}</p>
-                                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 opacity-60 truncate max-w-[150px]">{r.propertyName}</p>
+                                  <p className="text-sm font-bold text-slate-800 tracking-tight">{r.tenantName || r.tenant?.name || "Unknown Resident"}</p>
+                                  <p className="text-[8px] font-bold text-blue-500 uppercase tracking-widest mt-1">
+                                    ID: {r.tenant?.loginId || r.tenantLoginId || "—"}
+                                  </p>
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 opacity-60 truncate max-w-[200px]">{r.propertyName}</p>
                                </div>
                             </div>
                          </td>
@@ -263,7 +280,7 @@ export default function RentHistory() {
                             </div>
                          </td>
                          <td className="px-6 py-8 text-center font-bold text-slate-800">
-                            ₹{r.totalDue?.toLocaleString()}
+                            ₹{(Number(r.totalDue || r.rentAmount) || 0).toLocaleString('en-IN')}
                          </td>
                          <td className="px-6 py-8 text-center">
                             <span className={cn(

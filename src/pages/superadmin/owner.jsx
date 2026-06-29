@@ -826,6 +826,59 @@ export default function Owner() {
                        <DetailItem isEditing={isEditingOwner} onChange={e => setEditOwnerForm({...editOwnerForm, checkinUpiId: e.target.value})} icon={Wallet} label="UPI Link" value={isEditingOwner ? editOwnerForm.checkinUpiId : selectedOwner.checkinUpiId} />
                     </div>
                  </section>
+
+                 {/* Rental Agreement */}
+                 <section className="bg-violet-50/30 p-8 rounded-[2.5rem] border border-violet-100">
+                    <div className="flex items-center gap-4 mb-10">
+                       <div className="w-10 h-10 rounded-2xl bg-violet-600 text-white flex items-center justify-center font-bold shadow-lg shadow-violet-200">
+                          <FileText size={20} />
+                       </div>
+                       <h4 className="text-lg font-bold text-slate-800 uppercase tracking-widest">Rental Agreement</h4>
+                    </div>
+                    {(() => {
+                       const agreement = selectedOwner.digitalCheckin?.agreement || selectedOwner.agreement || {};
+                       const isAgreementSigned = selectedOwner.agreementSigned || agreement.signed || agreement.acceptedAt || agreement.eSignName;
+                       const agreementStatus = selectedOwner.agreementStatus || (isAgreementSigned ? "Signed" : "Not Signed");
+                       const eSignName = selectedOwner.agreementESignName || agreement.eSignName || "—";
+                       const signedAt = selectedOwner.agreementSignedAt || agreement.acceptedAt || agreement.signedAt;
+                       const signatureUrl = agreement.signatureDataUrl || selectedOwner.agreementSignatureUrl;
+                       const agreementDocUrl = selectedOwner.agreementDocUrl || agreement.documentUrl;
+                       return (
+                          <>
+                             <div className="grid grid-cols-2 gap-8 mb-6">
+                                <DetailItem icon={ShieldCheck} label="Agreement Status" value={agreementStatus} highlight={isAgreementSigned} />
+                                <DetailItem icon={User} label="e-Signature Name" value={eSignName} />
+                                <DetailItem icon={Calendar} label="Signed At" value={signedAt ? new Date(signedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : "—"} />
+                                <div className="space-y-2">
+                                   <div className="flex items-center gap-2 text-slate-400">
+                                      <FileText size={12} />
+                                      <span className="text-[9px] font-bold uppercase tracking-widest">Agreement Document</span>
+                                   </div>
+                                   {agreementDocUrl ? (
+                                      <div className="flex items-center gap-3">
+                                         <button onClick={() => window.open(agreementDocUrl, "_blank")} className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"><Eye size={12} /> View</button>
+                                         <button onClick={() => { const a = document.createElement("a"); a.href = agreementDocUrl; a.download = `Agreement_${selectedOwner.loginId}.pdf`; a.target = "_blank"; a.click(); }} className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1"><Download size={12} /> Download</button>
+                                      </div>
+                                   ) : (
+                                      <p className="text-sm font-bold text-slate-300 italic">No Document</p>
+                                   )}
+                                </div>
+                             </div>
+                             {signatureUrl && (
+                                <div className="mt-4 space-y-3">
+                                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Signature Preview</p>
+                                   <img src={signatureUrl} className="h-20 object-contain rounded-xl bg-white border border-slate-100 p-2 shadow-sm" alt="Signature" />
+                                </div>
+                             )}
+                             {!isAgreementSigned && (
+                                <div className="mt-4 p-4 bg-amber-50 border border-amber-100 rounded-2xl">
+                                   <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Agreement not yet signed by this owner.</p>
+                                </div>
+                             )}
+                          </>
+                       );
+                    })()}
+                 </section>
               </div>
 
               <div className="px-10 py-10 border-t border-slate-50 bg-slate-50/50 flex justify-between items-center">

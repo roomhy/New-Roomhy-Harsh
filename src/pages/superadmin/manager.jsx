@@ -122,12 +122,14 @@ export default function Manager() {
   const stats = useMemo(() => {
     const total = employees.length;
     const active = employees.filter(e => e.isActive !== false).length;
+    const locked = employees.filter(e => e.isActive === false).length;
     return { 
       total, 
       active, 
       marketing: employees.filter(e => e.role === "Marketing Team").length, 
       maintenance: employees.filter(e => e.role === "Maintenance Team").length,
-      restricted: employees.filter(e => !e.permissions || e.permissions.length === 0).length
+      restricted: employees.filter(e => !e.permissions || e.permissions.length === 0).length,
+      locked
     };
   }, [employees]);
 
@@ -322,7 +324,7 @@ export default function Manager() {
         <StatCardSmall label="Total Employees" value={stats.total} icon={Users} color="blue" trend="+3.2% Flux" up />
         <StatCardSmall label="Active Now" value={stats.active} icon={Activity} color="emerald" trend="Optimal" up />
         <StatCardSmall label="Marketing Team" value={stats.marketing} icon={Megaphone} color="indigo" trend="Growth Core" up />
-        <StatCardSmall label="Locked Access" value={stats.restricted} icon={Lock} color="rose" trend="Restricted" up={false} />
+        <StatCardSmall label="Locked Access" value={stats.locked} icon={Lock} color="rose" trend="Restricted" up={false} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">

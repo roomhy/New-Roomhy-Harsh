@@ -54,18 +54,30 @@ export default function KycVerification() {
     (item.loginId || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleUpdate = async (id, status) => {
+  const handleUpdate = async (item, status) => {
     try {
       setIsUpdating(true);
-      const endpoint = tab === "owners" ? `/api/owners/${id}/kyc` : `/api/tenants/${id}/kyc`;
-      await fetchJson(endpoint, {
-        method: "PATCH",
-        headers: getAuthHeader(),
-        body: JSON.stringify({ status })
-      });
+      if (tab === "owners") {
+        await fetchJson(`/api/owners/${item.loginId}/kyc`, {
+          method: "PATCH",
+          headers: getAuthHeader(),
+          body: JSON.stringify({ status })
+        });
+      } else {
+        const endpoint = status === "verified" ? "/api/tenants/kyc/approve" : "/api/tenants/kyc/reject";
+        await fetchJson(endpoint, {
+          method: "POST",
+          headers: getAuthHeader(),
+          body: JSON.stringify({ tenantId: item._id })
+        });
+      }
       loadData();
-    } catch (err) { alert("Failed to update status"); }
-    finally { setIsUpdating(false); }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update status");
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   return (
@@ -188,14 +200,14 @@ export default function KycVerification() {
                        <td className="px-10 py-8 text-right">
                           <div className="flex items-center justify-end gap-3">
                              <button 
-                                onClick={() => handleUpdate(item.loginId, "verified")}
+                                onClick={() => handleUpdate(item, "verified")}
                                 disabled={isUpdating}
                                 className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all border border-emerald-100 shadow-md active:scale-95 disabled:opacity-50"
                              >
                                 <Check className="w-5 h-5" />
                              </button>
                              <button 
-                                onClick={() => handleUpdate(item.loginId, "rejected")}
+                                onClick={() => handleUpdate(item, "rejected")}
                                 disabled={isUpdating}
                                 className="p-3.5 bg-rose-50 text-rose-600 rounded-2xl hover:bg-rose-600 hover:text-white transition-all border border-rose-100 shadow-md active:scale-95 disabled:opacity-50"
                              >

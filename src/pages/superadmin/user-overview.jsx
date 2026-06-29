@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   Users, UserCheck, Building2, UserPlus, 
   ArrowUpRight, ArrowDownRight, ChevronRight, 
@@ -16,29 +17,14 @@ import { StatCard } from "../../components/superadmin/StatCard";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
-const userDistributionData = [
-  { name: "Team Members", value: 78, color: "hsl(var(--chart-1))", percent: "6.3%" },
-  { name: "Property Owners", value: 432, color: "hsl(var(--chart-2))", percent: "34.6%" },
-  { name: "Tenants", value: 738, color: "hsl(var(--chart-3))", percent: "59.1%" },
-];
-
-const recentUsersData = [
-  { name: "Rohit Sharma", email: "rohit.mehta@...", role: "Team Member", date: "May 28, 2024", status: "Active", initial: "RS" },
-  { name: "Priya Mehta", email: "priya.mehta@email.com", role: "Property Owner", date: "May 27, 2024", status: "Active", initial: "PM" },
-  { name: "Amit Patel", email: "amit.patel@email.com", role: "Tenant", date: "May 26, 2024", status: "Active", initial: "AP" },
-];
-
-const pendingApprovals = [
-  { label: "Property Owners", count: 18, icon: Building2, color: "green" },
-  { label: "Tenants", count: 32, icon: Users, color: "blue" },
-  { label: "Documents", count: 27, icon: ClipboardList, color: "yellow" },
-];
-
-const kycStatus = [
-  { label: "Verified", count: 842, icon: CheckCircle2, color: "green" },
-  { label: "Pending", count: 276, icon: Clock, color: "yellow" },
-  { label: "Rejected", count: 130, icon: XCircle, color: "red" },
-];
+const iconMap = {
+  Building2,
+  Users,
+  ClipboardList,
+  CheckCircle2,
+  Clock,
+  XCircle
+};
 
 const COLORS = {
   blue: "bg-info-soft text-info",
@@ -48,22 +34,63 @@ const COLORS = {
 };
 
 export default function UserOverview() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({ total: 0, team: 0, owners: 0, tenants: 0, activeToday: 0 });
   const [loading, setLoading] = useState(true);
+
+  const [userDistributionData, setUserDistributionData] = useState([
+    { name: "Team Members", value: 0, color: "#6366F1", percent: "0%" },
+    { name: "Property Owners", value: 0, color: "#10B981", percent: "0%" },
+    { name: "Tenants", value: 0, color: "#3B82F6", percent: "0%" },
+  ]);
+
+  const [recentUsersData, setRecentUsersData] = useState([]);
+
+  const [pendingApprovals, setPendingApprovals] = useState([
+    { label: "Property Owners", count: 0, icon: Building2, color: "green" },
+    { label: "Tenants", count: 0, icon: Users, color: "blue" },
+    { label: "Documents", count: 0, icon: ClipboardList, color: "yellow" },
+  ]);
+
+  const [kycStatus, setKycStatus] = useState([
+    { label: "Verified", count: 0, icon: CheckCircle2, color: "green" },
+    { label: "Pending", count: 0, icon: Clock, color: "yellow" },
+    { label: "Rejected", count: 0, icon: XCircle, color: "red" },
+  ]);
 
   useEffect(() => {
     const loadStats = async () => {
       setLoading(true);
       try {
         const res = await fetchUserOverviewStats();
-        if (res.success && res.summary) {
-          setStats({
-            total: res.summary.total || 1248,
-            team: res.summary.team || 78,
-            owners: res.summary.owners || 432,
-            tenants: res.summary.tenants || 738,
-            activeToday: res.summary.activeToday || 1240
-          });
+        if (res.success) {
+          if (res.summary) {
+            setStats({
+              total: res.summary.total || 0,
+              team: res.summary.team || 0,
+              owners: res.summary.owners || 0,
+              tenants: res.summary.tenants || 0,
+              activeToday: res.summary.activeToday || 0
+            });
+          }
+          if (res.userDistributionData) {
+            setUserDistributionData(res.userDistributionData);
+          }
+          if (res.recentUsersData) {
+            setRecentUsersData(res.recentUsersData);
+          }
+          if (res.pendingApprovals) {
+            setPendingApprovals(res.pendingApprovals.map(item => ({
+              ...item,
+              icon: iconMap[item.icon] || ClipboardList
+            })));
+          }
+          if (res.kycStatus) {
+            setKycStatus(res.kycStatus.map(item => ({
+              ...item,
+              icon: iconMap[item.icon] || Clock
+            })));
+          }
         }
       } catch (error) {
         console.error("User Stats Error:", error);
@@ -118,7 +145,11 @@ export default function UserOverview() {
                   </div>
                </div>
                <div className="flex-1 space-y-5 w-full">
-                  {userDistributionData.map((item) => (
+                  {[
+                    { name: "Team Members", value: stats.team, color: "hsl(var(--chart-1))", total: stats.total },
+                    { name: "Property Owners", value: stats.owners, color: "hsl(var(--chart-2))", total: stats.total },
+                    { name: "Tenants", value: stats.tenants, color: "hsl(var(--chart-3))", total: stats.total },
+                  ].map((item) => (
                      <div key={item.name} className="flex items-center justify-between group">
                         <div className="flex items-center gap-3">
                            <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: item.color}} />
@@ -126,7 +157,7 @@ export default function UserOverview() {
                         </div>
                         <div className="flex items-center gap-3">
                            <span className="text-sm font-black text-slate-900">{item.value.toLocaleString()}</span>
-                           <span className="text-[10px] font-bold text-slate-400 px-2 py-0.5 bg-slate-50 rounded-lg">{item.percent}</span>
+                           <span className="text-[10px] font-bold text-slate-400 px-2 py-0.5 bg-slate-50 rounded-lg">{item.total > 0 ? ((item.value / item.total) * 100).toFixed(1) : 0}%</span>
                         </div>
                      </div>
                   ))}
@@ -137,7 +168,7 @@ export default function UserOverview() {
          <div className="col-span-12 lg:col-span-5 panel">
             <div className="flex items-center justify-between mb-8">
                <h3 className="text-lg font-bold text-slate-900">Recent Signups</h3>
-               <button className="text-xs font-bold text-blue-600 hover:underline">View All</button>
+               <button onClick={() => navigate('/superadmin/new_signups')} className="text-xs font-bold text-blue-600 hover:underline">View All</button>
             </div>
             <div className="space-y-5 flex-1 overflow-y-auto max-h-[350px] custom-scrollbar pr-2">
                {recentUsersData.map((user, i) => (

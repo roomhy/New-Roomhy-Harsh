@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   Users, Building2, Calendar, Wallet, 
   ArrowUpRight, ArrowDownRight, ChevronRight, 
@@ -19,6 +20,24 @@ import useSEO from "../../hooks/useSEO";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
+const formatRevenueMonthLabel = (key) => {
+  const m = String(key || "").trim();
+  const iso = m.match(/^(\d{4})-(\d{2})$/);
+  if (iso) {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return months[parseInt(iso[2], 10) - 1] || iso[2];
+  }
+  if (m.length <= 3) return m;
+  return m.slice(0, 3);
+};
+
+const formatRevenueAxis = (v) => {
+  const n = Number(v) || 0;
+  if (n >= 100000) return `${(n / 100000).toFixed(1)}L`;
+  if (n >= 1000) return `${(n / 1000).toFixed(0)}K`;
+  return String(n);
+};
+
 const colorMap = {
   blue: "bg-info-soft text-info",
   green: "bg-success-soft text-success",
@@ -27,6 +46,7 @@ const colorMap = {
 };
 
 export default function SuperadminDashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({ 
     totalUsers: 0, 
     tenants: 0, 
@@ -73,14 +93,16 @@ export default function SuperadminDashboard() {
 
   const totalUsersCount = stats.totalUsers || 1; // avoid divide by zero
   const usersByRoleData = [
-    { name: "Tenant", value: stats.tenants, color: "hsl(var(--chart-1))", percent: `${((stats.tenants / totalUsersCount) * 100).toFixed(1)}%` },
-    { name: "Owner", value: stats.owners, color: "hsl(var(--chart-2))", percent: `${((stats.owners / totalUsersCount) * 100).toFixed(1)}%` }
+    { name: "Tenant", value: stats.tenants, color: "#3B82F6", percent: `${((stats.tenants / totalUsersCount) * 100).toFixed(1)}%` },
+    { name: "Owner", value: stats.owners, color: "#10B981", percent: `${((stats.owners / totalUsersCount) * 100).toFixed(1)}%` }
   ];
 
-  const overviewDataDynamic = Object.entries(stats.monthlyRevenue).map(([month, rev]) => ({
-    name: month.substring(0, 3), // short month name
-    revenue: rev
-  }));
+  const overviewDataDynamic = Object.entries(stats.monthlyRevenue || {})
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, rev]) => ({
+      name: formatRevenueMonthLabel(month),
+      revenue: Number(rev) || 0
+    }));
 
   if (overviewDataDynamic.length === 0) {
     overviewDataDynamic.push({ name: "Current", revenue: stats.revenue || 0 });
@@ -184,15 +206,15 @@ export default function SuperadminDashboard() {
               <AreaChart data={overviewDataDynamic} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94A3B8", fontSize: 11, fontWeight: 600 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94A3B8", fontSize: 11, fontWeight: 600 }} tickFormatter={(v) => `${v / 1000}K`} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94A3B8", fontSize: 11, fontWeight: 600 }} tickFormatter={formatRevenueAxis} />
                 <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                <Area type="monotone" dataKey="revenue" stroke="hsl(var(--chart-1))" strokeWidth={3} fill="url(#rev)" dot={{ fill: "hsl(var(--chart-1))", r: 4 }} />
+                <Area type="monotone" dataKey="revenue" stroke="#3B82F6" strokeWidth={3} fill="url(#rev)" dot={{ fill: "#3B82F6", r: 4 }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -234,7 +256,7 @@ export default function SuperadminDashboard() {
         <div className="lg:col-span-2 panel">
           <div className="flex items-center justify-between mb-8">
             <h3 className="font-bold text-lg text-slate-900">Recent Activities</h3>
-            <button className="text-xs font-bold text-blue-600 hover:underline">View All</button>
+            <button onClick={() => navigate('/superadmin/new_signups')} className="text-xs font-bold text-blue-600 hover:underline">View All</button>
           </div>
           <div className="divide-y divide-slate-50">
             {activitiesDynamic.map((a, i) => {
@@ -279,7 +301,7 @@ export default function SuperadminDashboard() {
               </div>
             ))}
           </div>
-          <button className="w-full mt-8 py-3 bg-white text-blue-600 rounded-2xl font-bold text-sm hover:bg-blue-50 transition-colors shadow-lg">
+          <button onClick={() => navigate('/superadmin/reports')} className="w-full mt-8 py-3 bg-white text-blue-600 rounded-2xl font-bold text-sm hover:bg-blue-50 transition-colors shadow-lg">
              Generate Full Report
           </button>
         </div>

@@ -142,15 +142,15 @@ const RouteRoleGuard = () => {
     const isEmployeeRoute = path.startsWith('/employee/');
     if (!isAdminRoute && !isEmployeeRoute) return;
 
-    // If an owner session exists → they must not access these panels
+    // Use backend-confirmed role from AuthContext — never trust localStorage role directly
+    const role = String(authUser?.role || '').toLowerCase();
+
+    // Owner session must not access admin panels unless they are logged in as superadmin/admin
     const owner = getOwnerSession();
-    if (owner?.loginId) {
+    if (owner?.loginId && role !== 'superadmin' && role !== 'admin') {
       window.location.replace('/propertyowner/admin');
       return;
     }
-
-    // Use backend-confirmed role from AuthContext — never trust localStorage role directly
-    const role = String(authUser?.role || '').toLowerCase();
 
     if (isAdminRoute && role !== 'superadmin' && role !== 'admin') {
       window.location.replace('/superadmin/index');
@@ -208,9 +208,16 @@ const DomainGuard = () => {
     }
 
     // 3. Fallback for main website domain (roomhy.com) and others
-    // Show only coming-soon page
-    if (path !== "/coming-soon") {
-      window.location.replace("/coming-soon");
+    // Show only coming-soon page on root URL or paths not matching allowed website routes
+    const allowedWebsiteRoutes = [
+      "/website",
+      "/coming-soon"
+    ];
+
+    if (!allowedWebsiteRoutes.some(route => path.startsWith(route))) {
+      if (path === "/" || path === "") {
+        window.location.replace("/coming-soon");
+      }
     }
   }, [location.pathname]);
 
