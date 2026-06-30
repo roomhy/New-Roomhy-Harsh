@@ -41,7 +41,7 @@ export default function AboutPage() {
       <WebsiteNavbar />
 
       {/* --- COMPACT & STYLISH HEADER --- */}
-      <div className="relative w-full py-10 px-6 overflow-hidden border-b border-stone-200/50" 
+      <div className="relative w-full py-5 md:py-10 px-4 md:px-6 overflow-hidden border-b border-stone-200/50" 
            style={{ background: 'linear-gradient(135deg, #FFFAF5 0%, #FDFCFB 50%, #F5F7FA 100%)' }}>
         
         {/* Background Pattern */}
@@ -52,63 +52,65 @@ export default function AboutPage() {
         <div className="relative max-w-7xl mx-auto flex flex-col items-center text-center">
           
           {/* Icon */}
-          <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center mb-4">
-            <Info size={24} className="text-amber-600" />
+          <div className="w-8 h-8 md:w-12 md:h-12 rounded-xl bg-amber-100 flex items-center justify-center mb-2 md:mb-4">
+            <Info size={18} className="text-amber-600 md:w-6 md:h-6" />
           </div>
           
           {/* MAIN HEADING */}
-          <div className="flex items-center gap-4 mb-2">
-            <div className="h-[1px] w-8 bg-[#C5A059]/40 hidden md:block"></div>
-            <h1 className="text-3xl md:text-4xl font-bold text-[#1A1A1A] tracking-tight">
+          <div className="flex items-center gap-2 md:gap-4 mb-1 md:mb-2">
+            <div className="h-[1px] w-6 md:w-8 bg-[#C5A059]/40 hidden md:block"></div>
+            <h1 className="text-lg md:text-4xl font-bold text-[#1A1A1A] tracking-tight">
               About <span className="text-[#C5A059] font-serif italic font-medium">Us</span>
             </h1>
-            <div className="h-[1px] w-8 bg-[#C5A059]/40 hidden md:block"></div>
+            <div className="h-[1px] w-6 md:w-8 bg-[#C5A059]/40 hidden md:block"></div>
           </div>
 
           {/* SUB-HEADING */}
-          <p className="text-base md:text-lg text-stone-500 font-normal opacity-90 max-w-xl mx-auto">
+          <p className="text-xs md:text-lg text-stone-500 font-normal opacity-90 max-w-xl mx-auto">
             Our Story & Mission
           </p>
 
           {/* Bottom Accent Dot */}
-          <div className="mt-4 w-1.5 h-1.5 rounded-full bg-[#C5A059]/30"></div>
+          <div className="mt-2 md:mt-4 w-1.5 h-1.5 rounded-full bg-[#C5A059]/30"></div>
         </div>
       </div>
 
       {/* Vision Section */}
-      <section className="py-8 md:py-20 px-4 max-w-7xl mx-auto">
-        <div className="text-center mb-6 md:mb-12">
-          <p className="text-amber-600 font-semibold text-xs md:text-sm uppercase tracking-wider mb-1 md:mb-2">Looking Ahead</p>
-          <h2 className="text-2xl md:text-4xl font-extrabold text-gray-900">Our Vision</h2>
+      <section className="py-6 md:py-20 px-4 max-w-7xl mx-auto overflow-hidden">
+        <div className="text-center mb-4 md:mb-12">
+          <p className="text-amber-600 font-semibold text-[11px] md:text-sm uppercase tracking-wider mb-1 md:mb-2">Looking Ahead</p>
+          <h2 className="text-xl md:text-4xl font-extrabold text-gray-900">Our Vision</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+        {/* Horizontal scroll on mobile, grid on desktop */}
+        <div className="flex md:grid md:grid-cols-3 gap-4 md:gap-6 overflow-x-auto pb-4 md:pb-0 snap-x scrollbar-hide scroll-smooth -mx-4 px-4 md:mx-0 md:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {visionItems.map((item, index) => (
-            <div key={index} className="bg-white rounded-2xl p-5 md:p-8 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-gray-100 group">
+            <div key={index} className="min-w-[280px] md:min-w-0 flex-1 bg-white rounded-2xl p-4 md:p-8 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group snap-center">
               <div className={`w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-gradient-to-br ${item.gradient} flex items-center justify-center text-white mb-3 md:mb-5 group-hover:scale-110 transition-transform`}>
-                <item.icon size={20} className="md:w-6 md:h-6" />
+                <item.icon size={18} className="md:w-6 md:h-6" />
               </div>
-              <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-1.5 md:mb-3">{item.title}</h3>
-              <p className="text-sm md:text-base text-gray-500 leading-relaxed">{item.desc}</p>
+              <h3 className="text-base md:text-xl font-bold text-gray-900 mb-1 md:mb-3">{item.title}</h3>
+              <p className="text-xs md:text-base text-gray-500 leading-relaxed">{item.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* Mission Section */}
-      <section className="py-8 md:py-20 px-4 bg-white">
+      <section className="py-6 md:py-20 px-4 bg-white overflow-hidden">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-6 md:mb-12">
-            <p className="text-amber-600 font-semibold text-xs md:text-sm uppercase tracking-wider mb-1 md:mb-2">Our Purpose</p>
-            <h2 className="text-2xl md:text-4xl font-extrabold text-gray-900">Our Mission</h2>
+          <div className="text-center mb-4 md:mb-12">
+            <p className="text-amber-600 font-semibold text-[11px] md:text-sm uppercase tracking-wider mb-1 md:mb-2">Our Purpose</p>
+            <h2 className="text-xl md:text-4xl font-extrabold text-gray-900">Our Mission</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+          {/* Horizontal scroll on mobile, grid on desktop */}
+          <div className="flex md:grid md:grid-cols-3 gap-4 md:gap-6 overflow-x-auto pb-4 md:pb-0 snap-x scrollbar-hide scroll-smooth -mx-4 px-4 md:mx-0 md:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {missionItems.map((item, index) => (
-              <div key={index} className="bg-white rounded-2xl p-5 md:p-8 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-gray-100 group">
+              <div key={index} className="min-w-[280px] md:min-w-0 flex-1 bg-white rounded-2xl p-4 md:p-8 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group snap-center">
                 <div className={`w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-gradient-to-br ${item.gradient} flex items-center justify-center text-white mb-3 md:mb-5 group-hover:scale-110 transition-transform`}>
-                  <item.icon size={20} className="md:w-6 md:h-6" />
+                  <item.icon size={18} className="md:w-6 md:h-6" />
                 </div>
-                <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-1.5 md:mb-3">{item.title}</h3>
-                <p className="text-sm md:text-base text-gray-500 leading-relaxed">{item.desc}</p>
+                <h3 className="text-base md:text-xl font-bold text-gray-900 mb-1 md:mb-3">{item.title}</h3>
+                <p className="text-xs md:text-base text-gray-500 leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
@@ -153,34 +155,19 @@ export default function AboutPage() {
             <h2 className="text-2xl md:text-4xl font-extrabold text-gray-900">Our Leadership</h2>
           </div>
           
-          <div className="grid grid-cols-2 gap-6 max-w-4xl mx-auto">
-            {/* CEO 1 */}
-            <div className="flex flex-col items-center group">
-              <div className="relative w-28 h-28 md:w-48 md:h-48 mb-3 md:mb-6">
+          <div className="flex flex-col items-center max-w-4xl mx-auto">
+            {/* CEO */}
+            <div className="flex flex-col items-center group text-center">
+              <div className="relative w-36 h-36 md:w-52 md:h-52 mb-4 md:mb-6">
                 <div className="absolute inset-0 bg-amber-500 rounded-2xl md:rounded-3xl rotate-6 transition-transform group-hover:rotate-12 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gray-900 rounded-2xl md:rounded-3xl overflow-hidden shadow-xl border-2 md:border-4 border-white">
-                  <img src="/website/images/ceo1.png" alt="Founder" className="w-full h-full object-cover transition-all duration-500" />
+                  <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400" alt="Resham Singh" className="w-full h-full object-cover transition-all duration-500" />
                 </div>
               </div>
               <h3 className="text-sm md:text-2xl font-bold text-gray-900">Resham Singh</h3>
-              <p className="text-amber-600 font-semibold text-xs md:text-base mb-1 md:mb-3">Founder & CEO</p>
-              <p className="text-gray-500 text-center text-[10px] md:text-sm max-w-xs line-clamp-3 md:line-clamp-none">
-                With a vision to transform India's student housing sector into a transparent, tech-driven ecosystem.
-              </p>
-            </div>
-
-            {/* CEO 2 */}
-            <div className="flex flex-col items-center group">
-              <div className="relative w-28 h-28 md:w-48 md:h-48 mb-3 md:mb-6">
-                <div className="absolute inset-0 bg-teal-500 rounded-2xl md:rounded-3xl -rotate-6 transition-transform group-hover:-rotate-12 group-hover:scale-105" />
-                <div className="absolute inset-0 bg-gray-900 rounded-2xl md:rounded-3xl overflow-hidden shadow-xl border-2 md:border-4 border-white">
-                  <img src="/website/images/ceo2.png" alt="Co-Founder" className="w-full h-full object-cover transition-all duration-500" />
-                </div>
-              </div>
-              <h3 className="text-sm md:text-2xl font-bold text-gray-900">Resham Singh</h3>
-              <p className="text-teal-600 font-semibold text-xs md:text-base mb-1 md:mb-3">Founder & CEO</p>
-              <p className="text-gray-500 text-center text-[10px] md:text-sm max-w-xs line-clamp-3 md:line-clamp-none">
-                Dedicated to making room rentals fair, affordable, and accessible for students across the nation.
+              <p className="text-amber-600 font-semibold text-xs md:text-base mb-1 md:mb-3">Founder & Director</p>
+              <p className="text-gray-500 text-center text-[10px] md:text-sm max-w-md leading-relaxed">
+                With a vision to transform India's student housing sector into a transparent, tech-driven ecosystem, ensuring broker-free, affordable accommodation for India's youth.
               </p>
             </div>
           </div>

@@ -35,7 +35,7 @@ export default function ContactPage() {
   const contactCards = [
     { icon: Mail, title: 'Email Us', detail: 'hello@roomhy.com', sub: 'We reply within 24 hours', href: 'mailto:hello@roomhy.com', color: 'from-amber-500 to-orange-500' },
     { icon: Phone, title: 'Call Us', detail: '+91 99830 05030', sub: 'Mon-Sat, 9AM-7PM IST', href: 'tel:+919983005030', color: 'from-blue-500 to-indigo-500' },
-    { icon: MapPin, title: 'Visit Us', detail: 'Vijay Nagar, Indore, MP', sub: 'Walk-ins welcome', href: '#', color: 'from-emerald-500 to-teal-500' },
+    { icon: MapPin, title: 'Visit Us', detail: '22, Krishna Nagar, Rangbari Road, Kota, Rajasthan - 324005', sub: 'ROOMHY TECHNOLOGY PRIVATE LIMITED', href: '#', color: 'from-emerald-500 to-teal-500' },
   ];
 
   const formDetails = {

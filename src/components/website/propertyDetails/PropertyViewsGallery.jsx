@@ -10,7 +10,7 @@ function getOptimizedImageUrl(url, width = 800) {
   return url.replace('/upload/', `/upload/f_auto,q_auto,w_${width}/`);
 }
 
-const PropertyViewsGallery = ({ propertyViews = [], images = [] }) => {
+const PropertyViewsGallery = ({ propertyViews = [], images = [], onBack }) => {
   const [selectedView, setSelectedView] = useState(0);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showFullscreen, setShowFullscreen] = useState(false);
@@ -173,7 +173,7 @@ const PropertyViewsGallery = ({ propertyViews = [], images = [] }) => {
           {/* Top Navigation Bar (Floating) */}
           <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-20 bg-gradient-to-b from-black/50 to-transparent">
             <button 
-              onClick={() => navigate(-1)}
+              onClick={() => onBack ? onBack() : navigate(-1)}
               className="p-2 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white hover:text-black transition-all"
             >
               <ArrowLeft className="w-5 h-5" />

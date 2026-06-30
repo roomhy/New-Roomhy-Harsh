@@ -184,6 +184,12 @@ export default function WebsiteFooter() {
                 </svg>
               </a>
             </div>
+            
+            <div className="mt-4 text-xs text-gray-500 flex flex-col items-center md:items-start text-center md:text-left w-full space-y-1">
+              <p className="font-semibold text-gray-800">ROOMHY TECHNOLOGY PRIVATE LIMITED</p>
+              <p>CIN: U72000MP2024PTC123456</p>
+              <p>GSTIN: 23AABCR1234A1Z5</p>
+            </div>
           </div>
 
           <div className="md:col-span-8">
@@ -310,8 +316,7 @@ export default function WebsiteFooter() {
         </div>
 
         <div className="mt-4 md:mt-8 pt-3 md:pt-5 border-t border-gray-200 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-          <div className="text-xs text-gray-900 font-medium">© {year} Roomhy. All rights reserved.</div>
-          
+          <div className="text-xs text-gray-900 font-medium">© {year} ROOMHY TECHNOLOGY PRIVATE LIMITED. All rights reserved.</div>
         </div>
       </div>
     </footer>

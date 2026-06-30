@@ -11,6 +11,7 @@ import {
   Wifi, IndianRupee, Info, UtensilsCrossed, Camera, ChevronDown, ChevronUp,
   Wallet, FileText
 } from "lucide-react";
+import WebsitePropertyPreviewModal from "../../components/shared/WebsitePropertyPreviewModal";
 
 
 const PROPERTY_TYPES = ["hostel", "pg", "apartment", "co-living", "room"];
@@ -1015,6 +1016,7 @@ export default function Properties() {
   const [mobileTab, setMobileTab] = useState("all");
   const [viewProperty, setViewProperty] = useState(null);
   const [editProperty, setEditProperty] = useState(null);
+  const [previewProperty, setPreviewProperty] = useState(null);
   const apiBase = getApiBase();
 
   const loadProps = async (session) => {
@@ -1215,8 +1217,15 @@ export default function Properties() {
                     </div>
                     <div className="flex gap-2 w-full mt-0">
                       <button onClick={() => setViewProperty(p)}
-                        className="flex-1 flex items-center justify-center gap-1 py-2.5 border border-border text-foreground font-bold rounded-lg hover:bg-muted text-[11px] transition-all bg-card">
-                        <Eye className="size-3.5" /> View
+                        className="flex items-center justify-center gap-1 py-2.5 px-3 border border-border text-foreground font-bold rounded-lg hover:bg-muted text-[11px] transition-all bg-card">
+                        <Eye className="size-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setPreviewProperty(p)}
+                        className="flex items-center justify-center gap-1 py-2.5 px-3 bg-teal-50 border border-teal-200 text-teal-700 font-bold rounded-lg text-[10px] hover:bg-teal-100 transition-all"
+                        title="Preview on Website"
+                      >
+                        <Globe className="size-3.5" /> Preview
                       </button>
                       <button onClick={() => setEditProperty(p)}
                         className="flex-1 flex items-center justify-center gap-1 py-2.5 bg-blue-600 text-white font-bold rounded-lg text-[11px] hover:bg-blue-700 transition-all shadow-sm">
@@ -1317,8 +1326,14 @@ export default function Properties() {
                     {/* Action Buttons */}
                     <div className="flex gap-2">
                       <button onClick={() => setViewProperty(p)}
-                        className="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-slate-200 transition-colors flex items-center justify-center gap-1.5">
-                        <Eye className="w-4 h-4" /> View Details
+                        className="bg-slate-100 text-slate-700 py-2.5 px-3 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-slate-200 transition-colors flex items-center justify-center gap-1.5">
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setPreviewProperty(p)}
+                        className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-teal-50 border border-teal-200 text-teal-700 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-teal-100 transition-colors"
+                      >
+                        <Globe className="w-4 h-4" /> Preview
                       </button>
                       <button onClick={() => setEditProperty(p)}
                         className="flex-1 bg-blue-600 text-white py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5">
@@ -1349,6 +1364,13 @@ export default function Properties() {
           apiBase={apiBase}
           onClose={() => setEditProperty(null)}
           onSuccess={() => { setEditProperty(null); if (owner) loadProps(owner); }}
+        />
+      )}
+      {/* Website Preview Modal */}
+      {previewProperty && (
+        <WebsitePropertyPreviewModal
+          property={previewProperty}
+          onClose={() => setPreviewProperty(null)}
         />
       )}
     </PropertyOwnerLayout>

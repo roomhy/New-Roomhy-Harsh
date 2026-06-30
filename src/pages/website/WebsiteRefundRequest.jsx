@@ -84,12 +84,12 @@ export default function WebsiteRefundRequest() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white md:bg-gray-50">
       <WebsiteNavbar />
 
       <main className="min-h-screen">
         {/* --- COMPACT & STYLISH HEADER --- */}
-        <div className="relative w-full py-10 px-6 overflow-hidden border-b border-stone-200/50" 
+        <div className="relative w-full py-5 md:py-10 px-4 md:px-6 overflow-hidden border-b border-stone-200/50" 
              style={{ background: 'linear-gradient(135deg, #FFFAF5 0%, #FDFCFB 50%, #F5F7FA 100%)' }}>
           
           {/* Background Pattern */}
@@ -100,35 +100,35 @@ export default function WebsiteRefundRequest() {
           <div className="relative max-w-7xl mx-auto flex flex-col items-center text-center">
             
             {/* Icon */}
-            <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center mb-4">
-              <RefreshCcw size={24} className="text-green-600" />
+            <div className="w-8 h-8 md:w-12 md:h-12 rounded-xl bg-green-100 flex items-center justify-center mb-2 md:mb-4">
+              <RefreshCcw size={18} className="text-green-600 md:w-6 md:h-6" />
             </div>
             
             {/* MAIN HEADING */}
-            <div className="flex items-center gap-4 mb-2">
-              <div className="h-[1px] w-8 bg-[#C5A059]/40 hidden md:block"></div>
-              <h1 className="text-3xl md:text-4xl font-bold text-[#1A1A1A] tracking-tight">
+            <div className="flex items-center gap-2 md:gap-4 mb-1 md:mb-2">
+              <div className="h-[1px] w-6 md:w-8 bg-[#C5A059]/40 hidden md:block"></div>
+              <h1 className="text-2xl md:text-4xl font-bold text-[#1A1A1A] tracking-tight">
                 Refund <span className="text-[#C5A059] font-serif italic font-medium">Request</span>
               </h1>
-              <div className="h-[1px] w-8 bg-[#C5A059]/40 hidden md:block"></div>
+              <div className="h-[1px] w-6 md:w-8 bg-[#C5A059]/40 hidden md:block"></div>
             </div>
 
             {/* SUB-HEADING */}
-            <p className="text-base md:text-lg text-stone-500 font-normal opacity-90 max-w-xl mx-auto">
+            <p className="text-xs md:text-lg text-stone-500 font-normal opacity-90 max-w-xl mx-auto">
               Submit your refund or alternative property request
             </p>
 
             {/* Bottom Accent Dot */}
-            <div className="mt-4 w-1.5 h-1.5 rounded-full bg-[#C5A059]/30"></div>
+            <div className="mt-2 md:mt-4 w-1.5 h-1.5 rounded-full bg-[#C5A059]/30"></div>
           </div>
         </div>
 
         {/* Form Section */}
-        <section className="py-16 bg-white">
+        <section className="py-6 md:py-16 bg-white">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Sidebar */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 hidden lg:block">
               <div className="light-card rounded-2xl p-6 sticky top-24">
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                   <i data-lucide="info" className="w-5 h-5"></i> Booking Details
@@ -155,13 +155,13 @@ export default function WebsiteRefundRequest() {
 
             {/* Form */}
             <div className="lg:col-span-2">
-              <div className="light-card rounded-2xl p-6 md:p-10">
-                <form onSubmit={handleSubmit} className="space-y-8">
+              <div className="bg-white md:rounded-2xl p-0 md:p-10 md:shadow-sm md:border md:border-gray-100">
+                <form onSubmit={handleSubmit} className="space-y-4 md:space-y-8">
                   {/* Request Type Selection */}
                   <div>
-                    <h3 className="text-lg font-bold mb-4">Step 1: Select Request Type</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <label className={`p-4 border-2 rounded-lg cursor-pointer transition ${requestType === "refund" ? "border-blue-600 bg-blue-50" : "border-gray-200 bg-gray-50 hover:border-gray-300"}`}>
+                    <h3 className="text-sm md:text-lg font-bold mb-2 md:mb-4">Step 1: Select Request Type</h3>
+                    <div className="grid grid-cols-2 gap-3 md:gap-4">
+                      <label className={`p-2.5 md:p-4 border-2 rounded-lg cursor-pointer transition text-center md:text-left text-xs md:text-sm ${requestType === "refund" ? "border-blue-600 bg-blue-50" : "border-gray-200 bg-gray-50 hover:border-gray-300"}`}>
                         <input
                           type="radio"
                           name="requestType"
@@ -172,7 +172,7 @@ export default function WebsiteRefundRequest() {
                         />
                         <span className="font-semibold">Refund</span>
                       </label>
-                      <label className={`p-4 border-2 rounded-lg cursor-pointer transition ${requestType === "alternative" ? "border-blue-600 bg-blue-50" : "border-gray-200 bg-gray-50 hover:border-gray-300"}`}>
+                      <label className={`p-2.5 md:p-4 border-2 rounded-lg cursor-pointer transition text-center md:text-left text-xs md:text-sm ${requestType === "alternative" ? "border-blue-600 bg-blue-50" : "border-gray-200 bg-gray-50 hover:border-gray-300"}`}>
                         <input
                           type="radio"
                           name="requestType"
@@ -187,39 +187,39 @@ export default function WebsiteRefundRequest() {
                   </div>
 
                   {/* Booking Information */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-bold">Step 2: Booking Information</h3>
+                  <div className="space-y-3.5">
+                    <h3 className="text-sm md:text-lg font-bold">Step 2: Booking Information</h3>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Booking ID / Reference No. *</label>
+                      <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">Booking ID / Reference No. *</label>
                       <input
                         type="text"
                         name="bookingId"
                         value={formData.bookingId}
                         onChange={handleInputChange}
                         placeholder="e.g., BK-123456"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+                        className="w-full px-3 py-2 md:px-4 md:py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600 text-xs md:text-sm"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address *</label>
+                      <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">Email Address *</label>
                       <input
                         type="email"
                         name="userEmail"
                         value={formData.userEmail}
                         onChange={handleInputChange}
                         placeholder="your@email.com"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+                        className="w-full px-3 py-2 md:px-4 md:py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600 text-xs md:text-sm"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Reason for Request *</label>
+                      <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">Reason for Request *</label>
                       <select
                         name="requestReason"
                         value={formData.requestReason}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+                        className="w-full px-3 py-2 md:px-4 md:py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600 text-xs md:text-sm"
                         required
                       >
                         <option value="">Select a reason...</option>
@@ -234,12 +234,12 @@ export default function WebsiteRefundRequest() {
 
                   {/* Refund Payment Details */}
                   {requestType === "refund" && (
-                    <div className="space-y-4 bg-gray-50 p-6 rounded-lg border border-gray-200">
-                      <h3 className="text-lg font-bold">Step 3: Refund Payment Method</h3>
-                      <div className="space-y-4">
+                    <div className="space-y-3.5 bg-gray-50 p-4 md:p-6 rounded-lg border border-gray-200">
+                      <h3 className="text-sm md:text-lg font-bold">Step 3: Refund Payment Method</h3>
+                      <div className="space-y-3">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Method *</label>
-                          <div className="flex gap-4">
+                          <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1.5">Payment Method *</label>
+                          <div className="flex gap-4 text-xs md:text-sm">
                             <label className="flex items-center">
                               <input
                                 type="radio"
@@ -268,47 +268,47 @@ export default function WebsiteRefundRequest() {
                         {formData.paymentMethod === "bank" && (
                           <>
                             <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-2">Bank Name *</label>
+                              <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1">Bank Name *</label>
                               <input
                                 type="text"
                                 name="bankName"
                                 value={formData.bankName}
                                 onChange={handleInputChange}
                                 placeholder="e.g., HDFC Bank"
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+                                className="w-full px-3 py-2 md:px-4 md:py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600 text-xs md:text-sm"
                               />
                             </div>
                             <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-2">Account Holder Name *</label>
+                              <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1">Account Holder Name *</label>
                               <input
                                 type="text"
                                 name="accountHolder"
                                 value={formData.accountHolder}
                                 onChange={handleInputChange}
                                 placeholder="Your full name"
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+                                className="w-full px-3 py-2 md:px-4 md:py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600 text-xs md:text-sm"
                               />
                             </div>
                             <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-2">Account Number *</label>
+                              <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1">Account Number *</label>
                               <input
                                 type="text"
                                 name="accountNumber"
                                 value={formData.accountNumber}
                                 onChange={handleInputChange}
                                 placeholder="Your account number"
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+                                className="w-full px-3 py-2 md:px-4 md:py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600 text-xs md:text-sm"
                               />
                             </div>
                             <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-2">IFSC Code *</label>
+                              <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1">IFSC Code *</label>
                               <input
                                 type="text"
                                 name="ifscCode"
                                 value={formData.ifscCode}
                                 onChange={handleInputChange}
                                 placeholder="e.g., HDFC0000001"
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+                                className="w-full px-3 py-2 md:px-4 md:py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600 text-xs md:text-sm"
                               />
                             </div>
                           </>
@@ -316,14 +316,14 @@ export default function WebsiteRefundRequest() {
 
                         {formData.paymentMethod === "upi" && (
                           <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">UPI ID *</label>
+                            <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1">UPI ID *</label>
                             <input
                               type="text"
                               name="upiId"
                               value={formData.upiId}
                               onChange={handleInputChange}
                               placeholder="e.g., yourname@upi"
-                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+                              className="w-full px-3 py-2 md:px-4 md:py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600 text-xs md:text-sm"
                             />
                           </div>
                         )}
@@ -333,15 +333,15 @@ export default function WebsiteRefundRequest() {
 
                   {/* Alternative Property Details */}
                   {requestType === "alternative" && (
-                    <div className="space-y-4 bg-gray-50 p-6 rounded-lg border border-gray-200">
-                      <h3 className="text-lg font-bold">Step 3: Preferred Area</h3>
+                    <div className="space-y-3.5 bg-gray-50 p-4 md:p-6 rounded-lg border border-gray-200">
+                      <h3 className="text-sm md:text-lg font-bold">Step 3: Preferred Area</h3>
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Preferred Area / City *</label>
+                        <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1">Preferred Area / City *</label>
                         <select
                           name="preferredArea"
                           value={formData.preferredArea}
                           onChange={handleInputChange}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+                          className="w-full px-3 py-2 md:px-4 md:py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600 text-xs md:text-sm"
                         >
                           <option value="">Select your preferred area...</option>
                           <option value="kota">Kota</option>
@@ -356,32 +356,32 @@ export default function WebsiteRefundRequest() {
 
                   {/* Comments */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Additional Comments</label>
+                    <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">Additional Comments</label>
                     <textarea
                       name="comments"
                       value={formData.comments}
                       onChange={handleInputChange}
                       placeholder="Any additional information..."
-                      rows="4"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+                      rows="3"
+                      className="w-full px-3 py-2 md:px-4 md:py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600 text-xs md:text-sm"
                     ></textarea>
                   </div>
 
                   {/* Submit Button */}
-                  <div className="pt-6 flex gap-4">
+                  <div className="pt-3 flex gap-3 text-xs md:text-sm">
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 bg-blue-600 text-white px-4 py-2.5 md:px-6 md:py-3 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {submitting ? (
                         <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <Loader2 className="w-4 h-4 animate-spin" />
                           Submitting...
                         </>
                       ) : (
                         <>
-                          <Send className="w-5 h-5" />
+                          <Send className="w-4 h-4" />
                           Submit Request
                         </>
                       )}
@@ -389,9 +389,9 @@ export default function WebsiteRefundRequest() {
                     <button
                       type="reset"
                       disabled={submitting}
-                      className="flex-1 bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                      className="flex-1 bg-gray-200 text-gray-800 px-4 py-2.5 md:px-6 md:py-3 rounded-lg font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                      <RefreshCcw className="w-5 h-5" /> Clear
+                      <RefreshCcw className="w-4 h-4" /> Clear
                     </button>
                   </div>
                 </form>

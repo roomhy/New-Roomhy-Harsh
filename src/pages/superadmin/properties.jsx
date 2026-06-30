@@ -12,6 +12,7 @@ import {
 import { toast } from "react-hot-toast";
 import { getApiBase } from "../../utils/api";
 import LocationMapPicker from "../../components/website/LocationMapPicker";
+import WebsitePropertyPreviewModal from "../../components/shared/WebsitePropertyPreviewModal";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -60,6 +61,8 @@ export default function SuperadminProperties() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [viewProperty, setViewProperty] = useState(null);
   const [viewLoading, setViewLoading] = useState(false);
+  const [previewProperty, setPreviewProperty] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const getApiUrl = getApiBase;
 
@@ -266,11 +269,27 @@ export default function SuperadminProperties() {
                              {p.status}
                           </span>
                        </td>
-                       <td className="py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                             <button onClick={() => fetchPropertyDetail(p.id)} className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-indigo-600 transition-all border border-slate-100 shadow-sm" title="View Property"><Eye className="w-3.5 h-3.5" /></button>
-                             <button onClick={() => navigate(`?view=add&editId=${p.id}`)} className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-blue-600 transition-all border border-slate-100 shadow-sm" title="Edit Property"><Pencil className="w-3.5 h-3.5" /></button>
-                             <button onClick={() => handleDeleteProperty(p.id)} className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-rose-600 transition-all border border-slate-100 shadow-sm" title="Delete Property"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <td className="py-3 text-right">
+                           <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={async () => {
+                                  setPreviewLoading(true);
+                                  try {
+                                    const res = await fetch(`${getApiUrl()}/api/properties/${p.id}`);
+                                    const data = await res.json();
+                                    if (data.success && data.property) setPreviewProperty(data.property);
+                                    else toast.error("Failed to load preview");
+                                  } catch { toast.error("Error loading preview"); }
+                                  finally { setPreviewLoading(false); }
+                                }}
+                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-teal-50 text-teal-600 border border-teal-100 hover:bg-teal-100 transition-all text-[9px] font-bold uppercase tracking-wider shadow-sm"
+                                title="Preview on Website"
+                              >
+                                <Globe className="w-3 h-3" /> Preview
+                              </button>
+                              <button onClick={() => fetchPropertyDetail(p.id)} className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-indigo-600 transition-all border border-slate-100 shadow-sm" title="View Property"><Eye className="w-3.5 h-3.5" /></button>
+                              <button onClick={() => navigate(`?view=add&editId=${p.id}`)} className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-blue-600 transition-all border border-slate-100 shadow-sm" title="Edit Property"><Pencil className="w-3.5 h-3.5" /></button>
+                              <button onClick={() => handleDeleteProperty(p.id)} className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-rose-600 transition-all border border-slate-100 shadow-sm" title="Delete Property"><Trash2 className="w-3.5 h-3.5" /></button>
                           </div>
                        </td>
                     </tr>
@@ -329,6 +348,15 @@ export default function SuperadminProperties() {
           </div>
         </div>
       )}
+      {/* Preview Loading Overlay */}
+      {previewLoading && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center">
+          <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-4 shadow-2xl">
+            <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+            <p className="text-sm font-bold text-slate-600 uppercase tracking-widest">Loading Preview...</p>
+          </div>
+        </div>
+      )}
       {/* Property View Modal */}
       {viewProperty && !viewLoading && (
         <PropertyViewModal
@@ -336,6 +364,13 @@ export default function SuperadminProperties() {
           onClose={() => setViewProperty(null)}
           apiUrl={getApiUrl()}
           onRefresh={() => { fetchProperties(); fetchPropertyDetail(viewProperty._id); }}
+        />
+      )}
+      {/* Website Preview Modal */}
+      {previewProperty && !previewLoading && (
+        <WebsitePropertyPreviewModal
+          property={previewProperty}
+          onClose={() => setPreviewProperty(null)}
         />
       )}
     </>

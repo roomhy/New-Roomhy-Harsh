@@ -61,7 +61,7 @@ export default function FAQPage() {
       
       <main className="min-h-screen">
         {/* --- COMPACT & STYLISH HEADER --- */}
-        <div className="relative w-full py-10 px-6 overflow-hidden border-b border-stone-200/50" 
+        <div className="relative w-full py-5 md:py-10 px-4 md:px-6 overflow-hidden border-b border-stone-200/50" 
              style={{ background: 'linear-gradient(135deg, #FFFAF5 0%, #FDFCFB 50%, #F5F7FA 100%)' }}>
           
           {/* Background Pattern */}
@@ -72,44 +72,44 @@ export default function FAQPage() {
           <div className="relative max-w-7xl mx-auto flex flex-col items-center text-center">
             
             {/* Icon */}
-            <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-4">
-              <HelpCircle size={24} className="text-purple-600" />
+            <div className="w-8 h-8 md:w-12 md:h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-2 md:mb-4">
+              <HelpCircle size={18} className="text-purple-600 md:w-6 md:h-6" />
             </div>
             
             {/* MAIN HEADING */}
-            <div className="flex items-center gap-4 mb-2">
-              <div className="h-[1px] w-8 bg-[#C5A059]/40 hidden md:block"></div>
-              <h1 className="text-3xl md:text-4xl font-bold text-[#1A1A1A] tracking-tight">
+            <div className="flex items-center gap-2 md:gap-4 mb-1 md:mb-2">
+              <div className="h-[1px] w-6 md:w-8 bg-[#C5A059]/40 hidden md:block"></div>
+              <h1 className="text-lg md:text-4xl font-bold text-[#1A1A1A] tracking-tight">
                 Frequently Asked <span className="text-[#C5A059] font-serif italic font-medium">Questions</span>
               </h1>
-              <div className="h-[1px] w-8 bg-[#C5A059]/40 hidden md:block"></div>
+              <div className="h-[1px] w-6 md:w-8 bg-[#C5A059]/40 hidden md:block"></div>
             </div>
 
             {/* SUB-HEADING */}
-            <p className="text-base md:text-lg text-stone-500 font-normal opacity-90 max-w-xl mx-auto">
+            <p className="text-xs md:text-lg text-stone-500 font-normal opacity-90 max-w-xl mx-auto">
               Everything you need to know about finding your perfect home
             </p>
 
             {/* Bottom Accent Dot */}
-            <div className="mt-4 w-1.5 h-1.5 rounded-full bg-[#C5A059]/30"></div>
+            <div className="mt-2 md:mt-4 w-1.5 h-1.5 rounded-full bg-[#C5A059]/30"></div>
           </div>
         </div>
 
         {/* FAQ Section */}
-        <section className="py-12 bg-gray-50">
+        <section className="py-6 md:py-12 bg-gray-50">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="space-y-4">
+            <div className="space-y-2.5 md:space-y-4">
               {faqData.map((faq, index) => (
-                <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                   <details className="group">
-                    <summary className="flex justify-between items-center p-6 cursor-pointer hover:bg-gray-50 transition-colors">
-                      <span className="font-semibold text-lg text-gray-900 pr-4">
+                    <summary className="flex justify-between items-center p-4 md:p-6 cursor-pointer hover:bg-gray-50/50 transition-colors">
+                      <span className="font-semibold text-sm md:text-lg text-gray-900 pr-4">
                         {faq.question}
                       </span>
-                      <ChevronDown className="w-6 h-6 text-teal-500 flex-shrink-0 group-open:rotate-180 transition-transform" />
+                      <ChevronDown className="w-4 h-4 md:w-5 md:h-5 text-teal-500 flex-shrink-0 group-open:rotate-180 transition-transform" />
                     </summary>
-                    <div className="px-6 pb-6">
-                      <p className="text-gray-600 leading-relaxed whitespace-pre-line">
+                    <div className="px-4 pb-4 md:px-6 md:pb-6">
+                      <p className="text-gray-600 text-xs md:text-base leading-relaxed whitespace-pre-line">
                         {faq.answer}
                       </p>
                     </div>

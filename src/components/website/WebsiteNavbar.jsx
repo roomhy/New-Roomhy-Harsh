@@ -137,37 +137,40 @@ export default function WebsiteNavbar() {
                     <>
                       <button
                         onClick={() => setShowUserDropdown(!showUserDropdown)}
-                        className="flex items-center gap-1 px-2.5 py-1 bg-gray-50 hover:bg-gray-150 rounded-full border border-gray-150 text-xs font-bold text-gray-700 transition-colors"
+                        className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center text-xs font-bold uppercase shadow-sm hover:bg-teal-700 transition-all active:scale-95 focus:outline-none"
                       >
-                        <User className="w-3.5 h-3.5 text-gray-500" />
-                        <span className="max-w-[70px] truncate">{user.name || user.firstName || 'User'}</span>
-                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showUserDropdown ? 'rotate-180' : ''}`} />
+                        {(user.name || user.firstName || 'U')[0]}
                       </button>
 
                       {showUserDropdown && (
-                        <div className="absolute right-0 mt-1 top-full w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-[120] overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
-                          <button onClick={() => { setShowUserDropdown(false); navigate('/website/profile'); }} className="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-3">
-                            <User className="w-4 h-4 text-gray-500" /> Profile
+                        <div className="absolute right-0 mt-2 top-full w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-1.5 z-[120] overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
+                          {/* User info header inside dropdown */}
+                          <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/50">
+                            <p className="text-xs font-bold text-slate-800 truncate">{user.name || user.firstName || 'User'}</p>
+                            <p className="text-[10px] text-slate-500 truncate">{user.email || user.loginId || ''}</p>
+                          </div>
+                          <button onClick={() => { setShowUserDropdown(false); navigate('/website/profile'); }} className="w-full px-4 py-2.5 text-left text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-3">
+                            <User className="w-4 h-4 text-slate-400" /> Profile
                           </button>
-                          <button onClick={() => { setShowUserDropdown(false); navigate('/website/mystays'); }} className="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-3">
-                            <Home className="w-4 h-4 text-gray-500" /> My Stays
+                          <button onClick={() => { setShowUserDropdown(false); navigate('/website/mystays'); }} className="w-full px-4 py-2.5 text-left text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-3">
+                            <Home className="w-4 h-4 text-slate-400" /> My Stays
                           </button>
-                          <button onClick={() => { setShowUserDropdown(false); navigate('/website/chat'); }} className="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-3">
-                            <MessageSquare className="w-4 h-4 text-gray-500" /> Chat
+                          <button onClick={() => { setShowUserDropdown(false); navigate('/website/chat'); }} className="w-full px-4 py-2.5 text-left text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-3">
+                            <MessageSquare className="w-4 h-4 text-slate-400" /> Chat
                           </button>
-                          <button onClick={() => { setShowUserDropdown(false); navigate('/website/reviews'); }} className="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-3">
-                            <Star className="w-4 h-4 text-gray-500" /> My Reviews
+                          <button onClick={() => { setShowUserDropdown(false); navigate('/website/reviews'); }} className="w-full px-4 py-2.5 text-left text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-3">
+                            <Star className="w-4 h-4 text-slate-400" /> My Reviews
                           </button>
-                          <button onClick={handleLogout} className="w-full px-4 py-2 text-left text-xs text-red-650 hover:bg-red-50 flex items-center gap-3 border-t border-gray-50">
+                          <button onClick={handleLogout} className="w-full px-4 py-2.5 text-left text-xs text-red-650 hover:bg-red-50 flex items-center gap-3 border-t border-slate-50">
                             <LogOut className="w-4 h-4 text-red-500" /> Logout
                           </button>
                         </div>
                       )}
                     </>
                   ) : (
-                    <Link to="/website/login" className="flex items-center gap-1 px-3 py-1.5 bg-[#EE4266] text-white hover:bg-[#d63a5b] rounded-full text-xs font-bold transition-all shadow-md shadow-[#EE4266]/10 active:scale-[0.98]">
+                    <Link to="/website/login" className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#EE4266] text-white hover:bg-[#d63a5b] rounded-full text-xs font-bold transition-all shadow-md shadow-[#EE4266]/10 active:scale-[0.98]">
                       <User className="w-3.5 h-3.5" />
-                      <span>Login / Signup</span>
+                      <span>Login</span>
                     </Link>
                   )}
                 </div>
