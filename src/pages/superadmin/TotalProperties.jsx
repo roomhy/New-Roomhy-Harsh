@@ -4,9 +4,11 @@ import {
   Building2, CheckCircle2, Clock, XCircle, AlertCircle,
   Search, Filter, Download, ChevronLeft, ChevronRight,
   MapPin, Phone, Home, Layers, Users, MoreVertical,
-  RefreshCw, Image as ImageIcon, Plus, Eye, Pencil, SlidersHorizontal, X
+  RefreshCw, Image as ImageIcon, Plus, Eye, Pencil, SlidersHorizontal, X, Trash2, Globe
 } from "lucide-react";
 import { getApiBase } from "../../utils/api";
+import WebsitePropertyPreviewModal from "../../components/shared/WebsitePropertyPreviewModal";
+import { toast } from "react-hot-toast";
 
 const cn = (...c) => c.filter(Boolean).join(" ");
 
@@ -68,6 +70,11 @@ export default function TotalProperties() {
   const [allProperties, setAllProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [previewProperty, setPreviewProperty] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: "", message: "", type: "info", onConfirm: null });
 
   // filters
   const [search, setSearch]         = useState("");
@@ -168,7 +175,99 @@ export default function TotalProperties() {
     return filtered.slice(start, start + LIMIT);
   }, [filtered, currentPage]);
 
-  const resetAll = () => { setSearch(""); setFStatus("all"); setFType("all"); setFCity("all"); setFLocation("all"); setFOwner("all"); setFGender("all"); setFPriceMin(""); setFPriceMax(""); };
+  const resetAll = () => { setSearch(""); setFStatus("all"); setFType("all"); setFCity("all"); setFLocation("all"); setFOwner("all"); setFGender("all"); setFPriceMin(""); setFPriceMax(""); setSelectedIds(new Set()); };
+
+  const handleDeleteOne = (id) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Property",
+      message: "Are you sure you want to delete this property? This action cannot be undone.",
+      type: "danger",
+      onConfirm: async () => {
+        const toastId = toast.loading("Deleting property...");
+        try {
+          const res = await fetch(`${apiUrl}/api/properties/${id}`, { method: "DELETE" });
+          const data = await res.json();
+          if (data.success || res.ok) {
+            toast.success("Property deleted successfully", { id: toastId });
+            fetchProps();
+          } else {
+            toast.error(data.message || "Failed to delete property", { id: toastId });
+          }
+        } catch (err) {
+          console.error(err);
+          toast.error("Error deleting property", { id: toastId });
+        }
+      }
+    });
+  };
+
+  const handleBulkApprove = () => {
+    if (selectedIds.size === 0) return;
+    setConfirmModal({
+      isOpen: true,
+      title: "Bulk Approve Properties",
+      message: `Are you sure you want to approve all ${selectedIds.size} selected properties? They will go live on the website immediately.`,
+      type: "info",
+      onConfirm: async () => {
+        setBulkProcessing(true);
+        const toastId = toast.loading(`Publishing ${selectedIds.size} properties...`);
+        try {
+          let successCount = 0;
+          for (const id of selectedIds) {
+            const res = await fetch(`${apiUrl}/api/properties/${id}/publish`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" }
+            });
+            const data = await res.json();
+            if (data.success || res.ok) {
+              successCount++;
+            }
+          }
+          toast.success(`Successfully approved ${successCount} of ${selectedIds.size} properties!`, { id: toastId });
+          setSelectedIds(new Set());
+          fetchProps();
+        } catch (err) {
+          console.error(err);
+          toast.error("Error during bulk approval.", { id: toastId });
+        } finally {
+          setBulkProcessing(false);
+        }
+      }
+    });
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    setConfirmModal({
+      isOpen: true,
+      title: "Bulk Delete Properties",
+      message: `Are you sure you want to permanently delete all ${selectedIds.size} selected properties? This action cannot be undone.`,
+      type: "danger",
+      onConfirm: async () => {
+        setBulkProcessing(true);
+        const toastId = toast.loading(`Deleting ${selectedIds.size} properties...`);
+        try {
+          let successCount = 0;
+          for (const id of selectedIds) {
+            const res = await fetch(`${apiUrl}/api/properties/${id}`, { method: "DELETE" });
+            const data = await res.json();
+            if (data.success || res.ok) {
+              successCount++;
+            }
+          }
+          toast.success(`Successfully deleted ${successCount} of ${selectedIds.size} properties!`, { id: toastId });
+          setSelectedIds(new Set());
+          fetchProps();
+        } catch (err) {
+          console.error(err);
+          toast.error("Error during bulk deletion.", { id: toastId });
+        } finally {
+          setBulkProcessing(false);
+        }
+      }
+    });
+  };
 
   const stats = useMemo(()=>({
     total:     allProperties.length,
@@ -299,25 +398,90 @@ export default function TotalProperties() {
             <button onClick={resetAll} className="text-xs text-blue-500 font-bold hover:underline">Clear filters</button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  <th className="px-5 py-3.5 w-10"><input type="checkbox" className="rounded border-slate-300 cursor-pointer"/></th>
-                  <th className="text-left px-4 py-3.5">Property Details</th>
-                  <th className="text-left px-4 py-3.5">Owner</th>
-                  <th className="text-left px-4 py-3.5">Type</th>
-                  <th className="text-left px-4 py-3.5">Location</th>
-                  <th className="text-left px-4 py-3.5">Price</th>
-                  <th className="text-left px-4 py-3.5">Status</th>
-                  <th className="text-left px-4 py-3.5">Listed On</th>
-                  <th className="px-4 py-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {paginatedProps.map(p => (
-                  <tr key={p.id} className="group hover:bg-slate-50/80 transition-colors">
-                    <td className="px-5 py-4"><input type="checkbox" className="rounded border-slate-300 cursor-pointer"/></td>
+          <div>
+            {/* Bulk Actions Banner */}
+            {selectedIds.size > 0 && (
+              <div className="flex items-center justify-between px-6 py-3 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 border-b border-blue-100/50 backdrop-blur-sm animate-in slide-in-from-top-2 duration-300 flex-wrap gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shadow-sm">
+                    {selectedIds.size}
+                  </div>
+                  <span className="text-xs font-bold text-blue-900 tracking-wide">properties selected for bulk operations</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <button 
+                    disabled={bulkProcessing}
+                    onClick={handleBulkApprove} 
+                    className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl text-[11px] font-bold shadow-md shadow-emerald-100 hover:shadow-lg hover:from-emerald-600 hover:to-teal-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {bulkProcessing ? "Publishing..." : "Bulk Approve"}
+                  </button>
+                  <button 
+                    disabled={bulkProcessing}
+                    onClick={handleBulkDelete} 
+                    className="px-4 py-2 bg-gradient-to-r from-rose-500 to-red-600 text-white rounded-xl text-[11px] font-bold shadow-md shadow-rose-100 hover:shadow-lg hover:from-rose-600 hover:to-red-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {bulkProcessing ? "Deleting..." : "Bulk Delete"}
+                  </button>
+                  <button 
+                    disabled={bulkProcessing}
+                    onClick={() => setSelectedIds(new Set())} 
+                    className="px-3.5 py-2 text-[11px] font-bold text-slate-500 hover:text-slate-800 transition-colors uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <th className="px-5 py-3.5 w-10">
+                      <input
+                        type="checkbox"
+                        disabled={bulkProcessing}
+                        className="rounded border-slate-300 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        checked={paginatedProps.length > 0 && paginatedProps.every(p => selectedIds.has(p.id))}
+                        onChange={() => {
+                          const allSelected = paginatedProps.every(p => selectedIds.has(p.id));
+                          const next = new Set(selectedIds);
+                          if (allSelected) {
+                            paginatedProps.forEach(p => next.delete(p.id));
+                          } else {
+                            paginatedProps.forEach(p => next.add(p.id));
+                          }
+                          setSelectedIds(next);
+                        }}
+                      />
+                    </th>
+                    <th className="text-left px-4 py-3.5">Property Details</th>
+                    <th className="text-left px-4 py-3.5">Owner</th>
+                    <th className="text-left px-4 py-3.5">Type</th>
+                    <th className="text-left px-4 py-3.5">Location</th>
+                    <th className="text-left px-4 py-3.5">Price</th>
+                    <th className="text-left px-4 py-3.5">Status</th>
+                    <th className="text-left px-4 py-3.5">Listed On</th>
+                    <th className="px-4 py-3.5 text-right w-48 min-w-[190px]">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {paginatedProps.map(p => (
+                    <tr key={p.id} className="group hover:bg-slate-50/80 transition-colors">
+                      <td className="px-5 py-4">
+                        <input
+                          type="checkbox"
+                          disabled={bulkProcessing}
+                          className="rounded border-slate-300 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          checked={selectedIds.has(p.id)}
+                          onChange={() => {
+                            const next = new Set(selectedIds);
+                            if (next.has(p.id)) next.delete(p.id);
+                            else next.add(p.id);
+                            setSelectedIds(next);
+                          }}
+                        />
+                      </td>
 
                     {/* Property */}
                     <td className="px-4 py-4">
@@ -385,11 +549,46 @@ export default function TotalProperties() {
                     </td>
 
                     {/* Actions */}
-                    <td className="px-4 py-4">
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={()=>openViewModal(p)} className="p-1.5 rounded-lg bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-colors" title="View"><Eye className="w-3.5 h-3.5"/></button>
-                        <button onClick={()=>navigate(`/superadmin/add-property?editId=${p.id}`)} className="p-1.5 rounded-lg bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-colors" title="Edit"><Pencil className="w-3.5 h-3.5"/></button>
-                        <button className="p-1.5 rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"><MoreVertical className="w-3.5 h-3.5"/></button>
+                    <td className="px-4 py-4 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={async () => {
+                            setPreviewLoading(true);
+                            try {
+                              const res = await fetch(`${apiUrl}/api/properties/${p.id}`);
+                              const data = await res.json();
+                              if (data.success && data.property) setPreviewProperty(data.property);
+                              else toast.error("Failed to load preview");
+                            } catch { toast.error("Error loading preview"); }
+                            finally { setPreviewLoading(false); }
+                          }}
+                          className="w-8 h-8 rounded-xl bg-teal-50 text-teal-600 hover:bg-teal-100 border border-teal-100/50 shadow-sm flex items-center justify-center transition-all hover:scale-110"
+                          title="Preview on Website"
+                        >
+                          <Globe className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={()=>openViewModal(p)} 
+                          className="w-8 h-8 rounded-xl bg-slate-50 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-100/60 shadow-sm flex items-center justify-center transition-all hover:scale-110" 
+                          title="View Details"
+                        >
+                          <Eye className="w-4 h-4"/>
+                        </button>
+                        <button 
+                          onClick={()=>navigate(`/superadmin/add-property?editId=${p.id}`)} 
+                          className="w-8 h-8 rounded-xl bg-slate-50 text-slate-500 hover:bg-blue-50 hover:text-blue-600 border border-slate-100/60 shadow-sm flex items-center justify-center transition-all hover:scale-110" 
+                          title="Edit"
+                        >
+                          <Pencil className="w-4 h-4"/>
+                        </button>
+                        <button 
+                          onClick={()=>handleDeleteOne(p.id)} 
+                          className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100/50 shadow-sm flex items-center justify-center transition-all hover:scale-110" 
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4"/>
+                        </button>
+                        <button className="w-8 h-8 rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-200 border border-slate-100/60 shadow-sm flex items-center justify-center transition-all"><MoreVertical className="w-4 h-4"/></button>
                       </div>
                     </td>
                   </tr>
@@ -397,7 +596,8 @@ export default function TotalProperties() {
               </tbody>
             </table>
           </div>
-        )}
+        </div>
+      )}
 
         {/* Pagination */}
         <div className="flex items-center justify-between px-5 py-4 border-t border-slate-100 bg-white">
@@ -478,7 +678,7 @@ export default function TotalProperties() {
               ) : fullDetails ? (
                 <>
                   {fullDetails.pendingChanges?.status === "pending" && (
-                    <PendingChangesSection prop={fullDetails} apiUrl={apiUrl} onRefresh={() => { fetchProps(); openViewModal(selectedProp); }} />
+                    <PendingChangesSection prop={fullDetails} apiUrl={apiUrl} onRefresh={() => { fetchProps(); openViewModal(selectedProp); }} setConfirmModal={setConfirmModal} />
                   )}
 
                   {/* Images */}
@@ -686,6 +886,70 @@ export default function TotalProperties() {
           </div>
         </div>
       )}
+      {/* Preview Loading Overlay */}
+      {previewLoading && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center">
+          <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-4 shadow-2xl">
+            <RefreshCw className="w-8 h-8 animate-spin text-teal-600" />
+            <p className="text-sm font-bold text-slate-600 uppercase tracking-widest">Loading Preview...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Website Preview Modal */}
+      {previewProperty && !previewLoading && (
+        <WebsitePropertyPreviewModal
+          property={previewProperty}
+          onClose={() => setPreviewProperty(null)}
+        />
+      )}
+
+      {/* Custom Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-[300] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-slate-100 flex flex-col animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-6 pb-4 flex items-start gap-4">
+              <div className={cn(
+                "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border shadow-sm",
+                confirmModal.type === "danger" ? "bg-rose-50 border-rose-100 text-rose-600" :
+                confirmModal.type === "warning" ? "bg-amber-50 border-amber-100 text-amber-600" :
+                "bg-blue-50 border-blue-100 text-blue-600"
+              )}>
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-bold text-slate-800 text-base leading-tight">{confirmModal.title}</h3>
+                <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">{confirmModal.message}</p>
+              </div>
+            </div>
+            
+            {/* Actions */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 shrink-0">
+              <button 
+                onClick={() => setConfirmModal({ isOpen: false, title: "", message: "", type: "info", onConfirm: null })} 
+                className="px-5 py-2.5 rounded-xl text-[10px] font-bold text-slate-500 bg-white border border-slate-200 shadow-sm hover:bg-slate-50 transition-all uppercase tracking-widest"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  if (confirmModal.onConfirm) confirmModal.onConfirm();
+                  setConfirmModal({ isOpen: false, title: "", message: "", type: "info", onConfirm: null });
+                }} 
+                className={cn(
+                  "px-6 py-2.5 rounded-xl text-[10px] font-bold text-white shadow-lg transition-all uppercase tracking-widest active:scale-95",
+                  confirmModal.type === "danger" ? "bg-rose-600 shadow-rose-200 hover:bg-rose-700" :
+                  confirmModal.type === "warning" ? "bg-amber-600 shadow-amber-200 hover:bg-amber-700" :
+                  "bg-blue-600 shadow-blue-200 hover:bg-blue-700"
+                )}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -770,31 +1034,48 @@ function ImageGallerySection({ images }) {
   );
 }
 
-function PendingChangesSection({ prop, apiUrl, onRefresh }) {
+function PendingChangesSection({ prop, apiUrl, onRefresh, setConfirmModal }) {
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [showReject, setShowReject] = useState(false);
   const [reason, setReason] = useState("");
 
   const approve = async () => {
-    if (!window.confirm("Approve these changes? They will go live immediately.")) return;
-    setApproving(true);
-    try {
-      const res = await fetch(`${apiUrl}/api/properties/${prop._id}/approve-changes`, { method: "PUT", headers: { "Content-Type": "application/json" } });
-      const data = await res.json();
-      if (data.success) { alert("✅ Changes approved & live!"); onRefresh(); }
-      else alert(data.message || "Failed to approve");
-    } catch { alert("Error approving changes"); } finally { setApproving(false); }
+    setConfirmModal({
+      isOpen: true,
+      title: "Approve Changes",
+      message: "Approve these changes? They will go live immediately.",
+      type: "info",
+      onConfirm: async () => {
+        setApproving(true);
+        const toastId = toast.loading("Approving changes...");
+        try {
+          const res = await fetch(`${apiUrl}/api/properties/${prop._id}/approve-changes`, { method: "PUT", headers: { "Content-Type": "application/json" } });
+          const data = await res.json();
+          if (data.success) { toast.success("Changes approved & live!", { id: toastId }); onRefresh(); }
+          else toast.error(data.message || "Failed to approve", { id: toastId });
+        } catch { toast.error("Error approving changes", { id: toastId }); } finally { setApproving(false); }
+      }
+    });
   };
 
   const reject = async () => {
-    setRejecting(true);
-    try {
-      const res = await fetch(`${apiUrl}/api/properties/${prop._id}/reject-changes`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rejectReason: reason }) });
-      const data = await res.json();
-      if (data.success) { alert("Changes rejected."); setShowReject(false); onRefresh(); }
-      else alert(data.message || "Failed to reject");
-    } catch { alert("Error rejecting changes"); } finally { setRejecting(false); }
+    setConfirmModal({
+      isOpen: true,
+      title: "Reject Changes",
+      message: "Are you sure you want to reject these proposed changes?",
+      type: "warning",
+      onConfirm: async () => {
+        setRejecting(true);
+        const toastId = toast.loading("Rejecting changes...");
+        try {
+          const res = await fetch(`${apiUrl}/api/properties/${prop._id}/reject-changes`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rejectReason: reason }) });
+          const data = await res.json();
+          if (data.success) { toast.success("Changes rejected", { id: toastId }); setShowReject(false); onRefresh(); }
+          else toast.error(data.message || "Failed to reject", { id: toastId });
+        } catch { toast.error("Error rejecting changes", { id: toastId }); } finally { setRejecting(false); }
+      }
+    });
   };
 
   return (

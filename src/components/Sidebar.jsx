@@ -24,7 +24,7 @@ const NAV = [
     path: "/superadmin/home-overview",
     children: [
       { label: "Overview", path: "/superadmin/home-overview" },
-      { label: "Total Properties", path: "/superadmin/properties" },
+      { label: "Total Properties", path: "/superadmin/total-properties" },
       { label: "Total Tenants", path: "/superadmin/tenant" },
       { label: "Revenue Overview", path: "/superadmin/accounting" },
       { label: "Alerts (Pending Rent)", path: "/superadmin/rentcollection" },
@@ -90,7 +90,6 @@ const NAV = [
         { label: "Approve / Reject Properties", path: "/superadmin/property/approvals" },
         { label: "Employee Property Approvals", path: "/superadmin/employee-properties" },
         { label: "Pending Properties", path: "/superadmin/property/pending" },
-        { label: "All Properties List", path: "/superadmin/properties?view=list" },
         { label: "Rooms Management", path: "/superadmin/rooms" },
         { label: "Online Leads", path: "/superadmin/enquiry" },
         { label: "Web Enquiries", path: "/superadmin/websiteenq" },

@@ -85,7 +85,7 @@ export default function HomeOverview() {
 
       {/* Stats Row - LIVE CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-         <HomeStatCard label="Total Properties" value={loading ? "..." : stats.properties.toLocaleString()} trend="Live from database" icon={Building2} color="blue" up loading={loading} onClick={() => navigate('/superadmin/properties')} />
+         <HomeStatCard label="Total Properties" value={loading ? "..." : stats.properties.toLocaleString()} trend="Live from database" icon={Building2} color="blue" up loading={loading} onClick={() => navigate('/superadmin/total-properties')} />
          <HomeStatCard label="Total Tenants" value={loading ? "..." : stats.tenants.toLocaleString()} trend="Live from database" icon={Users} color="emerald" up loading={loading} onClick={() => navigate('/superadmin/tenant')} />
          <HomeStatCard label="Revenue Overview" value={loading ? "..." : `₹${stats.revenue.toLocaleString('en-IN')}`} trend="Commission + Service Fee" icon={DollarSign} color="purple" up loading={loading} onClick={() => navigate('/superadmin/accounting')} />
          <HomeStatCard label="Alerts (Pending Rent)" value={loading ? "..." : stats.alerts.toString()} trend="Active tenants only" icon={Bell} color="amber" up loading={loading} onClick={() => navigate('/superadmin/rentcollection')} />
