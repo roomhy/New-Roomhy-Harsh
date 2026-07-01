@@ -66,8 +66,12 @@ export default function StaffAttendancePage() {
       const res = await fetch(`${apiBase}/api/hr/my-attendance/${staffLoginId}?month=${new Date().getMonth() + 1}&year=${new Date().getFullYear()}`);
       const data = await res.json();
       const records = data?.data || [];
-      const todayStr = new Date().toISOString().split("T")[0];
-      const todayRec = records.find(r => r.date && new Date(r.date).toISOString().split("T")[0] === todayStr);
+      const toLocalYMD = (d) => {
+        if (!d) return "";
+        const date = new Date(d);
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      };
+      const todayRec = records.find(r => r.date && toLocalYMD(r.date) === toLocalYMD(new Date()));
       setTodayRecord(todayRec || null);
       setHistory(records);
     } catch (_) {}
@@ -251,7 +255,7 @@ export default function StaffAttendancePage() {
 
         {/* ──────── MY ATTENDANCE TAB ──────── */}
         {tab === "mine" && (
-          <div className="space-y-6 max-w-3xl">
+          <div className="space-y-6 max-w-[1400px] mx-auto">
             {/* Today Card */}
             <div className="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-3xl p-6 text-white shadow-xl shadow-blue-600/20">
               <div className="flex items-start justify-between mb-6">
@@ -340,7 +344,7 @@ export default function StaffAttendancePage() {
             </div>
 
             {/* Monthly Summary */}
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
                 { label: "Present", value: present, color: "bg-emerald-500" },
                 { label: "Absent", value: absent, color: "bg-rose-500" },
@@ -394,7 +398,7 @@ export default function StaffAttendancePage() {
 
         {/* ──────── TENANT ATTENDANCE TAB ──────── */}
         {tab === "tenants" && (
-          <div className="space-y-5 max-w-3xl">
+          <div className="space-y-5 max-w-[1400px] mx-auto">
             {/* Date Picker */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex items-center gap-4">
               <Calendar size={18} className="text-blue-500 shrink-0" />

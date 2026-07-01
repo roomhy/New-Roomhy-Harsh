@@ -36,26 +36,13 @@ export default function StaffRooms() {
     setLoading(true);
     setError("");
     try {
-      // Fetch properties to get property IDs
-      const propRes = await fetch(`${getApiBase()}/api/properties?ownerLoginId=${parentLoginId}`);
-      const propData = await propRes.json();
-      const properties = Array.isArray(propData) ? propData : (propData?.properties || propData?.data || []);
-
-      // Fetch rooms for each property
-      let rooms = [];
-      for (const prop of properties) {
-        const propId = prop._id || prop.id;
-        if (!propId) continue;
-        try {
-          const rRes = await fetch(`${getApiBase()}/api/rooms?property=${propId}`);
-          const rData = await rRes.json();
-          const propRooms = (Array.isArray(rData) ? rData : (rData?.rooms || rData?.data || [])).map(r => ({
-            ...r,
-            propertyTitle: prop.title || "",
-          }));
-          rooms = [...rooms, ...propRooms];
-        } catch (_) {}
-      }
+      // Fetch rooms directly for the owner (using ownerLoginId/parentLoginId)
+      const rRes = await fetch(`${getApiBase()}/api/rooms/owner/${parentLoginId}`);
+      const rData = await rRes.json();
+      const rooms = (rData?.rooms || []).map(r => ({
+        ...r,
+        propertyTitle: r.property?.title || "",
+      }));
 
       // Also fetch tenants for occupancy info
       const tRes = await fetch(`${getApiBase()}/api/tenants/owner/${parentLoginId}`);
@@ -110,7 +97,29 @@ export default function StaffRooms() {
 
   return (
     <StaffLayout title="Room Inventory" subtitle="Room occupancy and availability status">
-      <div className="space-y-6">
+      <div className="space-y-6 max-w-[1400px] mx-auto">
+
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Rooms</p>
+            <p className="text-2xl font-black text-slate-900">{counts.All}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Occupied Rooms</p>
+            <p className="text-2xl font-black text-blue-600">{counts.Occupied}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Vacant Rooms</p>
+            <p className="text-2xl font-black text-emerald-600">{counts.Available}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Available Beds Capacity</p>
+            <p className="text-2xl font-black text-violet-600">
+              {enriched.reduce((acc, r) => acc + Math.max(0, r._beds - r._assigned), 0)} Beds
+            </p>
+          </div>
+        </div>
 
         {/* Filter Tabs + Search */}
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">

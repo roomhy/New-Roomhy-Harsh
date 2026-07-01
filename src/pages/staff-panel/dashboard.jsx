@@ -22,6 +22,7 @@ function getStaffSession() {
 export default function StaffDashboard() {
   const staff = getStaffSession();
   const staffLoginId = staff?.loginId || staff?.login_id || staff?.staffId || "";
+  const parentId = staff?.parentLoginId || "";
   const staffName = staff?.name || "Staff Member";
   const staffRole = staff?.role || "Staff";
 
@@ -52,7 +53,6 @@ export default function StaffDashboard() {
       const today = new Date();
       const month = today.getMonth() + 1;
       const year = today.getFullYear();
-      const parentId = staff?.parentLoginId || "";
 
       const reqs = [
         fetch(`${apiBase}/api/hr/my-attendance/${staffLoginId}?month=${month}&year=${year}`).catch(() => null),
@@ -71,8 +71,12 @@ export default function StaffDashboard() {
       if (results[0] && results[0].ok) {
         const data = await results[0].json();
         const records = data?.data || [];
-        const todayStr = today.toISOString().split("T")[0];
-        const rec = records.find(r => r.date && new Date(r.date).toISOString().split("T")[0] === todayStr);
+        const toLocalYMD = (d) => {
+          if (!d) return "";
+          const date = new Date(d);
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+        };
+        const rec = records.find(r => r.date && toLocalYMD(r.date) === toLocalYMD(new Date()));
         setTodayAtt(rec || null);
       }
 
@@ -108,12 +112,13 @@ export default function StaffDashboard() {
         }
       }
       setStats({ tenants: tCount, rooms: rCount, complaints: cCount });
-
-    } catch (err) { console.error(err); }
+    } catch (_) {}
     finally { setLoading(false); }
-  }, [staffLoginId]);
+  }, [staffLoginId, parentId]);
 
-  useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
 
   const handleCheckIn = async () => {
     if (!staffLoginId) return;
@@ -129,7 +134,7 @@ export default function StaffDashboard() {
         setTodayAtt(data.data);
         showMsg(`Checked in at ${data.checkInTime} ✓`);
       }
-    } catch (_) { showMsg("Check-in failed"); }
+    } catch (_) {}
     finally { setCheckInLoading(false); }
   };
 
@@ -147,7 +152,7 @@ export default function StaffDashboard() {
         setTodayAtt(data.data);
         showMsg(`Checked out at ${data.checkOutTime} ✓`);
       }
-    } catch (_) { showMsg("Check-out failed"); }
+    } catch (_) {}
     finally { setCheckOutLoading(false); }
   };
 
@@ -155,8 +160,7 @@ export default function StaffDashboard() {
   const greeting = now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening";
   const timeStr = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
 
-  const PRIORITY_COLORS = {
-    Urgent: "text-rose-600 bg-rose-50 border-rose-200",
+  const PRIORITY_BG = {
     High: "text-orange-600 bg-orange-50 border-orange-200",
     Medium: "text-amber-600 bg-amber-50 border-amber-200",
     Low: "text-slate-500 bg-slate-100 border-slate-200",
@@ -164,7 +168,7 @@ export default function StaffDashboard() {
 
   return (
     <StaffLayout title="Dashboard" subtitle={`Welcome back, ${staffName}`}>
-      <div className="space-y-6 max-w-3xl">
+      <div className="space-y-6 max-w-[1400px] mx-auto">
 
         {/* Toast */}
         {msg && (
@@ -175,7 +179,7 @@ export default function StaffDashboard() {
 
         {/* Greeting + Check In/Out Card */}
         <div className="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-3xl p-6 text-white shadow-xl shadow-blue-600/25">
-          <div className="flex items-start justify-between mb-5">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-5">
             <div>
               <p className="text-blue-200 text-xs font-bold uppercase tracking-widest">{greeting}</p>
               <h2 className="text-2xl font-black mt-0.5 leading-tight">{staffName}</h2>
@@ -183,7 +187,7 @@ export default function StaffDashboard() {
                 {staffRole} {staffLoginId && <span className="font-mono text-blue-300">· {staffLoginId}</span>}
               </p>
             </div>
-            <div className="text-right">
+            <div className="text-right sm:text-right">
               <p className="text-3xl font-black">{timeStr}</p>
               <p className="text-blue-200 text-xs font-medium mt-0.5">{now.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}</p>
             </div>
@@ -213,7 +217,7 @@ export default function StaffDashboard() {
                 </div>
               )}
 
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={handleCheckIn}
                   disabled={checkInLoading || !!todayAtt?.checkIn}
@@ -236,7 +240,7 @@ export default function StaffDashboard() {
         </div>
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[
             { label: "Tenants", value: stats.tenants, sub: "Active Tenants", icon: Users, color: "from-blue-500 to-indigo-500", href: "/staff/tenants" },
             { label: "Rooms", value: stats.rooms, sub: "Total Rooms", icon: Building2, color: "from-emerald-500 to-teal-500", href: "/staff/rooms" },

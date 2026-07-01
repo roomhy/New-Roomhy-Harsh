@@ -15,6 +15,7 @@ import { PageHeader } from "../../components/superadmin/PageHeader";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip
 } from "recharts";
+import { fetchJson, getAuthHeader } from "../../utils/api";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -34,6 +35,53 @@ export default function SuperadminEnquiry() {
   const [search, setSearch] = useState("");
   const [enquiries, setEnquiries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+
+  const handleBulkUpdate = async (status) => {
+    if (selectedIds.size === 0) return;
+    const confirmMsg = `Are you sure you want to mark all ${selectedIds.size} selected enquiries as ${status}?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsBulkProcessing(true);
+    try {
+      for (const id of selectedIds) {
+        await fetchJson(`/api/website-enquiries/${id}`, {
+          method: "PUT",
+          body: JSON.stringify({ status: status.toLowerCase() })
+        });
+      }
+      setSelectedIds(new Set());
+      fetchEnquiries();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update some enquiries");
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    const confirmMsg = `Are you sure you want to permanently delete all ${selectedIds.size} selected enquiries?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsBulkProcessing(true);
+    try {
+      for (const id of selectedIds) {
+        await fetchJson(`/api/website-enquiries/${id}`, {
+          method: "DELETE"
+        });
+      }
+      setSelectedIds(new Set());
+      fetchEnquiries();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete some enquiries");
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
 
   const fetchEnquiries = async () => {
     try {
@@ -144,13 +192,36 @@ export default function SuperadminEnquiry() {
                       value={search} onChange={e => setSearch(e.target.value)}
                       placeholder="Search leads..." 
                       className="w-full bg-slate-50 border border-slate-100 rounded-xl py-2 pl-9 pr-3 text-[10px] font-bold outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all shadow-sm" 
-                    />
+                   />
                  </div>
                  <button onClick={fetchEnquiries} className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-blue-600 transition-all border border-slate-100 shadow-sm">
                     <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
                  </button>
               </div>
            </div>
+
+           {filteredEnquiries.length > 0 && (
+              <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
+                 <input
+                   type="checkbox"
+                   disabled={isBulkProcessing}
+                   className="rounded border-slate-300 cursor-pointer"
+                   checked={filteredEnquiries.every(enq => selectedIds.has(enq.id))}
+                   onChange={() => {
+                     const allSelected = filteredEnquiries.every(enq => selectedIds.has(enq.id));
+                     const next = new Set(selectedIds);
+                     if (allSelected) {
+                       filteredEnquiries.forEach(enq => next.delete(enq.id));
+                     } else {
+                       filteredEnquiries.forEach(enq => next.add(enq.id));
+                     }
+                     setSelectedIds(next);
+                   }}
+                 />
+                 <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Select All ({filteredEnquiries.length})</span>
+              </div>
+           )}
+
            <div className="space-y-3 h-[400px] overflow-y-auto custom-scrollbar pr-2">
               {loading ? (
                 <div className="flex flex-col items-center justify-center h-full text-slate-400">
@@ -162,7 +233,27 @@ export default function SuperadminEnquiry() {
                   <span className="text-[10px] font-bold">No Leads Found</span>
                 </div>
               ) : filteredEnquiries.map(enq => (
-                <div key={enq.id} className="flex items-center gap-4 group cursor-pointer p-3 rounded-xl border border-transparent hover:border-slate-100 hover:bg-slate-50 transition-all duration-300">
+                <div key={enq.id} className="flex items-center gap-4 group cursor-pointer p-3 rounded-xl border border-transparent hover:border-slate-100 hover:bg-slate-50 transition-all duration-300"
+                  onClick={() => {
+                    const next = new Set(selectedIds);
+                    if (next.has(enq.id)) next.delete(enq.id);
+                    else next.add(enq.id);
+                    setSelectedIds(next);
+                  }}
+                >
+                   <input
+                     type="checkbox"
+                     disabled={isBulkProcessing}
+                     className="rounded border-slate-300 cursor-pointer shrink-0"
+                     checked={selectedIds.has(enq.id)}
+                     onClick={(e) => e.stopPropagation()}
+                     onChange={() => {
+                       const next = new Set(selectedIds);
+                       if (next.has(enq.id)) next.delete(enq.id);
+                       else next.add(enq.id);
+                       setSelectedIds(next);
+                     }}
+                   />
                    <div className={cn(
                       "w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-sm shadow-sm transition-transform group-hover:scale-105 shrink-0",
                       enq.color === "blue" ? "bg-blue-600 shadow-blue-50" :
@@ -190,7 +281,7 @@ export default function SuperadminEnquiry() {
                       <p className="text-[10px] font-bold text-slate-800 leading-none">{enq.date}</p>
                       <p className="text-[8px] font-mono font-bold text-blue-600 mt-1.5 uppercase tracking-tighter opacity-70 leading-none truncate max-w-[80px]">{enq.id}</p>
                    </div>
-                   <button className="p-1.5 rounded-lg text-slate-300 hover:text-slate-800 hover:bg-white hover:shadow-sm transition-all"><ChevronRight className="w-4 h-4" /></button>
+                   <button className="p-1.5 rounded-lg text-slate-300 hover:text-slate-800 hover:bg-white hover:shadow-sm transition-all" onClick={(e) => e.stopPropagation()}><ChevronRight className="w-4 h-4" /></button>
                 </div>
               ))}
            </div>
@@ -203,6 +294,54 @@ export default function SuperadminEnquiry() {
          <ActionTile icon={PauseCircle} label="On Hold" count="156" color="indigo" sub="Awaiting Review" />
          <ActionTile icon={XCircle} label="Rejected" count="233" color="rose" sub="Failed Enquiries" />
       </div>
+
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-8 py-4 rounded-3xl border border-slate-800 shadow-2xl flex items-center gap-6 backdrop-blur-md animate-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-3 border-r border-slate-850 pr-6">
+            <span className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[11px] font-black shadow-lg animate-pulse">
+              {selectedIds.size}
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Selected</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              disabled={isBulkProcessing}
+              onClick={() => handleBulkUpdate("Approved")}
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-emerald-600/20 active:scale-95 transition-all flex items-center gap-2"
+            >
+              {isBulkProcessing ? "Processing..." : <><Check size={14} /> Approve</>}
+            </button>
+            <button
+              disabled={isBulkProcessing}
+              onClick={() => handleBulkUpdate("Rejected")}
+              className="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-rose-600/20 active:scale-95 transition-all flex items-center gap-2"
+            >
+              {isBulkProcessing ? "Processing..." : <><X size={14} /> Reject</>}
+            </button>
+            <button
+              disabled={isBulkProcessing}
+              onClick={() => handleBulkUpdate("On Hold")}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95 transition-all flex items-center gap-2"
+            >
+              {isBulkProcessing ? "Processing..." : <><PauseCircle size={14} /> Hold</>}
+            </button>
+            <button
+              disabled={isBulkProcessing}
+              onClick={handleBulkDelete}
+              className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-red-600/20 active:scale-95 transition-all flex items-center gap-2"
+            >
+              {isBulkProcessing ? "Processing..." : <><Trash2 size={14} /> Delete</>}
+            </button>
+            <button
+              disabled={isBulkProcessing}
+              onClick={() => setSelectedIds(new Set())}
+              className="text-slate-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors pl-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

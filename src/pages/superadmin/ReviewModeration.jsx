@@ -12,6 +12,35 @@ export default function ReviewModeration() {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("Pending");
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [filter]);
+
+  const handleBulkUpdate = async (newStatus) => {
+    if (selectedIds.size === 0) return;
+    const confirmMsg = `Are you sure you want to mark all ${selectedIds.size} selected reviews as ${newStatus}?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsBulkProcessing(true);
+    try {
+      for (const id of selectedIds) {
+        await fetchJson(`/api/reviews/${id}`, {
+          method: "PUT",
+          body: JSON.stringify({ status: newStatus })
+        });
+      }
+      setReviews(prev => prev.map(r => selectedIds.has(r._id) ? { ...r, status: newStatus } : r));
+      setSelectedIds(new Set());
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update some reviews");
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
 
   const loadReviews = async () => {
     try {
@@ -72,6 +101,28 @@ export default function ReviewModeration() {
         </div>
       </div>
 
+      {filteredReviews.length > 0 && (
+        <div className="flex items-center gap-3 bg-white px-6 py-3 rounded-2xl border border-slate-100 shadow-sm animate-in fade-in duration-300">
+          <input
+            type="checkbox"
+            disabled={isBulkProcessing}
+            className="rounded border-slate-300 cursor-pointer w-4 h-4"
+            checked={filteredReviews.every(r => selectedIds.has(r._id))}
+            onChange={() => {
+              const allSelected = filteredReviews.every(r => selectedIds.has(r._id));
+              const next = new Set(selectedIds);
+              if (allSelected) {
+                filteredReviews.forEach(r => next.delete(r._id));
+              } else {
+                filteredReviews.forEach(r => next.add(r._id));
+              }
+              setSelectedIds(next);
+            }}
+          />
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Select All Reviews ({filteredReviews.length})</span>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {loading ? (
           <div className="col-span-full py-40 text-center bg-white rounded-[2.5rem] border border-slate-100 shadow-sm">
@@ -87,7 +138,19 @@ export default function ReviewModeration() {
           <div key={r._id} className="bg-white rounded-3xl p-8 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col gap-6 group hover:border-blue-100 transition-all duration-300">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold uppercase shadow-sm">
+                <input
+                  type="checkbox"
+                  disabled={isBulkProcessing}
+                  className="rounded border-slate-300 cursor-pointer w-4 h-4 mr-1 shrink-0"
+                  checked={selectedIds.has(r._id)}
+                  onChange={() => {
+                    const next = new Set(selectedIds);
+                    if (next.has(r._id)) next.delete(r._id);
+                    else next.add(r._id);
+                    setSelectedIds(next);
+                  }}
+                />
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold uppercase shadow-sm shrink-0">
                   {(r.name || "U").charAt(0)}
                 </div>
                 <div>
@@ -148,6 +211,59 @@ export default function ReviewModeration() {
           </div>
         ))}
       </div>
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-8 py-4 rounded-3xl border border-slate-800 shadow-2xl flex items-center gap-6 backdrop-blur-md animate-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-3 border-r border-slate-850 pr-6">
+            <span className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[11px] font-black shadow-lg animate-pulse">
+              {selectedIds.size}
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Selected</span>
+          </div>
+          <div className="flex items-center gap-3">
+            {filter === "Pending" ? (
+              <>
+                <button
+                  disabled={isBulkProcessing}
+                  onClick={() => handleBulkUpdate("Active")}
+                  className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-emerald-600/20 active:scale-95 transition-all flex items-center gap-2"
+                >
+                  {isBulkProcessing ? "Processing..." : <><Check size={14} /> Approve Selected</>}
+                </button>
+                <button
+                  disabled={isBulkProcessing}
+                  onClick={() => handleBulkUpdate("Inactive")}
+                  className="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-rose-600/20 active:scale-95 transition-all flex items-center gap-2"
+                >
+                  {isBulkProcessing ? "Processing..." : <><X size={14} /> Reject Selected</>}
+                </button>
+              </>
+            ) : filter === "Active" ? (
+              <button
+                disabled={isBulkProcessing}
+                onClick={() => handleBulkUpdate("Inactive")}
+                className="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-rose-600/20 active:scale-95 transition-all flex items-center gap-2"
+              >
+                {isBulkProcessing ? "Processing..." : <><ShieldAlert size={14} /> Deactivate Selected</>}
+              </button>
+            ) : (
+              <button
+                disabled={isBulkProcessing}
+                onClick={() => handleBulkUpdate("Active")}
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-blue-600/20 active:scale-95 transition-all flex items-center gap-2"
+              >
+                {isBulkProcessing ? "Processing..." : <><RefreshCw size={14} /> Restore Selected</>}
+              </button>
+            )}
+            <button
+              disabled={isBulkProcessing}
+              onClick={() => setSelectedIds(new Set())}
+              className="text-slate-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors pl-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

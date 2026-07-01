@@ -22,6 +22,12 @@ export default function KycVerification() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [tab]);
 
   const loadData = async () => {
     try {
@@ -77,6 +83,40 @@ export default function KycVerification() {
       alert("Failed to update status");
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleBulkUpdate = async (status) => {
+    if (selectedIds.size === 0) return;
+    const confirmMsg = `Are you sure you want to mark all ${selectedIds.size} selected items as ${status}?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsBulkProcessing(true);
+    try {
+      const itemsToUpdate = filteredList.filter(item => selectedIds.has(item._id || item.loginId));
+      for (const item of itemsToUpdate) {
+        if (tab === "owners") {
+          await fetchJson(`/api/owners/${item.loginId}/kyc`, {
+            method: "PATCH",
+            headers: getAuthHeader(),
+            body: JSON.stringify({ status })
+          });
+        } else {
+          const endpoint = status === "verified" ? "/api/tenants/kyc/approve" : "/api/tenants/kyc/reject";
+          await fetchJson(endpoint, {
+            method: "POST",
+            headers: getAuthHeader(),
+            body: JSON.stringify({ tenantId: item._id })
+          });
+        }
+      }
+      setSelectedIds(new Set());
+      loadData();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update status for some items");
+    } finally {
+      setIsBulkProcessing(false);
     }
   };
 
@@ -142,114 +182,186 @@ export default function KycVerification() {
          </div>
 
          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-               <thead>
-                  <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] border-b border-slate-100">
-                     <th className="px-10 py-8">Stakeholder Identity</th>
-                     <th className="px-6 py-8">Contact Pulse</th>
-                     <th className="px-6 py-8 text-center">Protocol Segment</th>
-                     <th className="px-6 py-8 text-center">Audit Status</th>
-                     <th className="px-10 py-8 text-right">Audit Actions</th>
-                  </tr>
-               </thead>
-               <tbody className="divide-y divide-slate-50">
-                  {loading ? (
-                    <tr><td colSpan="5" className="py-40 text-center">
-                       <div className="w-16 h-16 border-4 border-blue-600/10 border-t-blue-600 rounded-full animate-spin mx-auto mb-8" />
-                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">Accessing Distributed Identity Vault...</p>
-                    </td></tr>
-                  ) : filteredList.length === 0 ? (
-                    <tr><td colSpan="5" className="py-40 text-center">
-                       <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-200">
-                          <ShieldCheck size={40} />
-                       </div>
-                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Compliance Queue Clear</p>
-                    </td></tr>
-                  ) : filteredList.map((item, i) => (
-                    <tr key={i} className="group hover:bg-slate-50/50 transition-all duration-300 cursor-pointer">
-                       <td className="px-10 py-8">
-                          <div className="flex items-center gap-6">
-                             <div className="w-14 h-14 rounded-2xl bg-white border border-slate-100 text-blue-600 flex items-center justify-center font-bold text-xl shadow-xl shadow-slate-200/40 transition-transform group-hover:scale-110 shrink-0">
-                                {(item.name || "U").charAt(0).toUpperCase()}
-                             </div>
-                             <div>
-                                <p className="text-base font-bold text-slate-800 tracking-tight">{item.name || "Unknown Identity"}</p>
-                                <p className="text-[9px] font-black bg-blue-600 text-white px-2 py-0.5 rounded-lg uppercase tracking-widest mt-2 inline-block">ID: {item.loginId || "N/A"}</p>
-                             </div>
-                          </div>
-                       </td>
-                       <td className="px-6 py-8">
-                          <div className="space-y-1.5">
-                             <p className="text-xs font-bold text-slate-700 leading-none">{item.phone || "No Pulse"}</p>
-                             <p className="text-[9px] font-bold text-slate-400 truncate max-w-[150px] uppercase tracking-wider">{item.email || "No Digital Record"}</p>
-                          </div>
-                       </td>
-                       <td className="px-6 py-8 text-center">
-                          <span className="text-[9px] font-bold text-slate-500 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 shadow-sm uppercase tracking-widest">
-                             {tab === "tenants" ? "Resident Profile" : "Asset Stakeholder"}
-                          </span>
-                       </td>
-                       <td className="px-6 py-8 text-center">
-                          <span className={cn(
-                             "text-[8px] font-bold px-4 py-1.5 rounded-xl border uppercase tracking-[0.2em] shadow-sm",
-                             "bg-amber-50 text-amber-600 border-amber-100"
-                          )}>
-                             {item.kycStatus || item.kyc?.status || "Pending Audit"}
-                          </span>
-                       </td>
-                       <td className="px-10 py-8 text-right">
-                          <div className="flex items-center justify-end gap-3">
-                             <button 
-                                onClick={() => handleUpdate(item, "verified")}
-                                disabled={isUpdating}
-                                className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all border border-emerald-100 shadow-md active:scale-95 disabled:opacity-50"
-                             >
-                                <Check className="w-5 h-5" />
-                             </button>
-                             <button 
-                                onClick={() => handleUpdate(item, "rejected")}
-                                disabled={isUpdating}
-                                className="p-3.5 bg-rose-50 text-rose-600 rounded-2xl hover:bg-rose-600 hover:text-white transition-all border border-rose-100 shadow-md active:scale-95 disabled:opacity-50"
-                             >
-                                <X className="w-5 h-5" />
-                             </button>
-                             <button 
-                                onClick={() => {
-                                  const docUrl = item.kyc?.documentImage || item.checkinAadhaarImage || item.tenantKyc?.documentImage || item.kyc?.aadharImage || item.kyc?.aadhaarFront || item.checkinAadhaarFront;
-                                  if (docUrl) window.open(docUrl, "_blank");
-                                  else alert("No KYC document found for this user.");
-                                }}
-                                title="View Document"
-                                className="p-3.5 bg-slate-50 text-slate-400 rounded-2xl hover:text-blue-600 hover:bg-white hover:shadow-xl transition-all border border-slate-100 shadow-md active:scale-95"
-                             >
-                                <Eye className="w-5 h-5" />
-                             </button>
-                             <button 
-                                onClick={() => {
-                                  const docUrl = item.kyc?.documentImage || item.checkinAadhaarImage || item.tenantKyc?.documentImage || item.kyc?.aadharImage || item.kyc?.aadhaarFront || item.checkinAadhaarFront;
-                                  if (docUrl) {
-                                     const a = document.createElement("a");
-                                     a.href = docUrl;
-                                     a.download = `KYC_${item.loginId || "Document"}.jpg`;
-                                     a.target = "_blank";
-                                     a.click();
-                                  } else {
-                                     alert("No KYC document found for this user.");
-                                  }
-                                }}
-                                title="Download Document"
-                                className="p-3.5 bg-slate-50 text-slate-400 rounded-2xl hover:text-emerald-600 hover:bg-white hover:shadow-xl transition-all border border-slate-100 shadow-md active:scale-95"
-                             >
-                                <Download className="w-5 h-5" />
-                             </button>
-                          </div>
-                       </td>
+             <table className="w-full text-left">
+                <thead>
+                   <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] border-b border-slate-100">
+                      <th className="px-10 py-8 w-12 text-center">
+                         <input
+                           type="checkbox"
+                           disabled={isBulkProcessing}
+                           className="rounded border-slate-300 cursor-pointer disabled:opacity-50"
+                           checked={filteredList.length > 0 && filteredList.every(item => selectedIds.has(item._id || item.loginId))}
+                           onChange={() => {
+                             const allSelected = filteredList.every(item => selectedIds.has(item._id || item.loginId));
+                             const next = new Set(selectedIds);
+                             if (allSelected) {
+                               filteredList.forEach(item => next.delete(item._id || item.loginId));
+                             } else {
+                               filteredList.forEach(item => next.add(item._id || item.loginId));
+                             }
+                             setSelectedIds(next);
+                           }}
+                         />
+                      </th>
+                      <th className="px-6 py-8">Stakeholder Identity</th>
+                      <th className="px-6 py-8">Contact Pulse</th>
+                      <th className="px-6 py-8 text-center">Protocol Segment</th>
+                      <th className="px-6 py-8 text-center">Audit Status</th>
+                      <th className="px-10 py-8 text-right">Audit Actions</th>
+                   </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                   {loading ? (
+                     <tr><td colSpan="6" className="py-40 text-center">
+                        <div className="w-16 h-16 border-4 border-blue-600/10 border-t-blue-600 rounded-full animate-spin mx-auto mb-8" />
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">Accessing Distributed Identity Vault...</p>
+                     </td></tr>
+                   ) : filteredList.length === 0 ? (
+                     <tr><td colSpan="6" className="py-40 text-center">
+                        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-200">
+                           <ShieldCheck size={40} />
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Compliance Queue Clear</p>
+                     </td></tr>
+                   ) : filteredList.map((item, i) => (
+                     <tr key={i} className="group hover:bg-slate-50/50 transition-all duration-300 cursor-pointer" onClick={() => {
+                        const next = new Set(selectedIds);
+                        const id = item._id || item.loginId;
+                        if (next.has(id)) next.delete(id);
+                        else next.add(id);
+                        setSelectedIds(next);
+                     }}>
+                        <td className="px-10 py-8 text-center" onClick={(e) => e.stopPropagation()}>
+                           <input
+                             type="checkbox"
+                             disabled={isBulkProcessing}
+                             className="rounded border-slate-300 cursor-pointer disabled:opacity-50"
+                             checked={selectedIds.has(item._id || item.loginId)}
+                             onChange={() => {
+                               const next = new Set(selectedIds);
+                               const id = item._id || item.loginId;
+                               if (next.has(id)) next.delete(id);
+                               else next.add(id);
+                               setSelectedIds(next);
+                             }}
+                           />
+                        </td>
+                        <td className="px-6 py-8">
+                           <div className="flex items-center gap-6">
+                              <div className="w-14 h-14 rounded-2xl bg-white border border-slate-100 text-blue-600 flex items-center justify-center font-bold text-xl shadow-xl shadow-slate-200/40 transition-transform group-hover:scale-110 shrink-0">
+                                 {(item.name || "U").charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                 <p className="text-base font-bold text-slate-800 tracking-tight">{item.name || "Unknown Identity"}</p>
+                                 <p className="text-[9px] font-black bg-blue-600 text-white px-2 py-0.5 rounded-lg uppercase tracking-widest mt-2 inline-block">ID: {item.loginId || "N/A"}</p>
+                              </div>
+                           </div>
+                        </td>
+                        <td className="px-6 py-8">
+                           <div className="space-y-1.5">
+                              <p className="text-xs font-bold text-slate-700 leading-none">{item.phone || "No Pulse"}</p>
+                              <p className="text-[9px] font-bold text-slate-400 truncate max-w-[150px] uppercase tracking-wider">{item.email || "No Digital Record"}</p>
+                           </div>
+                        </td>
+                        <td className="px-6 py-8 text-center">
+                           <span className="text-[9px] font-bold text-slate-500 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 shadow-sm uppercase tracking-widest">
+                              {tab === "tenants" ? "Resident Profile" : "Asset Stakeholder"}
+                           </span>
+                        </td>
+                        <td className="px-6 py-8 text-center">
+                           <span className={cn(
+                              "text-[8px] font-bold px-4 py-1.5 rounded-xl border uppercase tracking-[0.2em] shadow-sm",
+                              "bg-amber-50 text-amber-600 border-amber-100"
+                           )}>
+                              {item.kycStatus || item.kyc?.status || "Pending Audit"}
+                           </span>
+                        </td>
+                        <td className="px-10 py-8 text-right" onClick={(e) => e.stopPropagation()}>
+                           <div className="flex items-center justify-end gap-3">
+                              <button 
+                                 onClick={() => handleUpdate(item, "verified")}
+                                 disabled={isUpdating}
+                                 className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all border border-emerald-100 shadow-md active:scale-95 disabled:opacity-50"
+                              >
+                                 <Check className="w-5 h-5" />
+                              </button>
+                              <button 
+                                 onClick={() => handleUpdate(item, "rejected")}
+                                 disabled={isUpdating}
+                                 className="p-3.5 bg-rose-50 text-rose-600 rounded-2xl hover:bg-rose-600 hover:text-white transition-all border border-rose-100 shadow-md active:scale-95 disabled:opacity-50"
+                              >
+                                 <X className="w-5 h-5" />
+                              </button>
+                              <button 
+                                 onClick={() => {
+                                   const docUrl = item.kyc?.documentImage || item.checkinAadhaarImage || item.tenantKyc?.documentImage || item.kyc?.aadharImage || item.kyc?.aadhaarFront || item.checkinAadhaarFront;
+                                   if (docUrl) window.open(docUrl, "_blank");
+                                   else alert("No KYC document found for this user.");
+                                 }}
+                                 title="View Document"
+                                 className="p-3.5 bg-slate-50 text-slate-400 rounded-2xl hover:text-blue-600 hover:bg-white hover:shadow-xl transition-all border border-slate-100 shadow-md active:scale-95"
+                              >
+                                 <Eye className="w-5 h-5" />
+                              </button>
+                              <button 
+                                 onClick={() => {
+                                   const docUrl = item.kyc?.documentImage || item.checkinAadhaarImage || item.tenantKyc?.documentImage || item.kyc?.aadharImage || item.kyc?.aadhaarFront || item.checkinAadhaarFront;
+                                   if (docUrl) {
+                                      const a = document.createElement("a");
+                                      a.href = docUrl;
+                                      a.download = `KYC_${item.loginId || "Document"}.jpg`;
+                                      a.target = "_blank";
+                                      a.click();
+                                   } else {
+                                      alert("No KYC document found for this user.");
+                                   }
+                                 }}
+                                 title="Download Document"
+                                 className="p-3.5 bg-slate-50 text-slate-400 rounded-2xl hover:text-emerald-600 hover:bg-white hover:shadow-xl transition-all border border-slate-100 shadow-md active:scale-95"
+                              >
+                                 <Download className="w-5 h-5" />
+                              </button>
+                           </div>
+                        </td>
                     </tr>
                   ))}
-               </tbody>
+                </tbody>
             </table>
          </div>
       </div>
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-8 py-4 rounded-3xl border border-slate-800 shadow-2xl flex items-center gap-6 backdrop-blur-md animate-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-3 border-r border-slate-850 pr-6">
+            <span className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[11px] font-black shadow-lg animate-pulse">
+              {selectedIds.size}
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Selected</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              disabled={isBulkProcessing}
+              onClick={() => handleBulkUpdate("verified")}
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-emerald-600/20 active:scale-95 transition-all flex items-center gap-2"
+            >
+              {isBulkProcessing ? "Processing..." : <><Check size={14} /> Verify Selected</>}
+            </button>
+            <button
+              disabled={isBulkProcessing}
+              onClick={() => handleBulkUpdate("rejected")}
+              className="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-rose-600/20 active:scale-95 transition-all flex items-center gap-2"
+            >
+              {isBulkProcessing ? "Processing..." : <><X size={14} /> Reject Selected</>}
+            </button>
+            <button
+              disabled={isBulkProcessing}
+              onClick={() => setSelectedIds(new Set())}
+              className="text-slate-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors pl-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

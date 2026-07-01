@@ -30,6 +30,14 @@ export default function Complaints() {
   const [complaints, setComplaints] = useState([]);
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [bulkStaffId, setBulkStaffId] = useState("");
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setBulkStaffId("");
+  }, [tab]);
 
   if (!owner?.loginId && typeof window !== "undefined") { 
     window.location.href = "/propertyowner/ownerlogin"; 
@@ -120,6 +128,62 @@ export default function Complaints() {
     }
   };
 
+  const handleBulkResolve = async () => {
+    if (selectedIds.size === 0) return;
+    const confirmMsg = `Are you sure you want to mark all ${selectedIds.size} selected complaints as Resolved?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsBulkProcessing(true);
+    try {
+      for (const id of selectedIds) {
+        await fetchJson(`/api/complaints/${id}/status`, {
+          method: "PUT",
+          body: JSON.stringify({ status: "Resolved" })
+        });
+      }
+      cacheInvalidate(`complaints:${owner.loginId}`);
+      setComplaints(prev => prev.map(c => selectedIds.has(c._id) ? { ...c, status: "Resolved" } : c));
+      setSelectedIds(new Set());
+      toast.success("Selected complaints resolved.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to resolve some complaints.");
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const handleBulkAssign = async (staffId) => {
+    if (!staffId || selectedIds.size === 0) return;
+    const staffObj = staffList.find(s => s._id === staffId);
+    const confirmMsg = `Assign ${staffObj?.name || "selected staff"} to all ${selectedIds.size} selected complaints?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsBulkProcessing(true);
+    try {
+      for (const id of selectedIds) {
+        await fetchJson(`/api/complaints/${id}/assign`, {
+          method: "PATCH",
+          body: JSON.stringify({ assignedStaffId: staffId, assignedStaffName: staffObj?.name || null })
+        });
+      }
+      cacheInvalidate(`complaints:${owner.loginId}`);
+      setComplaints(prev => prev.map(c => selectedIds.has(c._id) ? {
+        ...c,
+        assignedStaffId: staffId,
+        assignedStaffName: staffObj?.name || null
+      } : c));
+      setSelectedIds(new Set());
+      setBulkStaffId("");
+      toast.success("Staff assigned to selected complaints.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to assign staff to some complaints.");
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
   const filtered = complaints.filter(c => {
     const cStatus = (c.status || "Open").toLowerCase().replace(" ", "-");
     const matchesTab = tab === "all" || cStatus === tab || (tab === "in-progress" && cStatus === "taken");
@@ -164,6 +228,24 @@ export default function Complaints() {
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
                 <thead><tr className="text-left text-[11.5px] uppercase tracking-wider text-muted-foreground bg-muted/50">
+                  <th className="px-4 py-3 w-10">
+                     <input
+                       type="checkbox"
+                       disabled={isBulkProcessing}
+                       className="rounded border-slate-300 cursor-pointer"
+                       checked={filtered.length > 0 && filtered.every(c => selectedIds.has(c._id))}
+                       onChange={() => {
+                         const allSelected = filtered.every(c => selectedIds.has(c._id));
+                         const next = new Set(selectedIds);
+                         if (allSelected) {
+                           filtered.forEach(c => next.delete(c._id));
+                         } else {
+                           filtered.forEach(c => next.add(c._id));
+                         }
+                         setSelectedIds(next);
+                       }}
+                     />
+                  </th>
                   <th className="px-4 py-3 font-semibold">Tenant</th>
                   <th className="px-4 py-3 font-semibold">Room</th>
                   <th className="px-4 py-3 font-semibold">Category</th>
@@ -175,9 +257,30 @@ export default function Complaints() {
                 </tr></thead>
                 <tbody className="divide-y divide-border">
                   {filtered.length === 0 ? (
-                     <tr><td colSpan="7" className="px-4 py-8 text-center text-muted-foreground">No complaints found.</td></tr>
+                     <tr><td colSpan="9" className="px-4 py-8 text-center text-muted-foreground">No complaints found.</td></tr>
                   ) : filtered.map(c => (
-                    <tr key={c._id} className="hover:bg-muted/40 transition-colors">
+                    <tr key={c._id} className="hover:bg-muted/40 transition-colors cursor-pointer"
+                      onClick={() => {
+                        const next = new Set(selectedIds);
+                        if (next.has(c._id)) next.delete(c._id);
+                        else next.add(c._id);
+                        setSelectedIds(next);
+                      }}
+                    >
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                         <input
+                           type="checkbox"
+                           disabled={isBulkProcessing}
+                           className="rounded border-slate-300 cursor-pointer"
+                           checked={selectedIds.has(c._id)}
+                           onChange={() => {
+                             const next = new Set(selectedIds);
+                             if (next.has(c._id)) next.delete(c._id);
+                             else next.add(c._id);
+                             setSelectedIds(next);
+                           }}
+                         />
+                      </td>
                       <td className="px-4 py-3 font-medium text-foreground">
                         {c.tenantName}
                         {c.escalated && <span className="ml-2 text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold">ESCALATED</span>}
@@ -190,7 +293,7 @@ export default function Complaints() {
                       <td className="px-4 py-3">
                         <Pill tone={c.status==="Resolved"?"success":(c.status==="Open"?"danger":"warning")}>{c.status}</Pill>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         {c.status !== "Resolved" ? (
                           <select 
                             value={c.assignedStaffId || ""} 
@@ -207,7 +310,7 @@ export default function Complaints() {
                       <td className="px-4 py-3 text-muted-foreground">
                         {new Date(c.createdAt).toLocaleDateString('en-IN', {day:'numeric',month:'short'})}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         {c.status === "Open" && (
                            <button onClick={() => updateStatus(c._id, "In Progress")} className="text-[11px] font-medium text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded">Mark In-Progress</button>
                         )}
@@ -236,13 +339,35 @@ export default function Complaints() {
                   onAction={() => window.location.reload()}
                 />
               ) : filtered.map(c => (
-                <div key={`mob-${c._id}`} className="bg-white rounded-[20px] p-4 border border-slate-100 shadow-[0_4px_16px_rgba(0,0,0,0.02)] relative overflow-hidden">
+                <div key={`mob-${c._id}`} className="bg-white rounded-[20px] p-4 border border-slate-100 shadow-[0_4px_16px_rgba(0,0,0,0.02)] relative overflow-hidden"
+                  onClick={() => {
+                    const next = new Set(selectedIds);
+                    if (next.has(c._id)) next.delete(c._id);
+                    else next.add(c._id);
+                    setSelectedIds(next);
+                  }}
+                >
                   <div className="flex justify-between items-start mb-3">
-                    <div className="flex-1">
-                       <h3 className="text-[16px] font-black text-slate-900">{c.tenantName}</h3>
-                       <p className="text-[11.5px] font-semibold text-slate-500 mt-0.5">Room {c.roomNo} · {c.category}</p>
+                    <div className="flex items-center gap-3 flex-1">
+                      <input
+                        type="checkbox"
+                        disabled={isBulkProcessing}
+                        className="rounded border-slate-350 cursor-pointer w-4 h-4 shrink-0"
+                        checked={selectedIds.has(c._id)}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => {
+                          const next = new Set(selectedIds);
+                          if (next.has(c._id)) next.delete(c._id);
+                          else next.add(c._id);
+                          setSelectedIds(next);
+                        }}
+                      />
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-[16px] font-black text-slate-900">{c.tenantName}</h3>
+                        <p className="text-[11.5px] font-semibold text-slate-500 mt-0.5">Room {c.roomNo} · {c.category}</p>
+                      </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1.5">
+                    <div className="flex flex-col items-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                        <span className={`inline-flex px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${
                          c.status === "Resolved" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
                          c.status === "Open" ? "bg-rose-50 text-rose-600 border-rose-100" :
@@ -254,11 +379,11 @@ export default function Complaints() {
                     </div>
                   </div>
 
-                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 mb-3">
+                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 mb-3" onClick={(e) => e.stopPropagation()}>
                     <p className="text-[12px] font-medium text-slate-700 italic">"{c.description || "No description provided."}"</p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="grid grid-cols-2 gap-3 mb-4" onClick={(e) => e.stopPropagation()}>
                     <div>
                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Priority</p>
                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
@@ -282,7 +407,7 @@ export default function Complaints() {
                     </div>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                      {c.status === "Open" && (
                         <button onClick={() => updateStatus(c._id, "In Progress")} className="flex-1 py-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-black uppercase tracking-wider hover:bg-blue-100 transition-colors">Start Work</button>
                      )}
@@ -298,6 +423,48 @@ export default function Complaints() {
             </div>
           </div>
         </>
+      )}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-8 py-4 rounded-3xl border border-slate-800 shadow-2xl flex items-center gap-6 backdrop-blur-md animate-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-3 border-r border-slate-850 pr-6">
+            <span className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[11px] font-black shadow-lg animate-pulse">
+              {selectedIds.size}
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Selected</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              disabled={isBulkProcessing}
+              onClick={handleBulkResolve}
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-emerald-600/20 active:scale-95 transition-all flex items-center gap-2"
+            >
+              Resolve Selected
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Assign:</span>
+              <select
+                disabled={isBulkProcessing}
+                value={bulkStaffId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setBulkStaffId(val);
+                  if (val) handleBulkAssign(val);
+                }}
+                className="bg-slate-800 border border-slate-700 text-white text-[11px] font-bold rounded-xl px-3 py-2 outline-none cursor-pointer"
+              >
+                <option value="">-- Select Staff --</option>
+                {staffList.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
+              </select>
+            </div>
+            <button
+              disabled={isBulkProcessing}
+              onClick={() => setSelectedIds(new Set())}
+              className="text-slate-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors pl-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
     </PropertyOwnerLayout>
   );

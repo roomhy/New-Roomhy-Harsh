@@ -52,7 +52,7 @@ export default function OurPropertyPage() {
   const [showBidModal, setShowBidModal] = useState(false);
   const [selectedPropertyForBid, setSelectedPropertyForBid] = useState(null);
   const { user, isAuthenticated } = useAuth();
-  
+
   // Fetch properties and related data dynamically
   useEffect(() => {
     const loadData = async () => {

@@ -354,7 +354,7 @@ export default function PropertyDetailsPage() {
   const [selectedImage, setSelectedImage] = useState(0);
   const [loadingInstitutes, setLoadingInstitutes] = useState(false);
   const [showQuickBookingModal, setShowQuickBookingModal] = useState(false);
-  
+
   // Handle Book Now button click
   const handleBookNow = () => {
     setShowQuickBookingModal(true);

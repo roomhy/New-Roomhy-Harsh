@@ -51,6 +51,7 @@ export default function StaffLogin() {
       }
       const emp = data.data || {};
       setStaffSession({
+        _id: emp._id,
         loginId: emp.loginId,
         name: emp.name,
         role: emp.role,
@@ -81,6 +82,7 @@ export default function StaffLogin() {
       });
       const emp = staffData || {};
       setStaffSession({
+        _id: emp._id || emp.id,
         loginId: emp.loginId || loginId.trim(),
         name: emp.name,
         role: emp.role,

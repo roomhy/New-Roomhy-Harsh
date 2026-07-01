@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import StaffMobileLayout from "./StaffMobileLayout";
 import { 
   LayoutDashboard, Users, Home, AlertCircle, 
   ClipboardList, Bell, Search, LogOut, 
@@ -27,6 +28,7 @@ export default function StaffLayout({ children, title, subtitle }) {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [staff, setStaff] = useState(null);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" ? window.innerWidth < 1024 : false);
 
   useEffect(() => {
     const session = getStaffSession();
@@ -37,12 +39,34 @@ export default function StaffLayout({ children, title, subtitle }) {
     setStaff(session);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const handleLogout = () => {
     clearStaffSession();
     window.location.href = "/staff/login";
   };
 
   if (!staff) return null; // wait for session check
+
+  if (isMobile) {
+    return (
+      <StaffMobileLayout
+        staff={staff}
+        title={title === "Dashboard" ? "" : title}
+        onLogout={handleLogout}
+      >
+        {children}
+      </StaffMobileLayout>
+    );
+  }
 
   const initials = (staff.name || "S").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 
