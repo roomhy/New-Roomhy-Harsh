@@ -1,7 +1,7 @@
 import React from "react";
 import StaffLayout from "../../components/StaffLayout";
 import { AlertCircle, Clock, CheckCircle2, Home, User, Plus, Search, Filter, ArrowRight, MessageSquare } from "lucide-react";
-import { getApiBase } from "../../utils/api";
+import { getApiBase, getAuthHeader } from "../../utils/api";
 import { toast } from "react-hot-toast";
 
 function getStaffSession() {
@@ -36,7 +36,7 @@ export default function StaffComplaints() {
         return;
       }
       
-      const compRes = await fetch(`${getApiBase()}/api/complaints/owner/${parentLoginId}`);
+      const compRes = await fetch(`${getApiBase()}/api/complaints/owner/${parentLoginId}`, { headers: getAuthHeader() });
       const compData = await compRes.json();
       
       if (compData && compData.complaints) {
@@ -73,7 +73,7 @@ export default function StaffComplaints() {
     try {
       const res = await fetch(`${getApiBase()}/api/complaints/${dbId}/status`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
         body: JSON.stringify({ status: newStatus })
       });
       const data = await res.json();

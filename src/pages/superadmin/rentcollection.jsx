@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { fetchJson, getAuthHeader } from "../../utils/api";
 import * as XLSX from 'xlsx';
+import { toast } from "react-hot-toast";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -108,11 +109,13 @@ export default function RentHistory() {
   ];
 
   const handleSendReminders = async () => {
-    if (!confirm("Send rent reminders to all unpaid tenants?")) return;
+    const toastId = toast.loading("Sending rent reminders to all unpaid tenants...");
     try {
       await fetchJson("/api/rents/reminders/send", { method: "POST", headers: getAuthHeader() });
-      alert("Reminders dispatched successfully");
-    } catch (err) { alert("Failed to send reminders"); }
+      toast.success("Reminders dispatched successfully!", { id: toastId });
+    } catch (err) {
+      toast.error("Failed to send reminders", { id: toastId });
+    }
   };
 
   const exportToExcel = () => {

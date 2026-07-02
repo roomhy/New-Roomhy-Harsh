@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import StaffLayout from "../../components/StaffLayout";
 import { Search, Home, Bed, Loader2, RefreshCw, Users, AlertCircle } from "lucide-react";
-import { getApiBase } from "../../utils/api";
+import { getApiBase, getAuthHeader } from "../../utils/api";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -45,7 +45,7 @@ export default function StaffRooms() {
       }));
 
       // Also fetch tenants for occupancy info
-      const tRes = await fetch(`${getApiBase()}/api/tenants/owner/${parentLoginId}`);
+      const tRes = await fetch(`${getApiBase()}/api/tenants/owner/${parentLoginId}`, { headers: getAuthHeader() });
       const tData = await tRes.json();
       const tenantList = tData?.tenants || tData?.data || (Array.isArray(tData) ? tData : []);
       setTenants(tenantList.filter(t => !t.isDeleted && t.status !== "inactive"));

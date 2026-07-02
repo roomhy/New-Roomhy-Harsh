@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useHtmlPage } from "../../utils/htmlPage";
 import { fetchJson } from "../../utils/api";
+import { Home, Check, PenTool } from "lucide-react";
 
 export default function Tenantagreement() {
   useHtmlPage({
@@ -15,7 +16,7 @@ export default function Tenantagreement() {
       { href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap", rel: "stylesheet" },
       { rel: "stylesheet", href: "/tenant/assets/css/tenantagreement.css" }
     ],
-    scripts: [{ src: "https://cdn.tailwindcss.com" }, { src: "https://unpkg.com/lucide@latest" }],
+    scripts: [{ src: "https://cdn.tailwindcss.com" }],
     inlineScripts: []
   });
 
@@ -25,9 +26,6 @@ export default function Tenantagreement() {
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (window?.lucide) window.lucide.createIcons();
-  }, []);
 
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem("tenant_user") || "null");
@@ -37,11 +35,14 @@ export default function Tenantagreement() {
     }
     (async () => {
       try {
-        const data = await fetchJson("/api/tenants");
-        const list = data?.tenants || data || [];
-        const match = list.find((t) => String(t.loginId || "").toUpperCase() === String(stored.loginId || "").toUpperCase());
+        const data = await fetchJson("/api/tenants/me");
+        const match = data?.tenant || data;
         setTenant(match || stored);
       } catch (err) {
+        if (err?.status === 401 || err?.status === 403) {
+          window.location.href = "/tenant/tenantlogin";
+          return;
+        }
         setErrorMsg(err?.body || err?.message || "Failed to load tenant data.");
       } finally {
         setLoading(false);
@@ -83,7 +84,7 @@ export default function Tenantagreement() {
       <div className="min-h-screen flex flex-col">
         <header className="bg-white h-16 flex items-center justify-between px-6 shadow-sm z-10">
           <div className="flex items-center gap-2">
-            <div className="bg-purple-600 text-white p-1.5 rounded-lg"><i data-lucide="home" className="w-5 h-5"></i></div>
+            <div className="bg-purple-600 text-white p-1.5 rounded-lg"><Home className="w-5 h-5" /></div>
             <h1 className="text-xl font-bold text-slate-800">Roomhy Tenant Onboarding</h1>
           </div>
         </header>
@@ -93,12 +94,12 @@ export default function Tenantagreement() {
             <div className="flex items-center justify-center mb-8">
               <div className="flex items-center">
                 <div className="flex flex-col items-center">
-                  <div className="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center font-bold mb-1"><i data-lucide="check" className="w-5 h-5"></i></div>
+                  <div className="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center font-bold mb-1"><Check className="w-5 h-5" /></div>
                   <span className="text-xs font-medium text-green-600">Profile</span>
                 </div>
                 <div className="w-20 h-1 bg-green-500 mx-2 rounded"></div>
                 <div className="flex flex-col items-center">
-                  <div className="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center font-bold mb-1"><i data-lucide="check" className="w-5 h-5"></i></div>
+                  <div className="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center font-bold mb-1"><Check className="w-5 h-5" /></div>
                   <span className="text-xs font-medium text-green-600">KYC</span>
                 </div>
                 <div className="w-20 h-1 bg-green-500 mx-2 rounded"></div>
@@ -145,7 +146,7 @@ export default function Tenantagreement() {
                 onClick={signAgreement}
                 className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition-transform active:scale-95 flex items-center justify-center gap-2 shadow-lg"
               >
-                <i data-lucide="pen-tool" className="w-5 h-5"></i> Digitally Sign & Enter Dashboard
+                <PenTool className="w-5 h-5" /> Digitally Sign & Enter Dashboard
               </button>
             </div>
           </div>

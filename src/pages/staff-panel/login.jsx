@@ -8,6 +8,12 @@ function setStaffSession(data) {
   localStorage.setItem("staff_session", s);
 }
 
+function setStaffToken(token) {
+  if (!token) return;
+  sessionStorage.setItem("token", token);
+  localStorage.setItem("token", token);
+}
+
 export default function StaffLogin() {
   const [step, setStep] = useState("login"); // "login" | "setPassword"
   const [loginId, setLoginId] = useState("");
@@ -20,6 +26,7 @@ export default function StaffLogin() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [staffData, setStaffData] = useState(null);
+  const [resetToken, setResetToken] = useState("");
 
   // If already logged in → redirect
   useEffect(() => {
@@ -46,6 +53,7 @@ export default function StaffLogin() {
       });
       setStaffData(data.data);
       if (data.requirePasswordReset || data.data?.requirePasswordReset) {
+        setResetToken(data.resetToken || "");
         setStep("setPassword");
         return;
       }
@@ -60,6 +68,7 @@ export default function StaffLogin() {
         assignedPropertyName: emp.assignedPropertyName || "",
         photoDataUrl: emp.photoDataUrl || "",
       });
+      setStaffToken(data.token);
       window.location.href = "/staff";
     } catch (err) {
       let msg = "Login failed.";
@@ -76,9 +85,10 @@ export default function StaffLogin() {
     setErrorMsg("");
     setLoading(true);
     try {
-      await fetchJson(`/api/employees/${loginId.trim()}/reset-password`, {
+      const resetRes = await fetchJson(`/api/employees/${loginId.trim()}/reset-password`, {
         method: "POST",
-        body: JSON.stringify({ newPassword, currentPassword: password }),
+        headers: { Authorization: `Bearer ${resetToken}` },
+        body: JSON.stringify({ newPassword }),
       });
       const emp = staffData || {};
       setStaffSession({
@@ -91,6 +101,7 @@ export default function StaffLogin() {
         assignedPropertyName: emp.assignedPropertyName || "",
         photoDataUrl: emp.photoDataUrl || "",
       });
+      setStaffToken(resetRes?.token);
       window.location.href = "/staff";
     } catch (err) {
       let msg = "Failed to set password.";

@@ -9,6 +9,7 @@ import {
 import { getApiBase } from "../../utils/api";
 import WebsitePropertyPreviewModal from "../../components/shared/WebsitePropertyPreviewModal";
 import { toast } from "react-hot-toast";
+import AddPropertyWizard from "./AddPropertyWizard";
 
 const cn = (...c) => c.filter(Boolean).join(" ");
 
@@ -75,6 +76,7 @@ export default function TotalProperties() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: "", message: "", type: "info", onConfirm: null });
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
   // filters
   const [search, setSearch]         = useState("");
@@ -297,7 +299,7 @@ export default function TotalProperties() {
           <button onClick={()=>setShowMore(v=>!v)} className={cn("flex items-center gap-2 px-4 py-2.5 border rounded-xl text-xs font-bold shadow-sm transition-all", showMore?"bg-blue-600 text-white border-blue-600":"bg-white border-slate-200 text-slate-600 hover:bg-slate-50")}>
             <SlidersHorizontal className="w-3.5 h-3.5"/> More Filters
           </button>
-          <button onClick={()=>navigate("/superadmin/add-property")} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all">
+          <button onClick={() => { setSelectedProp(null); setEditModalOpen(true); }} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all">
             <Plus className="w-3.5 h-3.5"/> Add Property
           </button>
         </div>
@@ -575,7 +577,7 @@ export default function TotalProperties() {
                           <Eye className="w-4 h-4"/>
                         </button>
                         <button 
-                          onClick={()=>navigate(`/superadmin/add-property?editId=${p.id}`)} 
+                          onClick={() => { setSelectedProp(p); setEditModalOpen(true); }} 
                           className="w-8 h-8 rounded-xl bg-slate-50 text-slate-500 hover:bg-blue-50 hover:text-blue-600 border border-slate-100/60 shadow-sm flex items-center justify-center transition-all hover:scale-110" 
                           title="Edit"
                         >
@@ -877,7 +879,7 @@ export default function TotalProperties() {
                   className="px-5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-slate-500 bg-slate-100 hover:bg-slate-200">
                   Close
                 </button>
-                <button onClick={() => { setViewModalOpen(false); navigate(`/superadmin/add-property?editId=${selectedProp.id}`); }}
+                <button onClick={() => { setViewModalOpen(false); setEditModalOpen(true); }}
                   className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-blue-700 shadow-lg shadow-blue-200/50">
                   <Pencil className="w-3.5 h-3.5" /> Edit Property
                 </button>
@@ -902,6 +904,29 @@ export default function TotalProperties() {
           property={previewProperty}
           onClose={() => setPreviewProperty(null)}
         />
+      )}
+
+      {editModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] overflow-y-auto p-4 flex items-center justify-center animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-[1300px] h-[90vh] shadow-2xl overflow-hidden flex flex-col relative animate-in zoom-in-95 duration-200">
+            <button 
+              onClick={() => setEditModalOpen(false)} 
+              className="absolute top-6 right-8 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-2.5 rounded-2xl transition-colors z-[180]"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex-1 overflow-y-auto">
+              <AddPropertyWizard 
+                propEditId={selectedProp?.id} 
+                isModal={true} 
+                onClose={() => {
+                  setEditModalOpen(false);
+                  fetchProps();
+                }} 
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Custom Confirmation Modal */}

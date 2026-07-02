@@ -256,7 +256,7 @@ export default function SuperadminDashboard() {
         <div className="lg:col-span-2 panel">
           <div className="flex items-center justify-between mb-8">
             <h3 className="font-bold text-lg text-slate-900">Recent Activities</h3>
-            <button onClick={() => navigate('/superadmin/new_signups')} className="text-xs font-bold text-blue-600 hover:underline">View All</button>
+            <button onClick={() => navigate(isEmployee ? '/employee/new_signups' : '/superadmin/new_signups')} className="text-xs font-bold text-blue-600 hover:underline">View All</button>
           </div>
           <div className="divide-y divide-slate-50">
             {activitiesDynamic.map((a, i) => {

@@ -23,6 +23,9 @@ export default function SuperadminIndexPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [forgotError, setForgotError] = useState("");
+    const [forgotLoading, setForgotLoading] = useState(false);
+    const [resetToken, setResetToken] = useState("");
 
     useHeadAssets({ 
         title, 
@@ -124,6 +127,118 @@ export default function SuperadminIndexPage() {
             }
         } catch (err) {
             setError("Connection error. Please try again.");
+        }
+    };
+
+    const handleCloseForgotModal = () => {
+        setShowForgotModal(false);
+        setForgotStep(1);
+        setForgotEmail("");
+        setOtp("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setForgotError("");
+        setResetToken("");
+    };
+
+    const handleSendOtp = async () => {
+        setForgotError("");
+        if (!forgotEmail.trim()) {
+            setForgotError("Email address is required.");
+            return;
+        }
+        setForgotLoading(true);
+        const API_URL = getApiBase();
+        try {
+            const res = await fetch(`${API_URL}/api/auth/forgot-password/request-otp`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: forgotEmail.trim() })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setForgotStep(2);
+            } else {
+                setForgotError(data.message || "Email address not found.");
+            }
+        } catch (err) {
+            setForgotError("Connection error. Please try again.");
+        } finally {
+            setForgotLoading(false);
+        }
+    };
+
+    const handleVerifyOtp = async () => {
+        setForgotError("");
+        if (!otp.trim() || otp.trim().length !== 6) {
+            setForgotError("Please enter a valid 6-digit OTP.");
+            return;
+        }
+        setForgotLoading(true);
+        const API_URL = getApiBase();
+        try {
+            const res = await fetch(`${API_URL}/api/auth/forgot-password/verify-otp`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: forgotEmail.trim(), otp: otp.trim() })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setResetToken(data.token);
+                setForgotStep(3);
+            } else {
+                setForgotError(data.message || "Invalid OTP code.");
+            }
+        } catch (err) {
+            setForgotError("Failed to verify OTP. Please try again.");
+        } finally {
+            setForgotLoading(false);
+        }
+    };
+
+    const handleResetPassword = async () => {
+        setForgotError("");
+        if (!newPassword) {
+            setForgotError("Please enter a new password.");
+            return;
+        }
+        if (newPassword.length < 6) {
+            setForgotError("Password must be at least 6 characters.");
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            setForgotError("Passwords do not match.");
+            return;
+        }
+        setForgotLoading(true);
+        const API_URL = getApiBase();
+        try {
+            const res = await fetch(`${API_URL}/api/auth/forgot-password/reset-password`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email: forgotEmail.trim(),
+                    token: resetToken,
+                    newPassword
+                })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                alert("Password reset successful! You can now login with your new password.");
+                setShowForgotModal(false);
+                setForgotStep(1);
+                setForgotEmail("");
+                setOtp("");
+                setNewPassword("");
+                setConfirmPassword("");
+                setResetToken("");
+            } else {
+                setForgotError(data.message || "Failed to reset password.");
+            }
+        } catch (err) {
+            setForgotError("Failed to reset password. Please try again.");
+        } finally {
+            setForgotLoading(false);
         }
     };
 
@@ -264,23 +379,28 @@ export default function SuperadminIndexPage() {
                     <button 
                         type="button" 
                         className="text-sm font-bold text-purple-600 hover:text-purple-800 transition-colors"
-                        onClick={() => setShowForgotModal(true)}
+                        onClick={() => { handleCloseForgotModal(); setShowForgotModal(true); }}
                     >
                         Forgot Password?
                     </button>
                 </div>
             </div>
 
-            {/* Forgot Password Modal (Simplified for UI consistency) */}
             {showForgotModal && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white w-full max-w-md p-8 rounded-3xl shadow-2xl border border-slate-100 fade-in">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-2xl font-extrabold text-slate-900">Reset Password</h2>
-                            <button onClick={() => setShowForgotModal(false)} className="p-2 hover:bg-slate-50 rounded-full transition-colors text-slate-400">
+                            <button onClick={handleCloseForgotModal} className="p-2 hover:bg-slate-50 rounded-full transition-colors text-slate-400">
                                 <X size={24} />
                             </button>
                         </div>
+
+                        {forgotError && (
+                            <div className="mb-4 text-rose-500 text-xs font-bold flex items-center gap-1 animate-shake">
+                                <X size={14} /> {forgotError}
+                            </div>
+                        )}
 
                         {forgotStep === 1 && (
                             <div className="space-y-6">
@@ -297,14 +417,16 @@ export default function SuperadminIndexPage() {
                                             onChange={(e) => setForgotEmail(e.target.value)}
                                             className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 transition-all outline-none" 
                                             placeholder="your@email.com" 
+                                            disabled={forgotLoading}
                                         />
                                     </div>
                                 </div>
                                 <button 
-                                    onClick={() => setForgotStep(2)}
-                                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-purple-600/20"
+                                    onClick={handleSendOtp}
+                                    disabled={forgotLoading}
+                                    className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-purple-600/20"
                                 >
-                                    Send OTP
+                                    {forgotLoading ? "Sending OTP..." : "Send OTP"}
                                 </button>
                             </div>
                         )}
@@ -319,14 +441,16 @@ export default function SuperadminIndexPage() {
                                     className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 transition-all outline-none text-center text-3xl font-bold tracking-[0.5em]" 
                                     placeholder="000000" 
                                     maxLength={6}
+                                    disabled={forgotLoading}
                                 />
                                 <button 
-                                    onClick={() => setForgotStep(3)}
-                                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-purple-600/20"
+                                    onClick={handleVerifyOtp}
+                                    disabled={forgotLoading}
+                                    className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-purple-600/20"
                                 >
-                                    Verify OTP
+                                    {forgotLoading ? "Verifying..." : "Verify OTP"}
                                 </button>
-                                <button onClick={() => setForgotStep(1)} className="text-slate-400 text-sm font-bold hover:text-slate-600">Back</button>
+                                <button onClick={() => { setForgotStep(1); setForgotError(""); }} className="text-slate-400 text-sm font-bold hover:text-slate-600">Back</button>
                             </div>
                         )}
 
@@ -341,6 +465,7 @@ export default function SuperadminIndexPage() {
                                             onChange={(e) => setNewPassword(e.target.value)}
                                             className="w-full p-3.5 pr-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 transition-all outline-none" 
                                             placeholder="New Password" 
+                                            disabled={forgotLoading}
                                         />
                                         <button
                                             type="button"
@@ -361,6 +486,7 @@ export default function SuperadminIndexPage() {
                                             onChange={(e) => setConfirmPassword(e.target.value)}
                                             className="w-full p-3.5 pr-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 transition-all outline-none" 
                                             placeholder="Confirm Password" 
+                                            disabled={forgotLoading}
                                         />
                                         <button
                                             type="button"
@@ -373,10 +499,11 @@ export default function SuperadminIndexPage() {
                                     </div>
                                 </div>
                                 <button 
-                                    onClick={() => setShowForgotModal(false)}
-                                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-purple-600/20"
+                                    onClick={handleResetPassword}
+                                    disabled={forgotLoading}
+                                    className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-purple-600/20"
                                 >
-                                    Update Password
+                                    {forgotLoading ? "Resetting..." : "Update Password"}
                                 </button>
                             </div>
                         )}

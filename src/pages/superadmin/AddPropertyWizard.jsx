@@ -98,7 +98,7 @@ const FormField = ({ label, value, onChange, placeholder, type = "text", suffix,
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function AddPropertyWizard() {
+export default function AddPropertyWizard({ propEditId, isModal, onClose }) {
   const navigate = useNavigate();
   const apiUrl = getApiBase();
 
@@ -108,7 +108,7 @@ export default function AddPropertyWizard() {
 
   // Edit Mode Detection
   const query = new URLSearchParams(window.location.search);
-  const editId = query.get("editId");
+  const editId = propEditId || query.get("editId");
 
   // Step 1 — Basic Info
   const [propertyType, setPropertyType] = useState("hostel");
@@ -526,6 +526,11 @@ export default function AddPropertyWizard() {
       if (res.ok) {
         setSubmitted(true);
         toast.success(editId ? "Property Updated Successfully!" : "Property Added Successfully!");
+        if (isModal && onClose) {
+          setTimeout(() => {
+            onClose();
+          }, 1500);
+        }
       } else {
         toast.error(editId ? "Failed to update property" : "Failed to add property");
       }
@@ -542,9 +547,14 @@ export default function AddPropertyWizard() {
           <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-emerald-100">
             <CheckCircle2 className="w-10 h-10 text-emerald-600" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-3 uppercase tracking-tight">Property Added Successfully!</h2>
+          <h2 className="text-2xl font-bold text-slate-800 mb-3 uppercase tracking-tight">{editId ? "Property Updated Successfully!" : "Property Added Successfully!"}</h2>
           <p className="text-xs font-bold text-slate-400 mb-8 uppercase">Your listing is now live and visible to potential tenants.</p>
-          <button onClick={() => navigate("/superadmin/total-properties")} className="w-full bg-blue-600 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-100">Go to Properties</button>
+          <button onClick={() => {
+            if (isModal && onClose) onClose();
+            else navigate("/superadmin/total-properties");
+          }} className="w-full bg-blue-600 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-100">
+            {isModal ? "Close" : "Go to Properties"}
+          </button>
         </div>
       </div>
     );

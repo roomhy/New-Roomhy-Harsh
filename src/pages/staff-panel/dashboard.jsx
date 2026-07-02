@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from "react";
 import StaffLayout from "../../components/StaffLayout";
 import {
-  UserCheck, ClipboardList, AlertCircle, Calendar,
-  CheckCircle2, Clock, Building2, LogIn, LogOut,
-  Bell, ChevronRight, Loader2, Users, Home, Activity
+  Users, Home, AlertCircle, ClipboardList,
+  CheckCircle2, Calendar, LogIn, LogOut,
+  ChevronRight, Loader2, UsersRound, Megaphone,
+  Sun, MapPin
 } from "lucide-react";
-import { getApiBase } from "../../utils/api";
+import { getApiBase, getAuthHeader } from "../../utils/api";
 
 const apiBase = getApiBase();
 
@@ -19,9 +20,138 @@ function getStaffSession() {
   return null;
 }
 
+function isToday(dateVal) {
+  if (!dateVal) return false;
+  const d = new Date(dateVal);
+  const today = new Date();
+  return d.getFullYear() === today.getFullYear() &&
+    d.getMonth() === today.getMonth() &&
+    d.getDate() === today.getDate();
+}
+
+const STAT_ACCENTS = {
+  blue: { iconBg: "bg-blue-50", iconColor: "text-blue-600", bar: "bg-blue-500" },
+  emerald: { iconBg: "bg-emerald-50", iconColor: "text-emerald-600", bar: "bg-emerald-500" },
+  rose: { iconBg: "bg-rose-50", iconColor: "text-rose-600", bar: "bg-rose-500" },
+  amber: { iconBg: "bg-amber-50", iconColor: "text-amber-600", bar: "bg-amber-500" },
+};
+
+function StatCard({ icon: Icon, value, label, sub, accent }) {
+  const a = STAT_ACCENTS[accent];
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-7 min-h-[160px] flex flex-col">
+      <div className="flex items-center gap-3.5 mb-6">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${a.iconBg}`}>
+          <Icon size={17} className={a.iconColor} />
+        </div>
+        <span className="text-3xl font-extrabold text-slate-900 leading-none">{value}</span>
+      </div>
+      <p className="text-base font-bold text-slate-800 leading-tight">{label}</p>
+      <p className="text-xs text-slate-400 mt-1">{sub}</p>
+      <div className={`h-[3px] w-6 rounded-full mt-4 ${a.bar}`} />
+    </div>
+  );
+}
+
+function PanelCard({ title, viewAllLabel, viewAllHref, children }) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-7 flex flex-col">
+      <div className="flex items-center justify-between pb-5 border-b border-slate-50">
+        <h3 className="font-bold text-slate-900 text-base">{title}</h3>
+        <a href={viewAllHref} className="text-xs font-bold text-blue-600 flex items-center gap-0.5 hover:underline shrink-0">
+          {viewAllLabel} <ChevronRight size={13} />
+        </a>
+      </div>
+      <div className="flex-1 flex flex-col min-h-[260px]">{children}</div>
+    </div>
+  );
+}
+
+function EmptyPanel({ icon: Icon, title, sub }) {
+  return (
+    <div className="h-full flex flex-col items-center justify-center text-center py-8">
+      <div className="w-20 h-20 rounded-full bg-indigo-50 flex items-center justify-center mb-4">
+        <Icon size={30} className="text-indigo-300" />
+      </div>
+      <p className="text-sm font-bold text-slate-700">{title}</p>
+      <p className="text-xs text-slate-400 mt-1">{sub}</p>
+    </div>
+  );
+}
+
+// Soft flowing wave pattern behind the hero content
+function HeroWavePattern({ className }) {
+  return (
+    <svg viewBox="0 0 800 400" className={className} preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M-20 260 C 160 200, 260 340, 440 260 S 720 160, 860 240" stroke="white" strokeOpacity="0.07" strokeWidth="115" strokeLinecap="round" />
+      <path d="M-20 120 C 180 60, 300 180, 480 110 S 760 40, 900 120" stroke="white" strokeOpacity="0.045" strokeWidth="80" strokeLinecap="round" />
+      {Array.from({ length: 5 }).map((_, row) =>
+        Array.from({ length: 5 }).map((_, col) => (
+          <circle key={`${row}-${col}`} cx={640 + col * 18} cy={30 + row * 18} r="1.6" fill="white" fillOpacity="0.35" />
+        ))
+      )}
+    </svg>
+  );
+}
+
+// Premium isometric building illustration for the hero card
+function BuildingIllustration({ className }) {
+  return (
+    <svg viewBox="0 0 260 220" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* birds */}
+      <path d="M150 34 q6 -6 12 0 q6 -6 12 0" stroke="white" strokeOpacity="0.55" strokeWidth="2" strokeLinecap="round" />
+      <path d="M196 18 q5 -5 10 0 q5 -5 10 0" stroke="white" strokeOpacity="0.4" strokeWidth="2" strokeLinecap="round" />
+
+      {/* ground shadow */}
+      <ellipse cx="140" cy="200" rx="95" ry="10" fill="black" fillOpacity="0.08" />
+
+      {/* left tree */}
+      <circle cx="42" cy="150" r="20" fill="white" fillOpacity="0.22" />
+      <circle cx="30" cy="165" r="14" fill="white" fillOpacity="0.16" />
+      <rect x="39" y="160" width="6" height="34" rx="2" fill="white" fillOpacity="0.22" />
+
+      {/* right tree */}
+      <circle cx="228" cy="158" r="17" fill="white" fillOpacity="0.2" />
+      <rect x="225" y="166" width="6" height="28" rx="2" fill="white" fillOpacity="0.2" />
+
+      {/* building side face (isometric depth) */}
+      <path d="M150 70 L196 92 L196 190 L150 190 Z" fill="white" fillOpacity="0.28" />
+      {/* building front face */}
+      <path d="M84 92 L150 70 L150 190 L84 190 Z" fill="white" fillOpacity="0.55" />
+      {/* roof edge */}
+      <path d="M84 92 L150 70 L196 92 L150 108 Z" fill="white" fillOpacity="0.7" />
+
+      {/* front-face windows */}
+      {[112, 138, 164].map((y) => (
+        <React.Fragment key={y}>
+          <rect x="96" y={y} width="14" height="14" rx="2" fill="#3B4CCA" fillOpacity="0.55" />
+          <rect x="122" y={y} width="14" height="14" rx="2" fill="#3B4CCA" fillOpacity="0.55" />
+        </React.Fragment>
+      ))}
+
+      {/* side-face windows */}
+      {[112, 138, 164].map((y) => (
+        <rect key={y} x="164" y={y} width="12" height="14" rx="2" fill="#3B4CCA" fillOpacity="0.4" />
+      ))}
+
+      {/* door */}
+      <rect x="105" y="172" width="22" height="18" rx="2" fill="#312E81" fillOpacity="0.6" />
+
+      {/* front porch block */}
+      <path d="M60 130 L84 118 L84 190 L60 190 Z" fill="white" fillOpacity="0.4" />
+      <rect x="66" y="150" width="10" height="12" rx="2" fill="#3B4CCA" fillOpacity="0.45" />
+
+      {/* background low-rise silhouettes */}
+      <rect x="8" y="120" width="26" height="70" rx="2" fill="white" fillOpacity="0.08" />
+      <rect x="204" y="100" width="30" height="90" rx="2" fill="white" fillOpacity="0.1" />
+    </svg>
+  );
+}
+
 export default function StaffDashboard() {
   const staff = getStaffSession();
   const staffLoginId = staff?.loginId || staff?.login_id || staff?.staffId || "";
+  const staffId = staff?._id || staff?.id || "";
   const parentId = staff?.parentLoginId || "";
   const staffName = staff?.name || "Staff Member";
   const staffRole = staff?.role || "Staff";
@@ -35,16 +165,24 @@ export default function StaffDashboard() {
 
   if (!staffLoginId) return null;
 
-  const [todayAtt, setTodayAtt]   = useState(null);
-  const [tasks, setTasks]         = useState({ pending: 0, inProgress: 0, total: 0 });
-  const [stats, setStats]         = useState({ tenants: 0, rooms: 0, complaints: 0 });
-  const [loading, setLoading]     = useState(true);
+  const [now, setNow] = useState(new Date());
+  const [todayAtt, setTodayAtt] = useState(null);
+  const [tasks, setTasks] = useState({ pending: 0, total: 0 });
+  const [recentTasks, setRecentTasks] = useState([]);
+  const [stats, setStats] = useState({ tenants: 0, rooms: 0, complaints: 0 });
+  const [visitorsToday, setVisitorsToday] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [checkOutLoading, setCheckOutLoading] = useState(false);
-  const [recentTasks, setRecentTasks] = useState([]);
   const [msg, setMsg] = useState("");
 
   const showMsg = (text) => { setMsg(text); setTimeout(() => setMsg(""), 3000); };
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(t);
+  }, []);
 
   const fetchDashboard = useCallback(async () => {
     if (!staffLoginId) return;
@@ -60,9 +198,11 @@ export default function StaffDashboard() {
       ];
 
       if (parentId) {
-        reqs.push(fetch(`${apiBase}/api/tenants/owner/${parentId}`).catch(() => null));
+        reqs.push(fetch(`${apiBase}/api/tenants/owner/${parentId}`, { headers: getAuthHeader() }).catch(() => null));
         reqs.push(fetch(`${apiBase}/api/rooms/owner/${parentId}`).catch(() => null));
-        reqs.push(fetch(`${apiBase}/api/complaints/owner/${parentId}`).catch(() => null));
+        reqs.push(fetch(`${apiBase}/api/complaints/owner/${parentId}`, { headers: getAuthHeader() }).catch(() => null));
+        reqs.push(fetch(`${apiBase}/api/visitors/owner/${parentId}`).catch(() => null));
+        reqs.push(fetch(`${apiBase}/api/announcements/owner/${parentId}`).catch(() => null));
       }
 
       const results = await Promise.all(reqs);
@@ -87,34 +227,48 @@ export default function StaffDashboard() {
         setTasks({
           total: allTasks.length,
           pending: allTasks.filter(t => t.status === "Pending").length,
-          inProgress: allTasks.filter(t => t.status === "In Progress").length,
         });
-        setRecentTasks(allTasks.slice(0, 3));
+        setRecentTasks(allTasks.filter(t => t.status !== "Completed").slice(0, 3));
       }
 
       // Stats
       let tCount = 0, rCount = 0, cCount = 0;
       if (parentId) {
         if (results[2] && results[2].ok) {
-           const d = await results[2].json();
-           const arr = Array.isArray(d) ? d : (d?.tenants || d?.data || []);
-           tCount = arr.filter(t => !t.isDeleted && t.status !== 'inactive').length;
+          const d = await results[2].json();
+          const arr = Array.isArray(d) ? d : (d?.tenants || d?.data || []);
+          tCount = arr.filter(t => !t.isDeleted && t.status !== "inactive").length;
         }
         if (results[3] && results[3].ok) {
-           const d = await results[3].json();
-           const arr = Array.isArray(d) ? d : (d?.rooms || d?.data || []);
-           rCount = arr.length;
+          const d = await results[3].json();
+          const arr = Array.isArray(d) ? d : (d?.rooms || d?.data || []);
+          rCount = arr.length;
         }
         if (results[4] && results[4].ok) {
-           const d = await results[4].json();
-           const arr = Array.isArray(d) ? d : (d?.complaints || d?.data || []);
-           cCount = arr.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length;
+          const d = await results[4].json();
+          const arr = Array.isArray(d) ? d : (d?.complaints || d?.data || []);
+          const assignedToMe = arr.filter(c => {
+            const assignedIdStr = c.assignedStaffId?._id || c.assignedStaffId || "";
+            return String(assignedIdStr) === String(staffId) ||
+              (c.assignedTo && String(c.assignedTo).toUpperCase() === String(staffLoginId).toUpperCase());
+          });
+          cCount = assignedToMe.filter(c => c.status !== "Resolved" && c.status !== "Closed").length;
+        }
+        if (results[5] && results[5].ok) {
+          const d = await results[5].json();
+          const arr = Array.isArray(d) ? d : (d?.visitors || d?.data || []);
+          setVisitorsToday(arr.filter(v => isToday(v.createdAt || v.date || v.visitDate)));
+        }
+        if (results[6] && results[6].ok) {
+          const d = await results[6].json();
+          const arr = Array.isArray(d) ? d : (d?.announcements || d?.data || []);
+          setAnnouncements(arr.slice(0, 4));
         }
       }
       setStats({ tenants: tCount, rooms: rCount, complaints: cCount });
     } catch (_) {}
     finally { setLoading(false); }
-  }, [staffLoginId, parentId]);
+  }, [staffLoginId, staffId, parentId]);
 
   useEffect(() => {
     fetchDashboard();
@@ -156,19 +310,27 @@ export default function StaffDashboard() {
     finally { setCheckOutLoading(false); }
   };
 
-  const now = new Date();
-  const greeting = now.getHours() < 12 ? "Good Morning" : now.getHours() < 17 ? "Good Afternoon" : "Good Evening";
+  const hour = now.getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const timeStr = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+  const fullDateStr = now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const badgeDateStr = now.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 
-  const PRIORITY_BG = {
-    High: "text-orange-600 bg-orange-50 border-orange-200",
-    Medium: "text-amber-600 bg-amber-50 border-amber-200",
-    Low: "text-slate-500 bg-slate-100 border-slate-200",
-  };
+  const dutyLabel = todayAtt?.checkIn && !todayAtt?.checkOut
+    ? "You're on duty"
+    : todayAtt?.checkOut
+    ? "Shift complete"
+    : "Not checked in";
+
+  const shiftStatus = todayAtt?.checkIn && !todayAtt?.checkOut
+    ? { label: "Active", dot: "bg-emerald-400" }
+    : todayAtt?.checkOut
+    ? { label: "Completed", dot: "bg-slate-300" }
+    : { label: "Not Started", dot: "bg-slate-300" };
 
   return (
-    <StaffLayout title="Dashboard" subtitle={`Welcome back, ${staffName}`}>
-      <div className="space-y-6 max-w-[1400px] mx-auto">
+    <StaffLayout title={staffName} subtitle="Dashboard">
+      <div className="space-y-10">
 
         {/* Toast */}
         {msg && (
@@ -177,144 +339,168 @@ export default function StaffDashboard() {
           </div>
         )}
 
-        {/* Greeting + Check In/Out Card */}
-        <div className="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-3xl p-6 text-white shadow-xl shadow-blue-600/25">
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-5">
+        {/* Greeting row */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Good morning, {staffName} 👋</h2>
+            <p className="text-sm text-slate-400 mt-1">Here's what's happening at your property today.</p>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 bg-white border border-slate-100 shadow-sm rounded-full px-4 py-2 text-xs font-bold text-slate-600 shrink-0">
+            <Calendar size={14} className="text-slate-400" />
+            {badgeDateStr}
+          </div>
+        </div>
+
+        {/* Hero on-duty card */}
+        <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-indigo-800 via-blue-700 to-indigo-900 p-10 sm:p-12 text-white shadow-2xl shadow-indigo-900/30">
+          <HeroWavePattern className="absolute inset-0 w-full h-full pointer-events-none" />
+          <BuildingIllustration className="hidden md:block absolute right-2 top-2 w-72 h-72 lg:w-80 lg:h-80 pointer-events-none" />
+
+          <div className="relative z-10 flex flex-wrap items-start gap-x-14 gap-y-8 md:pr-64">
             <div>
-              <p className="text-blue-200 text-xs font-bold uppercase tracking-widest">{greeting}</p>
-              <h2 className="text-2xl font-black mt-0.5 leading-tight">{staffName}</h2>
-              <p className="text-blue-200 text-sm font-medium mt-0.5">
-                {staffRole} {staffLoginId && <span className="font-mono text-blue-300">· {staffLoginId}</span>}
-              </p>
+              <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest">{dutyLabel}</p>
+              <p className="text-5xl sm:text-[52px] font-extrabold mt-4 leading-none">{timeStr}</p>
+              <p className="text-indigo-200 text-base font-medium mt-4">{fullDateStr}</p>
             </div>
-            <div className="text-right sm:text-right">
-              <p className="text-3xl font-black">{timeStr}</p>
-              <p className="text-blue-200 text-xs font-medium mt-0.5">{now.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}</p>
+            <div className="hidden sm:block w-px self-stretch bg-white/20" />
+            <div>
+              <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest">Warden</p>
+              <p className="text-4xl font-extrabold mt-4 leading-none">{staffName}</p>
+              <p className="text-indigo-200 text-base font-medium mt-4">STAFF ID: {staffLoginId}</p>
             </div>
           </div>
 
-          {/* Attendance status */}
-          {loading ? (
-            <div className="h-24 flex items-center justify-center">
-              <Loader2 size={20} className="animate-spin text-blue-200" />
-            </div>
-          ) : (
-            <>
-              {todayAtt && (
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  {[
-                    { label: "Check In", value: todayAtt.checkIn || "—", icon: LogIn },
-                    { label: "Check Out", value: todayAtt.checkOut || "Pending", icon: LogOut },
-                  ].map(({ label, value, icon: Icon }) => (
-                    <div key={label} className="bg-white/10 rounded-2xl p-3 backdrop-blur-sm border border-white/20">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Icon size={11} className="text-blue-200" />
-                        <p className="text-[10px] font-black text-blue-200 uppercase tracking-widest">{label}</p>
-                      </div>
-                      <p className="text-lg font-black">{value}</p>
-                    </div>
-                  ))}
+          <div className="relative z-10 flex flex-col lg:flex-row items-stretch lg:items-center gap-4 mt-12">
+            {/* Minimal status strip — typography-led, no colorful icon circles */}
+            <div className="flex-1 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 px-8 py-6 flex flex-wrap items-center gap-x-12 gap-y-4">
+              <div className="flex items-center gap-3">
+                <Sun size={16} className="text-indigo-200 shrink-0" />
+                <div>
+                  <p className="text-[10px] text-indigo-200 font-semibold uppercase tracking-wider leading-none">Duty Type</p>
+                  <p className="text-base font-bold text-white mt-2 leading-none">Day Shift</p>
                 </div>
-              )}
-
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={handleCheckIn}
-                  disabled={checkInLoading || !!todayAtt?.checkIn}
-                  className="flex-1 h-11 bg-white text-blue-700 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-blue-50 transition-all disabled:opacity-50 shadow-lg"
-                >
-                  {checkInLoading ? <Loader2 size={15} className="animate-spin" /> : <LogIn size={15} />}
-                  {todayAtt?.checkIn ? "Checked In ✓" : "Check In"}
-                </button>
-                <button
-                  onClick={handleCheckOut}
-                  disabled={checkOutLoading || !todayAtt?.checkIn || !!todayAtt?.checkOut}
-                  className="flex-1 h-11 bg-white/20 text-white border border-white/30 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-white/30 transition-all disabled:opacity-50"
-                >
-                  {checkOutLoading ? <Loader2 size={15} className="animate-spin" /> : <LogOut size={15} />}
-                  {todayAtt?.checkOut ? "Checked Out ✓" : "Check Out"}
-                </button>
               </div>
-            </>
-          )}
+              <div className="hidden sm:block w-px h-10 bg-white/15" />
+              <div className="flex items-center gap-3">
+                <MapPin size={16} className="text-indigo-200 shrink-0" />
+                <div>
+                  <p className="text-[10px] text-indigo-200 font-semibold uppercase tracking-wider leading-none">Check-in Location</p>
+                  <p className="text-base font-bold text-white mt-2 leading-none">Main Gate</p>
+                </div>
+              </div>
+              <div className="hidden sm:block w-px h-10 bg-white/15" />
+              <div className="flex items-center gap-3">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${shiftStatus.dot}`} />
+                <div>
+                  <p className="text-[10px] text-indigo-200 font-semibold uppercase tracking-wider leading-none">Shift Status</p>
+                  <p className="text-base font-bold text-white mt-2 leading-none">{shiftStatus.label}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 shrink-0">
+              <button
+                onClick={handleCheckIn}
+                disabled={checkInLoading || loading || !!todayAtt?.checkIn}
+                className="h-16 px-10 bg-white text-indigo-700 rounded-2xl font-bold text-base flex items-center justify-center gap-2 hover:bg-indigo-50 transition-all disabled:opacity-50 shadow-lg"
+              >
+                {checkInLoading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
+                {todayAtt?.checkIn ? "Checked In" : "Check In"}
+              </button>
+              <button
+                onClick={handleCheckOut}
+                disabled={checkOutLoading || loading || !todayAtt?.checkIn || !!todayAtt?.checkOut}
+                className="h-16 px-10 bg-indigo-500 text-white rounded-2xl font-bold text-base flex items-center justify-center gap-2 hover:bg-indigo-400 transition-all disabled:opacity-50 shadow-lg"
+              >
+                {checkOutLoading ? <Loader2 size={18} className="animate-spin" /> : <LogOut size={18} />}
+                {todayAtt?.checkOut ? "Checked Out" : "Check Out"}
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[
-            { label: "Tenants", value: stats.tenants, sub: "Active Tenants", icon: Users, color: "from-blue-500 to-indigo-500", href: "/staff/tenants" },
-            { label: "Rooms", value: stats.rooms, sub: "Total Rooms", icon: Building2, color: "from-emerald-500 to-teal-500", href: "/staff/rooms" },
-            { label: "Complaints", value: stats.complaints, sub: "Active Complaints", icon: AlertCircle, color: "from-rose-500 to-pink-500", href: "/staff/complaints" },
-            { label: "Pending Tasks", value: tasks.pending, sub: `${tasks.total} total`, icon: ClipboardList, color: "from-amber-400 to-orange-500", href: "/staff/tasks" },
-            { label: "Today's Status", value: todayAtt?.status || "Not Marked", sub: todayAtt?.checkIn ? `In: ${todayAtt.checkIn}` : "Tap to check in", icon: UserCheck, color: "from-violet-500 to-purple-600", href: "/staff/attendance" },
-            { label: "This Month", value: `${now.toLocaleDateString("en-IN", { month: "short", year: "numeric" })}`, sub: "Attendance month", icon: Calendar, color: "from-cyan-500 to-blue-500", href: "/staff/attendance" },
-          ].map(({ label, value, sub, icon: Icon, color, href }) => (
-            <a key={label} href={href}
-              className="bg-white rounded-2xl border border-slate-100 p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all group shadow-sm block">
-              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center mb-3 shadow-md group-hover:scale-110 transition-transform`}>
-                <Icon size={18} className="text-white" />
-              </div>
-              <p className="text-xl font-black text-slate-900 leading-tight truncate">{value}</p>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{label}</p>
-              <p className="text-[10px] text-slate-300 font-medium mt-0.5">{sub}</p>
-            </a>
-          ))}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+          <StatCard icon={Users} value={stats.tenants} label="Tenants" sub="Active Tenants" accent="blue" />
+          <StatCard icon={Home} value={stats.rooms} label="Rooms" sub="Total Rooms" accent="emerald" />
+          <StatCard icon={AlertCircle} value={stats.complaints} label="Complaints" sub="Active Complaints" accent="rose" />
+          <StatCard icon={ClipboardList} value={tasks.pending} label="Pending Tasks" sub="Awaiting Action" accent="amber" />
         </div>
 
-        {/* Recent Tasks */}
-        {recentTasks.length > 0 && (
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between p-5 border-b border-slate-100">
-              <h3 className="font-black text-slate-800 text-sm flex items-center gap-2">
-                <ClipboardList size={16} className="text-blue-500" /> My Recent Tasks
-              </h3>
-              <a href="/staff/tasks" className="text-xs font-black text-blue-600 flex items-center gap-1 hover:underline">
-                View All <ChevronRight size={13} />
-              </a>
-            </div>
-            <div className="divide-y divide-slate-50">
-              {recentTasks.map(task => (
-                <div key={task._id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors">
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${task.status === "Completed" ? "bg-emerald-500" : task.status === "In Progress" ? "bg-blue-500" : "bg-amber-500"}`} />
-                  <div className="min-w-0 flex-1">
-                    <p className={`font-black text-[13px] truncate ${task.status === "Completed" ? "line-through text-slate-400" : "text-slate-800"}`}>{task.title}</p>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      {task.propertyName && <span className="text-[10px] text-slate-400 font-medium">{task.propertyName}</span>}
+        {/* Bottom Info Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <PanelCard title="Today's Tasks" viewAllLabel="View all" viewAllHref="/staff/tasks">
+            {recentTasks.length === 0 ? (
+              <EmptyPanel icon={ClipboardList} title="No tasks assigned" sub="All clear for today!" />
+            ) : (
+              <div className="divide-y divide-slate-50">
+                {recentTasks.map(task => (
+                  <div key={task._id} className="flex items-start gap-3 py-3.5 first:pt-0 last:pb-0">
+                    <div className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${task.status === "In Progress" ? "bg-blue-500" : "bg-amber-500"}`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-bold text-slate-800 truncate">{task.title}</p>
+                      {task.description && (
+                        <p className="text-xs text-slate-400 mt-1 line-clamp-2">{task.description}</p>
+                      )}
                       {task.dueDate && (
-                        <span className={`text-[10px] font-bold ${new Date(task.dueDate) < new Date() && task.status !== "Completed" ? "text-rose-500" : "text-slate-400"}`}>
-                          · Due {new Date(task.dueDate).toLocaleDateString("en-IN")}
-                        </span>
+                        <p className="text-[11px] font-semibold text-slate-400 mt-1.5">
+                          Due {new Date(task.dueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                        </p>
                       )}
                     </div>
                   </div>
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border shrink-0 ${PRIORITY_COLORS[task.priority] || "bg-slate-100 text-slate-500 border-slate-200"}`}>
-                    {task.priority}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+                ))}
+              </div>
+            )}
+          </PanelCard>
 
-        {/* Quick Actions */}
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">
-          <h3 className="font-black text-slate-800 text-sm mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: "Attendance", icon: Calendar, href: "/staff/attendance", color: "bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-100" },
-              { label: "My Tasks", icon: ClipboardList, href: "/staff/tasks", color: "bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100" },
-              { label: "Complaints", icon: AlertCircle, href: "/staff/complaints", color: "bg-rose-50 text-rose-700 border-rose-100 hover:bg-rose-100" },
-              { label: "Tenants", icon: Users, href: "/staff/tenants", color: "bg-violet-50 text-violet-700 border-violet-100 hover:bg-violet-100" },
-              { label: "Rooms", icon: Home, href: "/staff/rooms", color: "bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100" },
-              { label: "Visitors", icon: UserCheck, href: "/staff/visitors", color: "bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100" },
-            ].map(({ label, icon: Icon, href, color }) => (
-              <a key={label} href={href}
-                className={`flex flex-col items-center gap-2 p-3 rounded-2xl border text-center transition-all ${color}`}>
-                <Icon size={20} />
-                <span className="text-[10px] font-black uppercase tracking-wider">{label}</span>
-              </a>
-            ))}
-          </div>
+          <PanelCard title="Scheduled Visitors" viewAllLabel="View log" viewAllHref="/staff/visitors">
+            {visitorsToday.length === 0 ? (
+              <EmptyPanel icon={UsersRound} title="No visitors today" sub="Have a peaceful day!" />
+            ) : (
+              <div className="divide-y divide-slate-50">
+                {visitorsToday.slice(0, 3).map(v => (
+                  <div key={v._id} className="flex items-center gap-3 py-3">
+                    <div className="w-2 h-2 rounded-full shrink-0 bg-indigo-500" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-bold text-slate-700 truncate">{v.name}</p>
+                      <p className="text-[11px] text-slate-400 truncate">Visiting {v.hostName}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </PanelCard>
+
+          <PanelCard title="Announcements" viewAllLabel="View all" viewAllHref="/staff/announcements">
+            {announcements.length === 0 ? (
+              <EmptyPanel icon={Megaphone} title="No announcements" sub="Nothing new right now." />
+            ) : (
+              <div>
+                <div className="flex items-start gap-3 py-2">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                    <Megaphone size={16} className="text-blue-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-bold text-slate-800">{announcements[0].title}</p>
+                    <p className="text-xs text-slate-400 mt-1 line-clamp-2">{announcements[0].content}</p>
+                    <p className="text-[11px] text-slate-300 font-medium mt-2">
+                      {new Date(announcements[0].createdAt || Date.now()).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      {" · "}
+                      {new Date(announcements[0].createdAt || Date.now()).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                    </p>
+                  </div>
+                </div>
+                {announcements.length > 1 && (
+                  <div className="flex items-center justify-center gap-1.5 mt-4">
+                    {announcements.map((_, i) => (
+                      <span key={i} className={`w-1.5 h-1.5 rounded-full ${i === 0 ? "bg-slate-800" : "bg-slate-200"}`} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </PanelCard>
         </div>
       </div>
     </StaffLayout>

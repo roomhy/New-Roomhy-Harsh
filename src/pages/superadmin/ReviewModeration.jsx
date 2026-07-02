@@ -5,6 +5,7 @@ import {
   Trash2, Eye, ShieldCheck, Filter
 } from "lucide-react";
 import { fetchJson } from "../../utils/api";
+import { toast } from "react-hot-toast";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -21,22 +22,23 @@ export default function ReviewModeration() {
 
   const handleBulkUpdate = async (newStatus) => {
     if (selectedIds.size === 0) return;
-    const confirmMsg = `Are you sure you want to mark all ${selectedIds.size} selected reviews as ${newStatus}?`;
-    if (!window.confirm(confirmMsg)) return;
-
     setIsBulkProcessing(true);
+    const toastId = toast.loading(`Updating status for ${selectedIds.size} reviews...`);
     try {
+      let successCount = 0;
       for (const id of selectedIds) {
         await fetchJson(`/api/reviews/${id}`, {
           method: "PUT",
           body: JSON.stringify({ status: newStatus })
         });
+        successCount++;
       }
       setReviews(prev => prev.map(r => selectedIds.has(r._id) ? { ...r, status: newStatus } : r));
+      toast.success(`Successfully updated ${successCount} reviews to ${newStatus}!`, { id: toastId });
       setSelectedIds(new Set());
     } catch (err) {
       console.error(err);
-      alert("Failed to update some reviews");
+      toast.error("Failed to update some reviews", { id: toastId });
     } finally {
       setIsBulkProcessing(false);
     }

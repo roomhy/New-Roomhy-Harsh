@@ -12,6 +12,7 @@ import {
   Download, CheckCircle2, AlertCircle, Trash
 } from "lucide-react";
 import { fetchJson, getAuthHeader } from "../../utils/api";
+import { toast } from "react-hot-toast";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -88,12 +89,11 @@ export default function KycVerification() {
 
   const handleBulkUpdate = async (status) => {
     if (selectedIds.size === 0) return;
-    const confirmMsg = `Are you sure you want to mark all ${selectedIds.size} selected items as ${status}?`;
-    if (!window.confirm(confirmMsg)) return;
-
     setIsBulkProcessing(true);
+    const toastId = toast.loading(`Updating KYC status for ${selectedIds.size} stakeholders...`);
     try {
       const itemsToUpdate = filteredList.filter(item => selectedIds.has(item._id || item.loginId));
+      let successCount = 0;
       for (const item of itemsToUpdate) {
         if (tab === "owners") {
           await fetchJson(`/api/owners/${item.loginId}/kyc`, {
@@ -101,6 +101,7 @@ export default function KycVerification() {
             headers: getAuthHeader(),
             body: JSON.stringify({ status })
           });
+          successCount++;
         } else {
           const endpoint = status === "verified" ? "/api/tenants/kyc/approve" : "/api/tenants/kyc/reject";
           await fetchJson(endpoint, {
@@ -108,13 +109,15 @@ export default function KycVerification() {
             headers: getAuthHeader(),
             body: JSON.stringify({ tenantId: item._id })
           });
+          successCount++;
         }
       }
+      toast.success(`Successfully updated ${successCount} items to ${status}!`, { id: toastId });
       setSelectedIds(new Set());
       loadData();
     } catch (err) {
       console.error(err);
-      alert("Failed to update status for some items");
+      toast.error("Failed to update status for some items", { id: toastId });
     } finally {
       setIsBulkProcessing(false);
     }
