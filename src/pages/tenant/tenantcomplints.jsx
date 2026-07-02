@@ -1,7 +1,12 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useHtmlPage } from "../../utils/htmlPage";
-import { fetchJson } from "../../utils/api";
+import { fetchJson, getApiBase } from "../../utils/api";
+import { clearAllAuthKeys } from "../../contexts/AuthContext";
+import {
+  Home, LogOut, Wrench, AlertCircle, Loader2,
+  Inbox, AlertTriangle, X,
+} from "lucide-react";
 
 const FILTERS = ["All", "Open", "In Progress", "Resolved"];
 const LOCAL_MAJOR_DRAFT_KEY = "roomhy_tenant_major_issue_drafts";
@@ -130,7 +135,7 @@ export default function Tenantcomplints() {
       { href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap", rel: "stylesheet" },
       { rel: "stylesheet", href: "/tenant/assets/css/tenantcomplints.css" }
     ],
-    scripts: [{ src: "https://cdn.tailwindcss.com" }, { src: "https://unpkg.com/lucide@latest" }],
+    scripts: [{ src: "https://cdn.tailwindcss.com" }],
     inlineScripts: []
   });
 
@@ -151,13 +156,10 @@ export default function Tenantcomplints() {
 
   // Major/Priority Complaint State
   const [majorDesc, setMajorDesc] = useState("");
-  const [majorImage, setMajorImage] = useState(null); // Will store base64 string
+  const [majorImageFile, setMajorImageFile] = useState(null); // File object — uploaded to Cloudinary on submit
   const [majorStatus, setMajorStatus] = useState({ loading: false, error: "" });
   const [imagePreview, setImagePreview] = useState(null);
 
-  useEffect(() => {
-    if (window?.lucide) window.lucide.createIcons();
-  }, [complaints, filter, loading, minorModalOpen, majorModalOpen, minorStatus, majorStatus]);
 
   const loadTenant = async () => {
     const stored = JSON.parse(
@@ -168,12 +170,9 @@ export default function Tenantcomplints() {
       return null;
     }
     try {
-      const data = await fetchJson("/api/tenants");
-      const list = data?.tenants || data || [];
-      const match = list.find(
-        (t) => String(t.loginId || "").toUpperCase() === String(stored.loginId || "").toUpperCase()
-      );
-      if (!match) throw new Error("Tenant profile not found.");
+      const data = await fetchJson("/api/tenants/me");
+      const match = data?.tenant || data;
+      if (!match?.loginId) throw new Error("Tenant profile not found.");
       const nextTenant = {
         ...stored,
         ...match,
@@ -185,6 +184,10 @@ export default function Tenantcomplints() {
       setTenant(nextTenant);
       return nextTenant;
     } catch (err) {
+      if (err?.status === 401 || err?.status === 403) {
+        window.location.href = "/tenant/tenantlogin";
+        return null;
+      }
       setErrorMsg(err?.body || err?.message || "Failed to load tenant data.");
       return null;
     }
@@ -266,16 +269,10 @@ export default function Tenantcomplints() {
     }
   };
 
-  // Image Upload Handler for Major
+  // Store the File object — the actual upload to Cloudinary happens in submitMajorComplaint.
+  // Reading as base64 here would store hundreds of KB in React state unnecessarily.
   const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setMajorImage(reader.result);
-      reader.readAsDataURL(file);
-    } else {
-      setMajorImage(null);
-    }
+    setMajorImageFile(e.target.files[0] || null);
   };
 
   // Handle Major Submission
@@ -286,6 +283,27 @@ export default function Tenantcomplints() {
       return;
     }
     setMajorStatus({ loading: true, error: "" });
+
+    // Upload image to Cloudinary first so the database stores a URL, not a base64 blob.
+    let imageStr = null;
+    if (majorImageFile) {
+      try {
+        const formData = new FormData();
+        formData.append("file", majorImageFile);
+        const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+        const uploadRes = await fetch(`${getApiBase()}/api/upload-file`, {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+        });
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          imageStr = uploadData.url || null;
+        }
+      } catch {
+        // Image upload failure is non-fatal — submit the complaint without the image.
+      }
+    }
 
     const createdAt = new Date().toISOString();
     const basePayload = {
@@ -301,7 +319,7 @@ export default function Tenantcomplints() {
       bedNo: tenant.bedNo,
       description: majorDesc,
       priority: "High",
-      imageStr: majorImage,
+      imageStr,
       status: "Open",
       escalated: false,
       createdAt
@@ -318,7 +336,7 @@ export default function Tenantcomplints() {
       });
       writeLocalMajorDrafts(readLocalMajorDrafts().filter((draft) => draft?.createdAt !== createdAt));
       setMajorDesc("");
-      setMajorImage(null);
+      setMajorImageFile(null);
       const fileInput = document.getElementById("majorImageInput");
       if (fileInput) fileInput.value = "";
       setMajorStatus({ loading: false, error: "" });
@@ -348,7 +366,7 @@ export default function Tenantcomplints() {
         ]);
 
         setMajorDesc("");
-        setMajorImage(null);
+        setMajorImageFile(null);
         const fileInput = document.getElementById("majorImageInput");
         if (fileInput) fileInput.value = "";
         setMajorStatus({ loading: false, error: "" });
@@ -379,7 +397,7 @@ export default function Tenantcomplints() {
         <aside className="w-64 bg-[#0f172a] flex-shrink-0 hidden md:flex flex-col transition-all duration-300">
           <div className="h-20 flex items-center px-6 border-b border-slate-800">
             <div className="bg-purple-600 p-2 rounded-lg mr-3">
-              <i data-lucide="home" className="w-5 h-5 text-white"></i>
+              <Home className="w-5 h-5 text-white" />
             </div>
             <div>
               <img src="/website/images/whitelogo.jpeg" alt="Roomhy Logo" className="h-16 w-auto" />
@@ -392,9 +410,13 @@ export default function Tenantcomplints() {
             <a href="/tenant/tenantcomplints" className="sidebar-item active">View My Requests</a>
           </nav>
           <div className="p-4 border-t border-slate-800">
-            <a href="/tenant/tenantlogin" className="flex items-center text-slate-400 hover:text-white w-full px-4 py-2 text-sm font-medium transition-colors">
-              <i data-lucide="log-out" className="w-5 h-5 mr-3"></i> Logout
-            </a>
+            <button
+              type="button"
+              onClick={() => { clearAllAuthKeys(); window.location.href = "/tenant/tenantlogin"; }}
+              className="flex items-center text-slate-400 hover:text-white w-full px-4 py-2 text-sm font-medium transition-colors"
+            >
+              <LogOut className="w-5 h-5 mr-3" /> Logout
+            </button>
           </div>
         </aside>
 
@@ -417,13 +439,13 @@ export default function Tenantcomplints() {
                     onClick={() => setMinorModalOpen(true)}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-md flex items-center transition-transform hover:scale-105"
                   >
-                    <i data-lucide="tool" className="w-4 h-4 mr-2"></i> Raise Minor Issue
+                    <Wrench className="w-4 h-4 mr-2" /> Raise Minor Issue
                   </button>
                   <button
                     onClick={() => setMajorModalOpen(true)}
                     className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-md flex items-center transition-transform hover:scale-105"
                   >
-                    <i data-lucide="alert-circle" className="w-4 h-4 mr-2"></i> Raise Major Issue
+                    <AlertCircle className="w-4 h-4 mr-2" /> Raise Major Issue
                   </button>
                 </div>
               </div>
@@ -473,13 +495,13 @@ export default function Tenantcomplints() {
               <div className="space-y-4">
                 {loading && (
                   <div className="text-center py-12 text-slate-400">
-                    <i data-lucide="loader-2" className="w-8 h-8 animate-spin mx-auto mb-2"></i>
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
                     <p>Loading your requests...</p>
                   </div>
                 )}
                 {!loading && filtered.length === 0 && (
                   <div className="text-center py-12 text-slate-400">
-                    <i data-lucide="inbox" className="w-10 h-10 mx-auto mb-3 opacity-40"></i>
+                    <Inbox className="w-10 h-10 mx-auto mb-3 opacity-40" />
                     <p>No complaints found.</p>
                   </div>
                 )}
@@ -502,7 +524,7 @@ export default function Tenantcomplints() {
                             </p>
                             {escalated && (
                               <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-300">
-                                <i data-lucide="alert-triangle" className="w-3 h-3"></i> Escalated to Admin
+                                <AlertTriangle className="w-3 h-3" /> Escalated to Admin
                               </span>
                             )}
                           </div>
@@ -570,10 +592,10 @@ export default function Tenantcomplints() {
           >
             <div className="flex justify-between items-center mb-6 border-b pb-4">
               <h3 className="text-xl font-bold text-slate-900 flex items-center">
-                <i data-lucide="tool" className="w-5 h-5 mr-2 text-blue-500"></i> Raise Minor Issue
+                <Wrench className="w-5 h-5 mr-2 text-blue-500" /> Raise Minor Issue
               </h3>
               <button onClick={() => setMinorModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <i data-lucide="x" className="w-6 h-6"></i>
+                <X className="w-6 h-6" />
               </button>
             </div>
 
@@ -647,10 +669,10 @@ export default function Tenantcomplints() {
           >
             <div className="flex justify-between items-center mb-6 border-b pb-4">
               <h3 className="text-xl font-bold text-red-700 flex items-center">
-                <i data-lucide="alert-circle" className="w-5 h-5 mr-2 text-red-600"></i> Raise Major Issue
+                <AlertCircle className="w-5 h-5 mr-2 text-red-600" /> Raise Major Issue
               </h3>
               <button onClick={() => setMajorModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <i data-lucide="x" className="w-6 h-6"></i>
+                <X className="w-6 h-6" />
               </button>
             </div>
 

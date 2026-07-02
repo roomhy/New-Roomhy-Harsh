@@ -10,22 +10,55 @@ const fileToBase64 = (file) =>
     reader.readAsDataURL(file);
   });
 
-const AadhaarUpload = ({ label, side, value, onChange }) => {
+// Inline validation error message
+const FieldError = ({ msg }) =>
+  msg ? (
+    <p style={{ margin: "4px 0 0", fontSize: "11px", color: "#b71c1c", fontWeight: 600 }}>{msg}</p>
+  ) : null;
+
+// OCR result badge shown under each Aadhaar image upload
+const OcrBadge = ({ ocr }) => {
+  if (!ocr || ocr.status === "idle") return null;
+  const s = {
+    display: "inline-flex", alignItems: "center", gap: "4px",
+    marginTop: "6px", fontSize: "11px", fontWeight: 600, borderRadius: "6px",
+    padding: "3px 8px"
+  };
+  if (ocr.status === "loading")
+    return <span style={{ ...s, background: "#e3f2fd", color: "#1565c0" }}>⏳ {ocr.message || "Scanning image…"}</span>;
+  if (ocr.status === "verified")
+    return (
+      <span style={{ ...s, background: "#e8f5e9", color: "#2e7d32" }}>
+        ✓ Aadhaar verified
+        {ocr.aadhaarNumber ? ` — ${ocr.aadhaarNumber.slice(0, 4)} **** ${ocr.aadhaarNumber.slice(-4)}` : ""}
+      </span>
+    );
+  if (ocr.status === "unreadable")
+    return <span style={{ ...s, background: "#fff8e1", color: "#e65100" }}>⚠ {ocr.message || "Unclear — try a clearer photo"}</span>;
+  if (ocr.status === "rejected")
+    return <span style={{ ...s, background: "#fce4ec", color: "#b71c1c" }}>✗ {ocr.message || "Doesn't appear to be an Aadhaar card"}</span>;
+  if (ocr.status === "error")
+    return <span style={{ ...s, background: "#fce4ec", color: "#b71c1c" }}>✗ {ocr.message || "Verification failed — please try again"}</span>;
+  return null;
+};
+
+const AadhaarUpload = ({ label, side, value, onChange, ocrStatus, error }) => {
   const inputRef = React.useRef(null);
+
+  const borderColor =
+    ocrStatus?.status === "verified"   ? "#4caf50" :
+    ocrStatus?.status === "rejected"   ? "#f44336" :
+    ocrStatus?.status === "unreadable" ? "#ff9800" :
+    error                              ? "#f44336" : "#b0bec5";
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      alert("Please upload an image file (JPG, PNG, etc.)");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      alert("File must be under 5MB");
-      return;
-    }
+    if (!file.type.startsWith("image/")) { alert("Please upload an image file (JPG, PNG, etc.)"); return; }
+    if (file.size > 5 * 1024 * 1024) { alert("File must be under 5MB"); return; }
     try {
-      onChange(await fileToBase64(file));
+      const b64 = await fileToBase64(file);
+      onChange(b64, file); // base64 for preview/upload, File for Tesseract OCR
     } catch {
       alert("Failed to read file. Please try again.");
     }
@@ -34,11 +67,13 @@ const AadhaarUpload = ({ label, side, value, onChange }) => {
 
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
-      <label style={{ marginBottom: "8px" }}>{label}</label>
+      <label style={{ marginBottom: "8px" }}>
+        {label} <span style={{ color: "#f44336" }}>*</span>
+      </label>
       <div
         onClick={() => inputRef.current?.click()}
         style={{
-          border: "2px dashed #b0bec5",
+          border: `2px dashed ${borderColor}`,
           borderRadius: "10px",
           minHeight: "110px",
           display: "flex",
@@ -50,8 +85,8 @@ const AadhaarUpload = ({ label, side, value, onChange }) => {
           overflow: "hidden",
           transition: "border-color 0.15s"
         }}
-        onMouseEnter={e => e.currentTarget.style.borderColor = "#546e7a"}
-        onMouseLeave={e => e.currentTarget.style.borderColor = "#b0bec5"}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = "#546e7a"; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = borderColor; }}
       >
         {value ? (
           <img
@@ -69,22 +104,16 @@ const AadhaarUpload = ({ label, side, value, onChange }) => {
           </>
         )}
       </div>
+      <OcrBadge ocr={ocrStatus} />
+      {error && !ocrStatus?.status && <FieldError msg={error} />}
       {value && (
         <button
           type="button"
           onClick={() => onChange("")}
           style={{
-            marginTop: "5px",
-            fontSize: "11px",
-            background: "none",
-            border: "none",
-            color: "#dc2626",
-            cursor: "pointer",
-            padding: 0,
-            fontWeight: 600,
-            boxShadow: "none",
-            minHeight: "auto",
-            width: "auto"
+            marginTop: "5px", fontSize: "11px", background: "none", border: "none",
+            color: "#dc2626", cursor: "pointer", padding: 0, fontWeight: 600,
+            boxShadow: "none", minHeight: "auto", width: "auto"
           }}
         >
           Remove
@@ -118,88 +147,204 @@ export default function DigitalCheckinTenantkyc() {
   });
 
   const {
-    loginId,
-    setLoginId,
-    aadhaarNumber,
-    setAadhaarNumber,
+    loginId, setLoginId,
+    aadhaarNumber, setAadhaarNumber,
     aadhaarLinkedPhone,
-    setAadhaarLinkedPhone,
-    otp,
-    setOtp,
-    otpMsg,
-    nextVisible,
-    otpSent,
-    handleStart,
-    handleComplete,
-    handleNext
+    tenantPhone,
+    fetchingProfile,
+    otp, setOtp,
+    otpMsg, nextVisible, otpSent, otpLoading, uploading,
+    frontOcr, backOcr, handleImageOcr,
+    errors, setErrors,
+    handleStart, handleComplete, handleNext
   } = useTenantKyc();
 
   const [aadhaarFront, setAadhaarFront] = React.useState("");
-  const [aadhaarBack, setAadhaarBack] = React.useState("");
-  const [tenantPhoto, setTenantPhoto] = React.useState("");
+  const [aadhaarBack, setAadhaarBack]   = React.useState("");
+  const [tenantPhoto, setTenantPhoto]   = React.useState("");
+
+  // Run OCR and clear field error when an image is selected
+  const onFrontChange = (base64, file) => {
+    setAadhaarFront(base64);
+    setErrors((prev) => ({ ...prev, aadhaarFront: "" }));
+    if (base64) handleImageOcr(file || base64, "front");
+    else handleImageOcr(null, "front");
+  };
+  const onBackChange = (base64, file) => {
+    setAadhaarBack(base64);
+    setErrors((prev) => ({ ...prev, aadhaarBack: "" }));
+    if (base64) handleImageOcr(file || base64, "back");
+    else handleImageOcr(null, "back");
+  };
+
+  // OTP button is disabled while: loading, OCR is running, or OTP was already sent successfully
+  const sendOtpDisabled =
+    otpLoading ||
+    uploading ||
+    frontOcr.status === "loading" ||
+    backOcr.status === "loading" ||
+    (otpSent && !otpMsg.startsWith("Failed"));
+
+  const sendOtpLabel =
+    otpLoading  ? "Sending OTP…" :
+    uploading   ? "Uploading documents…" :
+    otpSent     ? "OTP Sent" : "Send OTP";
 
   return (
     <div className="html-page">
       <div className="wrap">
         <h2>Tenant Aadhaar KYC</h2>
+
         <div className="grid">
+          {/* Login ID — read-only, from URL */}
           <div>
             <label>Login ID</label>
-            <input value={loginId} onChange={(e) => setLoginId(e.target.value)} required />
+            <input value={loginId} onChange={(e) => setLoginId(e.target.value)} readOnly />
           </div>
+
+          {/* Aadhaar Number */}
           <div>
-            <label>Aadhaar Number</label>
+            <label>
+              Aadhaar Number <span style={{ color: "#f44336" }}>*</span>
+            </label>
             <input
               value={aadhaarNumber}
-              onChange={(e) => setAadhaarNumber(e.target.value)}
-              pattern="\\d{12}"
+              onChange={(e) => {
+                setAadhaarNumber(e.target.value);
+                if (errors.aadhaarNumber) setErrors((p) => ({ ...p, aadhaarNumber: "" }));
+              }}
+              pattern="\d{12}"
               maxLength="12"
+              placeholder="12-digit Aadhaar number"
               required
+              style={errors.aadhaarNumber ? { borderColor: "#f44336" } : {}}
             />
+            <FieldError msg={errors.aadhaarNumber} />
           </div>
+
+          {/* Mobile Number — read-only, auto-filled from tenant record */}
           <div>
-            <label>Aadhaar Linked Phone Number</label>
-            <input value={aadhaarLinkedPhone} onChange={(e) => setAadhaarLinkedPhone(e.target.value)} required />
+            <label>
+              Mobile Number <span style={{ color: "#f44336" }}>*</span>
+              <span style={{ fontSize: "10px", color: "#78909c", marginLeft: "6px", fontWeight: 400 }}>
+                (linked to Aadhaar, set by owner — read-only)
+              </span>
+            </label>
+            <input
+              value={fetchingProfile ? "Loading…" : aadhaarLinkedPhone}
+              readOnly
+              disabled
+              placeholder={fetchingProfile ? "Loading mobile number…" : "Auto-filled from your tenant record"}
+              style={{
+                background: "#f5f5f5",
+                color: "#546e7a",
+                cursor: "not-allowed",
+                ...(errors.aadhaarLinkedPhone ? { borderColor: "#f44336" } : {})
+              }}
+            />
+            <FieldError msg={errors.aadhaarLinkedPhone} />
           </div>
+
+          {/* OTP */}
           <div>
             <label>OTP</label>
-            <input value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="Enter OTP from Aadhaar-linked mobile" />
+            <input
+              value={otp}
+              onChange={(e) => setOtp(e.target.value)}
+              placeholder="Enter OTP from Aadhaar-linked mobile"
+              disabled={!otpSent}
+            />
           </div>
         </div>
 
-        {/* Aadhaar Card Photo Upload */}
+        {/* Aadhaar Card Photos — both are required */}
         <div style={{ marginTop: "20px" }}>
-          <label style={{ marginBottom: "4px" }}>Aadhaar Card Photos</label>
+          <label style={{ marginBottom: "4px" }}>
+            Aadhaar Card Photos <span style={{ color: "#f44336" }}>*</span>
+          </label>
           <p style={{ margin: "0 0 14px", fontSize: "12px", color: "#7a8fa6" }}>
-            Upload clear photos of the front and back of your Aadhaar card.
+            Upload clear photos of the front and back of your Aadhaar card. The number will be verified automatically.
           </p>
           <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-            <AadhaarUpload label="Front Side" side="front" value={aadhaarFront} onChange={setAadhaarFront} />
-            <AadhaarUpload label="Back Side" side="back" value={aadhaarBack} onChange={setAadhaarBack} />
+            <AadhaarUpload
+              label="Front Side"
+              side="front"
+              value={aadhaarFront}
+              onChange={onFrontChange}
+              ocrStatus={frontOcr}
+              error={errors.aadhaarFront}
+            />
+            <AadhaarUpload
+              label="Back Side"
+              side="back"
+              value={aadhaarBack}
+              onChange={onBackChange}
+              ocrStatus={backOcr}
+              error={errors.aadhaarBack}
+            />
           </div>
         </div>
 
-        {/* Tenant Selfie */}
+        {/* Tenant Selfie — optional */}
         <div style={{ marginTop: "24px" }}>
           <label style={{ marginBottom: "4px" }}>Tenant Selfie / Photo</label>
           <p style={{ margin: "0 0 14px", fontSize: "12px", color: "#7a8fa6" }}>
-            Upload a clear face photo of the tenant. This will be stored with your KYC record.
+            Upload a clear face photo of the tenant (optional).
           </p>
           <div style={{ maxWidth: "200px" }}>
-            <AadhaarUpload label="Tenant Photo" side="selfie" value={tenantPhoto} onChange={setTenantPhoto} />
+            <AadhaarUpload
+              label="Tenant Photo"
+              side="selfie"
+              value={tenantPhoto}
+              onChange={(b64) => setTenantPhoto(b64)}
+            />
           </div>
         </div>
 
-        <button type="button" onClick={handleStart}>Send OTP</button>
-        <button type="button" onClick={() => handleComplete(aadhaarFront, aadhaarBack, tenantPhoto)}>
-          {otpSent ? "Verify OTP & Complete" : "Complete Verification"}
+        {/* Send OTP button — disabled while loading or already sent */}
+        <button
+          type="button"
+          onClick={() => handleStart(aadhaarFront, aadhaarBack, tenantPhoto)}
+          disabled={sendOtpDisabled}
+          style={sendOtpDisabled ? { opacity: 0.6, cursor: "not-allowed" } : {}}
+        >
+          {sendOtpLabel}
         </button>
-        {otpMsg && <p className="muted">{otpMsg}</p>}
+
+        {/* Verify OTP button — only active after OTP sent */}
+        <button
+          type="button"
+          onClick={() => handleComplete(aadhaarFront, aadhaarBack, tenantPhoto)}
+          disabled={!otpSent || !otp.trim()}
+          style={(!otpSent || !otp.trim()) ? { opacity: 0.6, cursor: "not-allowed" } : {}}
+        >
+          Verify OTP &amp; Complete KYC
+        </button>
+
+        {/* Status / error messages */}
+        {otpMsg && (
+          <p
+            className="muted"
+            style={{
+              color: otpMsg.startsWith("Failed") || otpMsg.startsWith("Verification failed")
+                ? "#b71c1c"
+                : otpMsg.startsWith("KYC verification completed")
+                ? "#2e7d32"
+                : "#546e7a",
+              fontWeight: 600,
+              marginTop: "12px"
+            }}
+          >
+            {otpMsg}
+          </p>
+        )}
+
         {nextVisible && (
-          <button type="button" onClick={handleNext}>Continue to Rental Agreement</button>
+          <button type="button" onClick={handleNext}>
+            Continue to Rental Agreement →
+          </button>
         )}
       </div>
     </div>
   );
 }
-

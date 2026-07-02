@@ -68,8 +68,9 @@ export default function DigitalCheckinTenantprofile() {
       <div className="wrap">
         <h2>Tenant Profile</h2>
         <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 20 }}>
-          Complete your profile. All details will be printed in your Rental Agreement (Annexure A).
-          Fields marked <span style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a", borderRadius: 4, padding: "1px 5px", fontSize: 11 }}>owner-set</span> are pre-filled by your property owner and cannot be changed.
+          All details below are pre-filled by your property owner and are printed in your Rental Agreement.
+          These fields are <strong>read-only</strong> — only your <strong>Backup Email</strong> can be added by you.
+          Contact your owner if any information needs to be corrected.
         </p>
 
         {loading && (
@@ -88,44 +89,49 @@ export default function DigitalCheckinTenantprofile() {
               <input value={form.loginId} readOnly style={inputStyle(true)} />
             </Field>
 
-            <Field label="Full Name *">
-              {inp("name", { required: true, placeholder: "As per Aadhaar card" })}
+            <Field label={<>Full Name <LockBadge /></>}>
+              {inp("name", { placeholder: "Filled by owner" })}
             </Field>
 
-            <Field label="Date of Birth (DD/MM/YYYY) *">
-              {inp("dob", { type: "text", required: true, placeholder: "DD/MM/YYYY" })}
+            <Field label={<>Date of Birth (DD/MM/YYYY) <LockBadge /></>}>
+              {inp("dob", { type: "text", placeholder: "Filled by owner" })}
             </Field>
 
             {/* ── SECTION 2: Contact ── */}
             <SectionTitle n="02" title="Contact Details" />
 
-            <Field label="Email Address" note="(used in agreement)">
-              {inp("email", { type: "email", placeholder: "your@email.com" })}
+            <Field label={<>Email Address <LockBadge /></>} note="(used in agreement)">
+              {inp("email", { type: "email", placeholder: "Filled by owner" })}
             </Field>
 
-            <Field label="Phone Number *" note="(used in agreement)">
-              {inp("phone", { required: true, placeholder: "10-digit mobile number" })}
+            <Field label={<>Phone Number <LockBadge /></>} note="(used in agreement)">
+              {inp("phone", { placeholder: "Filled by owner" })}
             </Field>
 
             <div style={{ gridColumn: "1 / -1" }}>
-              <Field label="Permanent Address *" note="(used in agreement)">
+              <Field label={<>Permanent Address <LockBadge /></>} note="(used in agreement)">
                 <textarea
                   value={form.permanentAddress || ""}
-                  onChange={(e) => updateForm({ permanentAddress: e.target.value })}
+                  readOnly
                   rows={3}
-                  required
-                  placeholder="House/Flat No., Street, Area, City, State, PIN"
-                  style={{ ...inputStyle(false), resize: "vertical" }}
+                  placeholder="Filled by owner"
+                  style={{ ...inputStyle(true), resize: "none" }}
                 />
               </Field>
             </div>
 
-            <Field label="Guardian / Emergency Number *" note="(backup phone for agreement)">
-              {inp("guardianNumber", { required: true, placeholder: "Emergency contact number" })}
+            <Field label={<>Guardian / Emergency Number <LockBadge /></>} note="(auto-filled from owner entry)">
+              {inp("guardianNumber", { placeholder: "Filled by owner" })}
             </Field>
 
-            <Field label="Backup Email" note="(optional)">
-              {inp("backupEmail", { type: "email", placeholder: "Backup contact email" })}
+            <Field label="Backup Email" note="(optional — you can add this)">
+              <input
+                type="email"
+                value={form.backupEmail || ""}
+                onChange={(e) => updateForm({ backupEmail: e.target.value })}
+                placeholder="Backup contact email"
+                style={inputStyle(false)}
+              />
             </Field>
 
             {/* ── SECTION 3: Property Details ── */}
@@ -144,26 +150,7 @@ export default function DigitalCheckinTenantprofile() {
             </Field>
 
             <Field label="Accommodation Type *">
-              {locked.accommodationType ? (
-                <input value={form.accommodationType || ""} readOnly style={inputStyle(true)} />
-              ) : (
-                <select
-                  value={form.accommodationType || ""}
-                  onChange={(e) => updateForm({ accommodationType: e.target.value })}
-                  required
-                  style={{ ...inputStyle(false), appearance: "auto" }}
-                >
-                  <option value="">Select type</option>
-                  <option>Single Room</option>
-                  <option>Double Sharing</option>
-                  <option>Triple Sharing</option>
-                  <option>Dormitory</option>
-                  <option>Private PG</option>
-                  <option>Flat / Apartment</option>
-                  <option>AC Room</option>
-                  <option>Non-AC Room</option>
-                </select>
-              )}
+              <input value={form.accommodationType || ""} readOnly style={inputStyle(true)} placeholder="Filled by owner" />
             </Field>
 
             {/* ── SECTION 4: Financial / Agreement Terms ── */}

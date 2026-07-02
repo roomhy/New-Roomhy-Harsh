@@ -50,7 +50,10 @@ export default function Tenantlogin() {
 
   const storeAuth = (data) => {
     if (!data?.user) return;
-    // Token is now in httpOnly cookie set by backend — never stored in JS storage.
+    if (data?.token) {
+      localStorage.setItem("token", data.token);
+      sessionStorage.setItem("token", data.token);
+    }
     localStorage.setItem("user", JSON.stringify(data.user));
     sessionStorage.setItem("user", JSON.stringify(data.user));
     localStorage.setItem("tenant_user", JSON.stringify(data.user));

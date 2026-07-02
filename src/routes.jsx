@@ -200,7 +200,10 @@ const routeEntries = [
   ["/tenant/tenantcomplints", "./pages/tenant/tenantcomplints.jsx"],
   ["/tenant/tenantdashboard", "./pages/tenant/tenantdashboard.jsx"],
   ["/tenant/tenantlogin", "./pages/tenant/tenantlogin.jsx"],
-  
+
+  // Public visitor pass verification (opened when a pass QR is scanned)
+  ["/visitor-verify", "./pages/tenant/visitor-verify.jsx"],
+
   // Digital Checkin Routes
   ["/digital-checkin/index", "./pages/digital-checkin/index.jsx"],
   ["/digital-checkin/ownerkyc", "./pages/digital-checkin/ownerkyc.jsx"],

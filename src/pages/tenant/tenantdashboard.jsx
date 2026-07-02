@@ -1,6 +1,28 @@
+// thing to rember in tenant dashboard all the tenant ledger tenant adhar kyc
+// this all page are present in this only
+
+
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useHtmlPage } from "../../utils/htmlPage";
-import { fetchJson, getApiBase } from "../../utils/api";
+import { fetchJson, getApiBase, getAuthHeader } from "../../utils/api";
+import { clearAllAuthKeys } from "../../contexts/AuthContext";
+import {
+  CheckCircle, Download, Eye, Upload, Star, Clock, XCircle,
+  Clock3, AlertTriangle, FileWarning, X, CreditCard, HandCoins,
+} from "lucide-react";
+import {
+  Sidebar, MobileBottomNav, MobileTopBar, DashboardHeader, HeroRentCard, UpcomingDuesCard, PaymentTrendChart,
+  RecentPaymentsTable, LeaseInformation, QuickActions, AnnouncementCard,
+  QuickActionIcons,
+  LedgerHeader, LedgerSummaryCards, BalanceChart, SummaryPanel,
+  LedgerFilters, LedgerTable, Pagination, DateRangePicker,
+  KycHeader, VerificationStatusCard, IdentityInformationCard, VerificationTimeline,
+  WelcomeHeader, Breadcrumb, MoveOutHero, MoveOutForm, ImportantNoteCard,
+  VisitorHero, VisitorDetailsCard, VisitorPassCard, VisitorNoteCard, VisitorPassStatusCard,
+  LeaveHero, LeaveForm, LeaveHistory, LeaveNoteCard,
+  ComplaintHero, ComplaintForm, ComplaintHistory,
+} from "./dashboardComponents";
 
 // ─── Razorpay loader ───────────────────────────────────────────────────────────
 const ensureRazorpayLoaded = () =>
@@ -225,7 +247,7 @@ export default function Tenantdashboard() {
       { href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap", rel: "stylesheet" },
       { rel: "stylesheet", href: "/tenant/assets/css/tenantdashboard.css" },
     ],
-    scripts: [{ src: "https://cdn.tailwindcss.com" }, { src: "https://unpkg.com/lucide@latest" }],
+    scripts: [{ src: "https://cdn.tailwindcss.com" }],
     inlineScripts: [],
   });
 
@@ -244,6 +266,7 @@ export default function Tenantdashboard() {
   const [actionBusy, setActionBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [documentViewer, setDocumentViewer] = useState(null);
+  const [announcements, setAnnouncements] = useState([]);
 
   // Tab State
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -266,6 +289,8 @@ export default function Tenantdashboard() {
   const [complaintPriority, setComplaintPriority] = useState("Low");
   const [complaintStatusMsg, setComplaintStatusMsg] = useState("");
   const [complaintBusy, setComplaintBusy] = useState(false);
+  const [visitorBusy, setVisitorBusy] = useState(false);
+  const [leaveBusy, setLeaveBusy] = useState(false);
   const [myComplaints, setMyComplaints] = useState([]);
 
   // Visitor Pass State
@@ -286,6 +311,13 @@ export default function Tenantdashboard() {
   const [ledgerEntries, setLedgerEntries] = useState([]);
   const [ledgerBalance, setLedgerBalance] = useState(0);
   const [loadingLedger, setLoadingLedger] = useState(false);
+  const [ledgerType, setLedgerType] = useState("All Transactions");
+  const [ledgerCategory, setLedgerCategory] = useState("All Categories");
+  const [ledgerPage, setLedgerPage] = useState(1);
+  const [ledgerDateFrom, setLedgerDateFrom] = useState("");
+  const [ledgerDateTo, setLedgerDateTo] = useState("");
+  const [ledgerPickerOpen, setLedgerPickerOpen] = useState(false);
+  const LEDGER_PAGE_SIZE = 6;
 
   // KYC state
   const [aadhaarNumber, setAadhaarNumber] = useState("");
@@ -416,12 +448,15 @@ export default function Tenantdashboard() {
     return items;
   }, [history, tenant, tenantUser, propertyName, roomInfo, rentAmount]);
 
-  // File upload helper
+  // File upload helper — multipart/form-data, so we can't use fetchJson (which
+  // would set Content-Type: application/json and break the FormData boundary).
+  // Auth header is injected manually via getAuthHeader().
   const uploadFile = async (file) => {
     const formData = new FormData();
     formData.append("file", file);
     const response = await fetch(`${apiBase}/api/upload-file`, {
       method: "POST",
+      headers: getAuthHeader(),
       body: formData,
     });
     if (!response.ok) {
@@ -580,23 +615,43 @@ export default function Tenantdashboard() {
     }
   };
 
+  // Fill any KYC / digital-check-in fields the API response omits using the
+  // locally-cached tenant record written during digital check-in. API data
+  // always wins; the local cache only backfills missing values.
+  const hydrateFromLocal = (t) => {
+    if (!t) return t;
+    try {
+      const key = String(t.loginId || loginId || "").toUpperCase();
+      const local = readLocalTenants().find((x) => String(x.loginId || "").toUpperCase() === key);
+      if (!local) return t;
+      return {
+        ...local,
+        ...t,
+        kycStatus: t.kycStatus || local.kycStatus,
+        kyc: { ...(local.kyc || {}), ...(t.kyc || {}) },
+        digitalCheckin: { ...(local.digitalCheckin || {}), ...(t.digitalCheckin || {}) },
+      };
+    } catch {
+      return t;
+    }
+  };
+
   // ─── Data fetchers ───────────────────────────────────────────────────────────
   const loadTenant = async () => {
     if (!loginId) { window.location.href = "/tenant/tenantlogin"; return null; }
-    // SECURITY FIX: Replaced GET /api/tenants (returned all tenants, client-side
-    // filtered) with GET /api/tenants/me (returns only the authenticated tenant's
-    // own record, identity enforced server-side via JWT). This eliminates the mass
-    // PII exposure where every tenant's Aadhaar, phone, email and financials were
-    // visible in the browser's network tab.
     try {
       const data = await fetchJson("/api/tenants/me");
-      const match = data?.tenant || null;
+      const match = data?.tenant ? hydrateFromLocal(data.tenant) : null;
       if (match) {
         setTenant(match);
         return match;
       }
       throw new Error("Tenant profile not found.");
     } catch (err) {
+      if (err?.status === 401 || err?.status === 403) {
+        window.location.href = "/tenant/tenantlogin";
+        return null;
+      }
       throw err;
     }
   };
@@ -626,6 +681,17 @@ export default function Tenantdashboard() {
     }
   };
 
+  const loadAnnouncements = async (ownerLoginId) => {
+    const ownerId = ownerLoginId || tenant?.ownerLoginId;
+    if (!ownerId) return;
+    try {
+      const data = await fetchJson(`/api/announcements/owner/${encodeURIComponent(ownerId)}`);
+      if (Array.isArray(data?.announcements)) setAnnouncements(data.announcements);
+    } catch (err) {
+      console.error("Failed to load announcements:", err);
+    }
+  };
+
   const refreshDashboard = async () => {
     setLoading(true);
     setErrorMsg("");
@@ -634,6 +700,8 @@ export default function Tenantdashboard() {
       await loadRents();
       if (tData) {
         await loadLedger();
+        loadAnnouncements(tData.ownerLoginId);
+        fetchMyComplaints(tData);
       }
     }
     catch (err) { setErrorMsg(err?.body || err?.message || "Failed to load tenant dashboard."); }
@@ -642,9 +710,6 @@ export default function Tenantdashboard() {
 
   useEffect(() => { refreshDashboard(); }, []);
 
-  useEffect(() => {
-    if (window?.lucide) window.lucide.createIcons();
-  }, [tenant, rent, history, payOpen, userMenuOpen, genericModal, cashPanelOpen, pdfBusy, activeTab]);
 
   useEffect(() => {
     const page = document.querySelector(".html-page");
@@ -717,7 +782,7 @@ export default function Tenantdashboard() {
   const closeDocumentViewer = () => setDocumentViewer(null);
 
   const clearSession = () => {
-    try { localStorage.removeItem("tenant_user"); localStorage.removeItem("user"); } catch {}
+    clearAllAuthKeys();
     window.location.href = "/tenant/tenantlogin";
   };
 
@@ -733,9 +798,8 @@ export default function Tenantdashboard() {
     setActionBusy(true);
     setActionMsg("");
     try {
-      const orderResponse = await fetch(`${apiBase}/api/rents/create-order`, {
+      const orderData = await fetchJson("/api/rents/create-order", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: rentAmount,
           tenantId: loginId,
@@ -743,8 +807,7 @@ export default function Tenantdashboard() {
           description: "Monthly Rent Payment",
         }),
       });
-      const orderData = await orderResponse.json();
-      if (!orderResponse.ok || !orderData?.success)
+      if (!orderData?.success)
         throw new Error(orderData?.error || orderData?.message || "Failed to create payment order.");
 
       await ensureRazorpayLoaded();
@@ -791,7 +854,7 @@ export default function Tenantdashboard() {
               "Payment Confirmation",
               <div className="text-center">
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <i data-lucide="check-circle" className="w-8 h-8 text-green-600"></i>
+                  <CheckCircle className="w-8 h-8 text-green-600" />
                 </div>
                 <h4 className="text-lg font-bold text-slate-900 mb-2">Payment Successful!</h4>
                 <p className="text-sm text-slate-600 mb-6">
@@ -802,7 +865,7 @@ export default function Tenantdashboard() {
                   disabled={pdfBusy}
                   className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition disabled:opacity-60"
                 >
-                  <i data-lucide="download" className="w-4 h-4"></i>
+                  <Download className="w-4 h-4" />
                   {pdfBusy ? "Generating PDF..." : "Download Receipt (PDF)"}
                 </button>
               </div>
@@ -856,10 +919,11 @@ export default function Tenantdashboard() {
     }
   };
 
-  const fetchMyComplaints = async () => {
-    if (!tenant) return;
+  const fetchMyComplaints = async (t = null) => {
+    const target = t || tenant;
+    if (!target?._id) return;
     try {
-      const data = await fetchJson(`/api/complaints/tenant/${tenant._id}`);
+      const data = await fetchJson(`/api/complaints/tenant/${target._id}`);
       if (data && data.complaints) {
         setMyComplaints(data.complaints);
       }
@@ -895,8 +959,8 @@ export default function Tenantdashboard() {
   const handleVisitorSubmit = async (e) => {
     e.preventDefault();
     if (!tenant) return;
-    setComplaintBusy(true);
-    setVisitorMsg("Submitting visitor pass request...");
+    setVisitorBusy(true);
+    setVisitorMsg("Sending request to owner for approval...");
     try {
       await fetchJson("/api/visitors", {
         method: "POST",
@@ -906,10 +970,9 @@ export default function Tenantdashboard() {
           visitorName,
           visitorPhone,
           expectedEntryTime: visitorExpectedTime,
-          status: "Pre-approved"
         })
       });
-      setVisitorMsg("Visitor Pass Pre-approved!");
+      setVisitorMsg("Request sent! Your visitor pass will appear here once the owner approves it.");
       setVisitorName("");
       setVisitorPhone("");
       setVisitorExpectedTime("");
@@ -917,14 +980,14 @@ export default function Tenantdashboard() {
     } catch (err) {
       setVisitorMsg(err?.body || err?.message || "Failed to create visitor pass.");
     } finally {
-      setComplaintBusy(false);
+      setVisitorBusy(false);
     }
   };
 
   const handleLeaveSubmit = async (e) => {
     e.preventDefault();
     if (!tenant) return;
-    setComplaintBusy(true);
+    setLeaveBusy(true);
     setLeaveMsg("Submitting leave request...");
     try {
       await fetchJson("/api/leaves", {
@@ -945,7 +1008,7 @@ export default function Tenantdashboard() {
     } catch (err) {
       setLeaveMsg(err?.body || err?.message || "Failed to submit leave request.");
     } finally {
-      setComplaintBusy(false);
+      setLeaveBusy(false);
     }
   };
 
@@ -955,6 +1018,14 @@ export default function Tenantdashboard() {
       if (activeTab === "visitor") fetchMyVisitors();
       if (activeTab === "leave") fetchMyLeaves();
     }
+  }, [activeTab, tenant]);
+
+  // While viewing the Visitor Pass tab, poll so an owner's approval appears
+  // without a manual refresh.
+  useEffect(() => {
+    if (!tenant || activeTab !== "visitor") return;
+    const id = setInterval(() => fetchMyVisitors(), 15000);
+    return () => clearInterval(id);
   }, [activeTab, tenant]);
 
   const handleCashRequest = async () => {
@@ -1013,7 +1084,7 @@ export default function Tenantdashboard() {
         "Payment Confirmation",
         <div className="text-center">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <i data-lucide="check-circle" className="w-8 h-8 text-green-600"></i>
+            <CheckCircle className="w-8 h-8 text-green-600" />
           </div>
           <h4 className="text-lg font-bold text-slate-900 mb-2">Cash Payment Verified</h4>
           <p className="text-sm text-slate-600 mb-6">Your cash payment has been marked as paid.</p>
@@ -1022,7 +1093,7 @@ export default function Tenantdashboard() {
             disabled={pdfBusy}
             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition disabled:opacity-60"
           >
-            <i data-lucide="download" className="w-4 h-4"></i>
+            <Download className="w-4 h-4" />
             {pdfBusy ? "Generating PDF..." : "Download Receipt (PDF)"}
           </button>
         </div>
@@ -1084,6 +1155,310 @@ export default function Tenantdashboard() {
     }
   };
 
+  // ─── Dashboard derived data ──────────────────────────────────────────────────
+  const firstName = (tenantUser?.name || tenant?.name || "Tenant").split(" ")[0];
+
+  const todayLabel = useMemo(() => {
+    const d = new Date();
+    const wd = d.toLocaleDateString("en-GB", { weekday: "short" });
+    const day = String(d.getDate()).padStart(2, "0");
+    const mon = d.toLocaleDateString("en-GB", { month: "long" });
+    return `${wd}, ${day} ${mon} ${d.getFullYear()}`;
+  }, []);
+
+  const calInfo = useMemo(() => {
+    const up = (d) => d.toLocaleDateString("en-GB", { month: "short" }).toUpperCase();
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    return {
+      month: up(today),
+      day: String(today.getDate()),
+      nextMonth: up(tomorrow),
+      nextDay: String(tomorrow.getDate()),
+    };
+  }, []);
+
+  const dueInfo = useMemo(() => {
+    const today = new Date();
+    let due = new Date(today.getFullYear(), today.getMonth(), 5);
+    if (today.getDate() > 5) due = new Date(today.getFullYear(), today.getMonth() + 1, 5);
+    const prevDue = new Date(due.getFullYear(), due.getMonth() - 1, 5);
+    const totalSpan = (due - prevDue) / 86400000;
+    const elapsed = (today - prevDue) / 86400000;
+    const daysRemaining = Math.max(0, Math.ceil((due - today) / 86400000));
+    const progress = Math.round((elapsed / totalSpan) * 100);
+    const label = due.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    return { daysRemaining, progress, label };
+  }, []);
+
+  const latestPaid = useMemo(
+    () => history.find((it) => ["paid", "completed"].includes(String(it.paymentStatus || "").toLowerCase())) || null,
+    [history]
+  );
+
+  const chartData = useMemo(() => {
+    const monthShort = (val) => {
+      if (!val) return "—";
+      const d = new Date(val);
+      if (!Number.isNaN(d.getTime())) return d.toLocaleDateString("en-GB", { month: "short" });
+      const m = String(val).match(/[A-Za-z]{3,}/);
+      return m ? m[0].slice(0, 3) : String(val).slice(0, 3);
+    };
+    const paid = history.filter((h) => ["paid", "completed"].includes(String(h.paymentStatus || "").toLowerCase()));
+    const src = (paid.length ? paid : history).slice(0, 6).reverse();
+    return src.map((it) => ({
+      month: monthShort(it.collectionMonth || it.paymentDate || it.createdAt),
+      amount: Number(it.paidAmount || it.totalDue || it.rentAmount || 0),
+    }));
+  }, [history]);
+
+  const percentChange = useMemo(() => {
+    if (chartData.length < 2) return null;
+    const last = chartData[chartData.length - 1].amount;
+    const prev = chartData[chartData.length - 2].amount;
+    if (!prev) return null;
+    return Math.round(((last - prev) / prev) * 100);
+  }, [chartData]);
+
+  const recentRows = useMemo(
+    () =>
+      history.slice(0, 5).map((it, i) => {
+        const s = String(it.paymentStatus || "").toLowerCase();
+        return {
+          id: it._id || i,
+          date: formatDate(it.paymentDate || it.updatedAt || it.createdAt),
+          description: `Monthly Rent${it.collectionMonth ? ` – ${it.collectionMonth}` : ""}`,
+          amount: it.paidAmount || it.totalDue || it.rentAmount || 0,
+          status: s === "paid" || s === "completed" ? "Paid" : s === "overdue" ? "Overdue" : "Unpaid",
+          item: it,
+        };
+      }),
+    [history]
+  );
+
+  // ─── Ledger derived data ─────────────────────────────────────────────────────
+  // Normalize raw ledger entries → display rows with a derived category.
+  const ledgerRows = useMemo(() => {
+    return (ledgerEntries || []).map((e, i) => ({
+      id: e.id ?? i,
+      date: e.date,
+      details: e.details,
+      debit: Number(e.debit || 0),
+      credit: Number(e.credit || 0),
+      balance: Number(e.balance || 0),
+      category: Number(e.credit || 0) > 0 ? "Payment" : "Rent",
+    }));
+  }, [ledgerEntries]);
+
+  // Parse a display date string like "19 Jun 2026" → ISO "2026-06-19" for comparison.
+  const parseDisplayDate = (s) => {
+    if (!s) return null;
+    const MONTHS = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+    const m = String(s).match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/);
+    if (!m) return null;
+    const mo = MONTHS[m[2].toLowerCase()];
+    if (mo === undefined) return null;
+    return new Date(Number(m[3]), mo, Number(m[1]));
+  };
+
+  // Rows filtered by the active date range — used as base for stats, chart, and type/category filters.
+  const dateFilteredRows = useMemo(() => {
+    if (!ledgerDateFrom && !ledgerDateTo) return ledgerRows;
+    const from = ledgerDateFrom ? new Date(ledgerDateFrom) : null;
+    const to   = ledgerDateTo   ? new Date(ledgerDateTo)   : null;
+    if (to) to.setHours(23, 59, 59, 999);
+    return ledgerRows.filter((r) => {
+      const d = parseDisplayDate(r.date);
+      if (!d) return true;
+      if (from && d < from) return false;
+      if (to   && d > to)   return false;
+      return true;
+    });
+  }, [ledgerRows, ledgerDateFrom, ledgerDateTo]);
+
+  const ledgerStats = useMemo(() => {
+    const totalDebits = dateFilteredRows.reduce((s, r) => s + r.debit, 0);
+    const totalCredits = dateFilteredRows.reduce((s, r) => s + r.credit, 0);
+    const debitCount = dateFilteredRows.filter((r) => r.debit > 0).length;
+    const creditCount = dateFilteredRows.filter((r) => r.credit > 0).length;
+
+    // month-over-month trend (last full month vs previous), null if insufficient
+    const mKey = (s) => {
+      const m = String(s || "").match(/([A-Za-z]{3,})\s+(\d{2,4})/);
+      return m ? `${m[1].slice(0, 3)} ${m[2].slice(-2)}` : String(s || "");
+    };
+    const byMonth = (sel) => {
+      const map = new Map();
+      [...dateFilteredRows].reverse().forEach((r) => {
+        const k = mKey(r.date);
+        map.set(k, (map.get(k) || 0) + sel(r));
+      });
+      return Array.from(map.values());
+    };
+    const pct = (arr) => {
+      const nz = arr.filter((v) => v > 0);
+      if (nz.length < 2) return null;
+      const prev = nz[nz.length - 2], last = nz[nz.length - 1];
+      if (!prev) return null;
+      return Math.round(((last - prev) / prev) * 100);
+    };
+
+    return {
+      totalDebits,
+      totalCredits,
+      debitCount,
+      creditCount,
+      debitTrend: pct(byMonth((r) => r.debit)),
+      creditTrend: pct(byMonth((r) => r.credit)),
+      outstanding: Math.max(0, ledgerBalance),
+      net: -ledgerBalance,
+    };
+  }, [dateFilteredRows, ledgerBalance]);
+
+  // Balance-trend chart: running net balance (credits − debits) over time.
+  const ledgerChart = useMemo(() => {
+    const monthKey = (s) => {
+      const m = String(s || "").match(/([A-Za-z]{3,})\s+(\d{2,4})/);
+      return m ? `${m[1].slice(0, 3)} '${m[2].slice(-2)}` : String(s || "");
+    };
+    const chrono = [...dateFilteredRows].reverse();
+    const points = chrono.map((r) => ({ label: monthKey(r.date), value: -r.balance }));
+    if (points.length === 1) points.unshift({ label: "Opening", value: 0 });
+    return points;
+  }, [dateFilteredRows]);
+
+  const isDateFiltered = !!(ledgerDateFrom || ledgerDateTo);
+
+  const ledgerDateLabel = useMemo(() => {
+    if (isDateFiltered) {
+      const fmt = (iso) => {
+        if (!iso) return "";
+        const d = new Date(iso);
+        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+      };
+      if (ledgerDateFrom && ledgerDateTo) return `${fmt(ledgerDateFrom)} – ${fmt(ledgerDateTo)}`;
+      if (ledgerDateFrom) return `From ${fmt(ledgerDateFrom)}`;
+      return `Until ${fmt(ledgerDateTo)}`;
+    }
+    if (!ledgerRows.length) return "All time";
+    const last = ledgerRows[0]?.date;
+    const first = ledgerRows[ledgerRows.length - 1]?.date;
+    return first && last && first !== last ? `${first} – ${last}` : first || "All time";
+  }, [ledgerRows, ledgerDateFrom, ledgerDateTo, isDateFiltered]);
+
+  const filteredLedgerRows = useMemo(() => {
+    return dateFilteredRows.filter((r) => {
+      if (ledgerType === "Debits" && r.debit <= 0) return false;
+      if (ledgerType === "Credits" && r.credit <= 0) return false;
+      if (ledgerCategory !== "All Categories" && r.category !== ledgerCategory) return false;
+      return true;
+    });
+  }, [dateFilteredRows, ledgerType, ledgerCategory]);
+
+  useEffect(() => { setLedgerPage(1); }, [ledgerType, ledgerCategory, ledgerDateFrom, ledgerDateTo]);
+
+  const ledgerPageCount = Math.max(1, Math.ceil(filteredLedgerRows.length / LEDGER_PAGE_SIZE));
+  const pagedLedgerRows = useMemo(
+    () => filteredLedgerRows.slice((ledgerPage - 1) * LEDGER_PAGE_SIZE, ledgerPage * LEDGER_PAGE_SIZE),
+    [filteredLedgerRows, ledgerPage]
+  );
+
+  const downloadLedgerCsv = () => {
+    const header = ["Date", "Description", "Category", "Debit", "Credit", "Balance"];
+    const lines = filteredLedgerRows.map((r) =>
+      [r.date, `"${String(r.details || "").replace(/"/g, '""')}"`, r.category, r.debit || "", r.credit || "", r.balance]
+        .join(",")
+    );
+    const csv = [header.join(","), ...lines].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Roomhy_Ledger_${loginId || "statement"}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const fmtOrDash = (v) => {
+    const out = formatDate(v);
+    return out === "-" ? "—" : out;
+  };
+
+  const leaseDetails = tenant?.digitalCheckin?.agreementDetails || {};
+  const leaseStart = leaseDetails.licenseStartDate || tenant?.moveInDate;
+  const leaseEnd = leaseDetails.licenseEndDate;
+  const leaseStatus = tenant ? (tenant.moveoutRequest?.status === "approved" ? "Inactive" : "Active") : "—";
+
+  // ─── KYC read-only display data ──────────────────────────────────────────────
+  // Same source the owner panel reads (tenant.kyc.*), with digital-check-in
+  // fallbacks so values entered during KYC auto-fill the tenant's own view.
+  const kyc = tenant?.kyc || {};
+  const dcKyc = tenant?.digitalCheckin?.kyc || {};
+  const rawAadhaar = String(
+    aadhaarNumber || kyc.aadhaarNumber || kyc.aadhar || dcKyc.aadhaarNumber || tenant?.aadhaarNumber || ""
+  ).replace(/\D/g, "");
+  const maskedAadhaar = rawAadhaar ? `XXXX XXXX ${rawAadhaar.slice(-4)}` : "";
+  const aadhaarPhoneVal = kyc.aadhaarLinkedPhone || dcKyc.aadhaarLinkedPhone || tenant?.aadhaarLinkedPhone || "";
+  const panVal = panNumber || kyc.panNumber || kyc.pan || "";
+  const nameOnDoc = kyc.nameOnDocument || tenant?.name || tenantUser?.name || "";
+  const relationshipVal = kyc.relationship || "Self";
+
+  // KYC counts as "submitted" whenever digital-KYC data exists, even if the
+  // status flag hasn't propagated yet — so the auto-filled view always shows.
+  const kycDigilocker = !!(kyc.digilockerVerified || dcKyc.digilockerVerified);
+  const hasKycData = !!(rawAadhaar || kyc.aadhaarFront || dcKyc.aadhaarFront || kycDigilocker);
+  const kycStatusVal = String(tenant?.kycStatus || (hasKycData ? "submitted" : "pending")).toLowerCase();
+  const kycActionRequired = !["submitted", "verified"].includes(kycStatusVal) && !hasKycData;
+  const kycDate = (() => {
+    const f = formatDate(kyc.digilockerVerifiedAt || kyc.submittedAt || kyc.verifiedAt || tenant?.kycSubmittedAt);
+    return f === "-" ? formatDate(new Date().toISOString()) : f;
+  })();
+
+  const downloadLatestReceipt = () => {
+    if (latestPaid) downloadReceiptPdf(latestPaid);
+    else setActionMsg("No paid receipt available yet.");
+  };
+
+  // Open the tenant's signed rental agreement (same resolution order as the
+  // Documents section): hosted pdfUrl → backend-generated PDF → not-signed notice.
+  const openAgreement = () => {
+    const pdfUrl = tenant?.digitalCheckin?.agreement?.pdfUrl;
+    if (pdfUrl) {
+      window.open(pdfUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if ((tenant?.agreementSigned || tenant?.agreementSignedAt) && loginId) {
+      const base = getApiBase();
+      window.open(
+        `${base}/api/checkin/tenant/agreement/pdf/${encodeURIComponent(loginId)}`,
+        "_blank",
+        "noopener,noreferrer"
+      );
+      return;
+    }
+    setDocumentViewer({
+      title: "Rental Agreement",
+      type: "agreement",
+      body: (
+        <div className="space-y-4 text-sm text-slate-600">
+          <div className="p-4 rounded-xl border border-amber-100 bg-amber-50 text-center">
+            <p className="font-semibold text-amber-800">Agreement not yet signed</p>
+            <p className="text-xs mt-1 text-amber-600">Complete your digital check-in to generate the signed agreement.</p>
+          </div>
+        </div>
+      ),
+    });
+  };
+
+  const quickActions = [
+    { title: "Pay Rent", subtitle: "Settle your monthly rent", color: "purple", icon: QuickActionIcons.CreditCard, onClick: () => setPayOpen(true) },
+    { title: "Raise Complaint", subtitle: "Report an issue", color: "orange", icon: QuickActionIcons.Flag, onClick: () => setActiveTab("complaints") },
+    { title: "Maintenance Request", subtitle: "Request a repair", color: "blue", icon: QuickActionIcons.Wrench, onClick: () => setActiveTab("complaints") },
+    { title: "Visitor Pass", subtitle: "Pre-approve a guest", color: "green", icon: QuickActionIcons.UserPlus, onClick: () => setActiveTab("visitor") },
+    { title: "Leave Request", subtitle: "Submit leave request", color: "indigo", icon: QuickActionIcons.CalendarOff, onClick: () => setActiveTab("leave") },
+  ];
+
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="html-page">
@@ -1102,558 +1477,191 @@ export default function Tenantdashboard() {
 
       <div className="flex h-screen overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-64 bg-[#0f172a] flex-shrink-0 hidden md:flex flex-col transition-all duration-300">
-          <div className="h-20 flex items-center px-6 border-b border-slate-800">
-            <div className="bg-purple-600 p-2 rounded-lg mr-3">
-              <i data-lucide="home" className="w-5 h-5 text-white"></i>
-            </div>
-            <div>
-              <img src="/website/images/whitelogo.jpeg" alt="Roomhy Logo" className="h-16 w-auto" />
-              <p className="text-[10px] text-slate-400 font-medium tracking-wider">TENANT PORTAL</p>
-            </div>
-          </div>
-          <nav className="flex-1 py-4 space-y-1 px-3 overflow-y-auto custom-scrollbar">
-            <button
-              onClick={() => setActiveTab("dashboard")}
-              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all ${
-                activeTab === "dashboard"
-                  ? "bg-purple-600 text-white shadow-lg shadow-purple-600/20"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-              }`}
-            >
-              <i data-lucide="home" className="w-5 h-5 mr-3"></i> Dashboard
-            </button>
-
-            <button
-              onClick={() => setActiveTab("ledger")}
-              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all ${
-                activeTab === "ledger"
-                  ? "bg-purple-600 text-white shadow-lg shadow-purple-600/20"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-              }`}
-            >
-              <i data-lucide="receipt" className="w-5 h-5 mr-3"></i> Tenant Ledger
-            </button>
-
-            <button
-              onClick={() => setActiveTab("kyc")}
-              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all ${
-                activeTab === "kyc"
-                  ? "bg-purple-600 text-white shadow-lg shadow-purple-600/20"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-              }`}
-            >
-              <i data-lucide="shield-check" className="w-5 h-5 mr-3"></i> KYC Verification
-            </button>
-
-            <button
-              onClick={() => setActiveTab("police")}
-              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all ${
-                activeTab === "police"
-                  ? "bg-purple-600 text-white shadow-lg shadow-purple-600/20"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-              }`}
-            >
-              <i data-lucide="shield" className="w-5 h-5 mr-3"></i> Police Verification
-            </button>
-
-            <button
-              onClick={() => setActiveTab("moveout")}
-              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all ${
-                activeTab === "moveout"
-                  ? "bg-purple-600 text-white shadow-lg shadow-purple-600/20"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-              }`}
-            >
-              <i data-lucide="log-out" className="w-5 h-5 mr-3"></i> Move-out Notice
-            </button>
-
-            <button
-              onClick={() => setActiveTab("feedback")}
-              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all ${
-                activeTab === "feedback"
-                  ? "bg-purple-600 text-white shadow-lg shadow-purple-600/20"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-              }`}
-            >
-              <i data-lucide="star" className="w-5 h-5 mr-3"></i> Feedback & Review
-            </button>
-
-            <div className="sidebar-section-title px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">Gate Management</div>
-
-            <button
-              onClick={() => setActiveTab("visitor")}
-              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all ${
-                activeTab === "visitor"
-                  ? "bg-purple-600 text-white shadow-lg shadow-purple-600/20"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-              }`}
-            >
-              <i data-lucide="user-plus" className="w-5 h-5 mr-3"></i> Visitor Pass
-            </button>
-            <button
-              onClick={() => setActiveTab("leave")}
-              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all ${
-                activeTab === "leave"
-                  ? "bg-purple-600 text-white shadow-lg shadow-purple-600/20"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-              }`}
-            >
-              <i data-lucide="calendar-off" className="w-5 h-5 mr-3"></i> Leave Request
-            </button>
-
-            <div className="sidebar-section-title px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">Help & Requests</div>
-
-            <button
-              onClick={() => setActiveTab("complaints")}
-              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all ${
-                activeTab === "complaints"
-                  ? "bg-purple-600 text-white shadow-lg shadow-purple-600/20"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-              }`}
-            >
-              <i data-lucide="flag" className="w-5 h-5 mr-3"></i> Lodge Complaint
-            </button>
-          </nav>
-          <div className="p-4 border-t border-slate-800">
-            <button
-              onClick={clearSession}
-              className="flex items-center text-slate-400 hover:text-white w-full px-4 py-2 text-sm font-medium transition-colors text-left"
-            >
-              <i data-lucide="log-out" className="w-5 h-5 mr-3"></i> Logout
-            </button>
-          </div>
-        </aside>
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={clearSession} />
 
         <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
-          <header className="bg-white h-16 flex items-center justify-between px-6 border-b border-slate-200 flex-shrink-0">
-            <h2 className="text-lg font-bold text-slate-800">
-              {activeTab === "dashboard" && "Tenant Dashboard"}
-              {activeTab === "ledger" && "Resident Ledger Statement"}
-              {activeTab === "kyc" && "KYC Document Verification"}
-              {activeTab === "police" && "Police Station Verification Receipt"}
-              {activeTab === "moveout" && "Submit Exit Move-out Notice"}
-              {activeTab === "feedback" && "Submit Reviews & Feedback"}
-              {activeTab === "visitor" && "Request Visitor Pass"}
-              {activeTab === "leave" && "Submit Leave Request"}
-            </h2>
-          </header>
+          {/* Mobile-only top bar with brand + logout */}
+          <MobileTopBar onLogout={clearSession} />
 
-          <main className="flex-1 overflow-y-auto p-6 md:p-8 bg-slate-50">
+          {activeTab !== "dashboard" && activeTab !== "ledger" && activeTab !== "kyc" && activeTab !== "moveout" && activeTab !== "visitor" && activeTab !== "leave" && activeTab !== "complaints" && (
+            <header className="hidden md:flex bg-white h-16 items-center justify-between px-6 border-b border-slate-200 flex-shrink-0">
+              <h2 className="text-lg font-bold text-slate-800">
+                {activeTab === "police" && "Police Station Verification Receipt"}
+                {activeTab === "feedback" && "Submit Reviews & Feedback"}
+                {activeTab === "visitor" && "Request Visitor Pass"}
+                {activeTab === "leave" && "Submit Leave Request"}
+              </h2>
+            </header>
+          )}
+
+          <main className={`flex-1 overflow-y-auto p-6 md:p-8 pb-28 md:pb-8 ${activeTab === "dashboard" || activeTab === "ledger" || activeTab === "kyc" || activeTab === "moveout" || activeTab === "visitor" || activeTab === "leave" || activeTab === "complaints" ? "bg-white" : "bg-slate-50"}`}>
             {errorMsg ? <div className="text-sm text-red-600 mb-6 bg-red-50 p-3 rounded-lg border border-red-200">{errorMsg}</div> : null}
 
             {/* TAB 1: DASHBOARD */}
             {activeTab === "dashboard" && (
-              <div className="max-w-6xl mx-auto space-y-8">
-                {/* Welcome */}
-                <div>
-                  <h2 className="text-4xl font-bold text-slate-900">
-                    Welcome back,{" "}
-                    <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                      {(tenantUser?.name || tenant?.name || "Tenant").split(" ")[0]}
-                    </span>
-                  </h2>
-                  <p className="text-slate-500 mt-2">Here's your rental summary and account overview</p>
-                </div>
+              <div className="max-w-7xl mx-auto space-y-6">
+                <DashboardHeader
+                  firstName={firstName}
+                  dateLabel={todayLabel}
+                  onPayRent={() => setPayOpen(true)}
+                />
 
-                {/* Rent Banner */}
-                <div className="rent-banner p-8 rounded-2xl shadow-xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl"></div>
-                  <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl"></div>
-                  <div className="relative z-10 grid md:grid-cols-2 gap-8">
-                    <div>
-                      <div className="flex items-center gap-2 text-blue-100 mb-3">
-                        <i data-lucide="receipt" className="w-5 h-5"></i>
-                        <span className="font-semibold text-sm uppercase tracking-wide">Monthly Rent Payment</span>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* LEFT COLUMN */}
+                  <div className="lg:col-span-2 space-y-6">
+                    <HeroRentCard
+                      amountDue={rentAmount}
+                      isPaid={isPaid}
+                      statusLabel={statusLabel}
+                      dueText="Due on 5th of this month"
+                      cal={calInfo}
+                      onPayNow={() => setPayOpen(true)}
+                      onDownloadReceipt={downloadLatestReceipt}
+                      hasReceipt={!!latestPaid}
+                    />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-6">
+                      <div className="sm:col-span-2">
+                        <UpcomingDuesCard
+                          nextDueLabel={dueInfo.label}
+                          amount={rentAmount}
+                          daysRemaining={dueInfo.daysRemaining}
+                          progress={dueInfo.progress}
+                          onViewAll={() => setActiveTab("ledger")}
+                        />
                       </div>
-                      <div className="mb-6">
-                        <p className="text-sm text-blue-100 mb-2">Amount Due</p>
-                        <h1 className="text-6xl font-bold text-white">
-                          {loading ? "₹ --" : formatCurrency(isPaid ? 0 : rentAmount)}
-                        </h1>
-                      </div>
-                      <div className="flex flex-wrap gap-3 items-center">
-                        <span className="px-4 py-2 bg-white/20 text-white rounded-full text-sm font-medium backdrop-blur">
-                          Due: 5th of Month
-                        </span>
-                        <span className={`px-4 py-2 text-white rounded-full text-sm font-bold flex items-center gap-1 ${isPaid ? "bg-green-500" : paymentStatus === "overdue" ? "bg-red-500" : "bg-amber-500"}`}>
-                          <i data-lucide={isPaid ? "check-circle" : "alert-circle"} className="w-4 h-4"></i>{" "}
-                          {statusLabel}
-                        </span>
+                      <div className="sm:col-span-3">
+                        <PaymentTrendChart data={chartData} percentChange={percentChange} />
                       </div>
                     </div>
-                    <div className="flex flex-col justify-between items-start md:items-end gap-6">
-                      <div className="text-white/90 text-sm space-y-2">
-                        <p><strong>Property:</strong> {propertyName}</p>
-                        <p><strong>Room:</strong> {roomInfo}</p>
-                        <p><strong>Login ID:</strong> <span className="font-mono">{loginId || "--"}</span></p>
-                      </div>
-                      <button
-                        onClick={() => setPayOpen(true)}
-                        className="bg-white text-blue-600 hover:bg-blue-50 px-8 py-4 rounded-xl font-bold shadow-lg transition-all hover:shadow-2xl hover:scale-105 flex items-center gap-2 w-full md:w-auto justify-center"
-                      >
-                        <i data-lucide="credit-card" className="w-5 h-5"></i> Pay Now
-                      </button>
-                    </div>
+
+                    <RecentPaymentsTable
+                      rows={recentRows}
+                      onDownload={(item) => downloadReceiptPdf(item)}
+                      onViewAll={() => setActiveTab("ledger")}
+                    />
                   </div>
-                </div>
 
-                {/* Quick Action Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <button onClick={() => setActiveTab("complaints")} className="dashboard-card p-6 flex flex-col cursor-pointer group text-left">
-                    <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-red-200 transition">
-                      <i data-lucide="flag" className="w-6 h-6 text-red-600"></i>
-                    </div>
-                    <h3 className="font-semibold text-slate-900 mb-2">Lodge Complaint</h3>
-                    <p className="text-sm text-slate-500">Report maintenance or other issues</p>
-                    <div className="mt-4 text-blue-600 text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
-                      Open <i data-lucide="arrow-right" className="w-4 h-4"></i>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("kyc")}
-                    className="dashboard-card p-6 flex flex-col cursor-pointer group text-left"
-                  >
-                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-purple-200 transition">
-                      <i data-lucide="shield-check" className="w-6 h-6 text-purple-600"></i>
-                    </div>
-                    <h3 className="font-semibold text-slate-900 mb-2">KYC Documents</h3>
-                    <p className="text-sm text-slate-500">Access rental agreements and identity files</p>
-                    <div className="mt-4 text-blue-600 text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
-                      Upload <i data-lucide="arrow-right" className="w-4 h-4"></i>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() =>
-                      openGenericModal(
-                        "Emergency Contacts",
-                        <div className="space-y-3">
-                          <div className="p-3 bg-red-50 rounded-lg border border-red-100">
-                            <p className="font-bold text-red-700 text-sm">Property Manager</p>
-                            <p className="text-lg font-bold text-red-900 mt-1">+91 98765 43210</p>
-                          </div>
-                          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                            <p className="font-medium text-slate-700 text-sm">Local Police</p>
-                            <p className="text-lg font-bold text-slate-900 mt-1">100</p>
-                          </div>
-                          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                            <p className="font-medium text-slate-700 text-sm">Ambulance</p>
-                            <p className="text-lg font-bold text-slate-900 mt-1">108</p>
-                          </div>
-                        </div>
-                      )
-                    }
-                    className="dashboard-card p-6 flex flex-col cursor-pointer group text-left"
-                  >
-                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-green-200 transition">
-                      <i data-lucide="phone-call" className="w-6 h-6 text-green-600"></i>
-                    </div>
-                    <h3 className="font-semibold text-slate-900 mb-2">Emergency Contacts</h3>
-                    <p className="text-sm text-slate-500">Quick access to important contacts</p>
-                    <div className="mt-4 text-blue-600 text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
-                      Show <i data-lucide="arrow-right" className="w-4 h-4"></i>
-                    </div>
-                  </button>
-                  <button onClick={() => setVisitorModalOpen(true)} className="dashboard-card p-6 flex flex-col cursor-pointer group text-left">
-                    <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-orange-200 transition">
-                      <i data-lucide="user-plus" className="w-6 h-6 text-orange-600"></i>
-                    </div>
-                    <h3 className="font-semibold text-slate-900 mb-2">Visitor Pass</h3>
-                    <p className="text-sm text-slate-500">Generate pass for your guests</p>
-                    <div className="mt-4 text-blue-600 text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
-                      Create <i data-lucide="arrow-right" className="w-4 h-4"></i>
-                    </div>
-                  </button>
-                  <button onClick={() => setLeaveModalOpen(true)} className="dashboard-card p-6 flex flex-col cursor-pointer group text-left">
-                    <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-indigo-200 transition">
-                      <i data-lucide="calendar-off" className="w-6 h-6 text-indigo-600"></i>
-                    </div>
-                    <h3 className="font-semibold text-slate-900 mb-2">Leave Request</h3>
-                    <p className="text-sm text-slate-500">Submit exit details for holidays</p>
-                    <div className="mt-4 text-blue-600 text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
-                      Submit <i data-lucide="arrow-right" className="w-4 h-4"></i>
-                    </div>
-                  </button>
-                </div>
-
-                {/* Current Stay */}
-                <div className="dashboard-card p-8">
-                  <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <i data-lucide="home" className="w-6 h-6 text-blue-600"></i>
-                    </div>
-                    Your Current Stay
-                  </h3>
-                  <div className="grid md:grid-cols-4 gap-6">
-                    <div className="p-4 bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-100">
-                      <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-2">Property</p>
-                      <p className="text-lg font-bold text-slate-900">{propertyName}</p>
-                    </div>
-                    <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-100">
-                      <p className="text-xs text-blue-600 font-semibold uppercase tracking-wider mb-2">Room Details</p>
-                      <p className="text-lg font-bold text-blue-900">{roomInfo}</p>
-                    </div>
-                    <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-100">
-                      <p className="text-xs text-purple-600 font-semibold uppercase tracking-wider mb-2">Login ID</p>
-                      <p className="text-lg font-bold text-purple-900 font-mono">{loginId || "--"}</p>
-                    </div>
-                    <div className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl border border-orange-100">
-                      <p className="text-xs text-orange-600 font-semibold uppercase tracking-wider mb-2">Move-In Date</p>
-                      <p className="text-lg font-bold text-orange-900">{formatDate(tenant?.moveInDate)}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Documents */}
-                <div id="documents" className="dashboard-card p-8">
-                  <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3">
-                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <i data-lucide="folder-open" className="w-6 h-6 text-purple-600"></i>
-                    </div>
-                    Documents & Bills
-                  </h3>
-                  <div className="space-y-3">
-                    {docs.map((doc) => (
-                      <div
-                        key={doc.key}
-                        className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 transition"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${doc.accent === "green" ? "bg-green-100" : "bg-purple-100"}`}>
-                            <i data-lucide={doc.icon} className={`w-5 h-5 ${doc.accent === "green" ? "text-green-600" : "text-purple-600"}`}></i>
-                          </div>
-                          <div>
-                            <p className="font-semibold text-slate-900">{doc.title}</p>
-                            <p className="text-xs text-slate-500 mt-1">{doc.subtitle}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={doc.onView}
-                            className="flex items-center gap-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold px-4 py-2 rounded-lg transition"
-                          >
-                            <i data-lucide="eye" className="w-3 h-3"></i>
-                            {doc.actionLabel || "View"}
-                          </button>
-                          {doc.downloadable ? (
-                            <button
-                              onClick={() => downloadReceiptPdf(doc.rentItem)}
-                              disabled={pdfBusy}
-                              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition disabled:opacity-60"
-                            >
-                              <i data-lucide="download" className="w-3 h-3"></i>
-                              {pdfBusy ? "Generating..." : "Download PDF"}
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Activity Timeline */}
-                <div id="activity" className="dashboard-card p-8 pb-12">
-                  <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <i data-lucide="activity" className="w-6 h-6 text-blue-600"></i>
-                    </div>
-                    Activity Timeline
-                  </h3>
+                  {/* RIGHT COLUMN */}
                   <div className="space-y-6">
-                    {activityRows.length === 0 ? (
-                      <div className="flex gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center border-4 border-white shadow-md">
-                            <i data-lucide="clock-3" className="w-5 h-5 text-slate-500"></i>
-                          </div>
-                        </div>
-                        <div className="pt-1">
-                          <p className="font-semibold text-slate-900">No payment activity yet</p>
-                          <p className="text-sm text-slate-500 mt-1">Your rent payments will appear here.</p>
-                        </div>
-                      </div>
-                    ) : (
-                      activityRows.map((item, index) => {
-                        const paid = ["paid", "completed"].includes(String(item.paymentStatus || "").toLowerCase());
-                        return (
-                          <div key={item._id || `${item.collectionMonth}-${index}`} className="flex gap-4">
-                            <div className="flex flex-col items-center">
-                              <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 border-white shadow-md ${paid ? "bg-green-100" : "bg-amber-100"}`}>
-                                <i data-lucide={paid ? "check-circle" : "clock-3"} className={`w-5 h-5 ${paid ? "text-green-600" : "text-amber-600"}`}></i>
-                              </div>
-                              {index < activityRows.length - 1 ? (
-                                <div className="w-0.5 h-12 bg-slate-200 mt-2"></div>
-                              ) : null}
-                            </div>
-                            <div className="pt-1 flex-1">
-                              <div className="flex items-center justify-between gap-4">
-                                <div>
-                                  <p className="font-semibold text-slate-900">
-                                    {paid ? "Rent Paid Successfully" : "Rent Payment Pending"}
-                                  </p>
-                                  <p className="text-sm text-slate-500 mt-1">
-                                    {formatDate(item.paymentDate || item.updatedAt || item.createdAt, true)} •{" "}
-                                    {formatCurrency(item.paidAmount || item.totalDue || item.rentAmount)} •{" "}
-                                    {paymentMethodLabel(item.paymentMethod)}
-                                  </p>
-                                </div>
-                                {paid && (
-                                  <button
-                                    onClick={() => downloadReceiptPdf(item)}
-                                    disabled={pdfBusy}
-                                    title="Download Receipt"
-                                    className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 border border-blue-200 hover:border-blue-400 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition disabled:opacity-50"
-                                  >
-                                    <i data-lucide="download" className="w-3 h-3"></i>
-                                    {pdfBusy ? "..." : "Receipt"}
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
+                    <LeaseInformation
+                      status={leaseStatus}
+                      property={propertyName}
+                      startDate={fmtOrDash(leaseStart)}
+                      endDate={fmtOrDash(leaseEnd)}
+                      onViewDetails={openAgreement}
+                    />
+                    <QuickActions actions={quickActions} />
+                    <AnnouncementCard
+                      recentComplaint={myComplaints[0] || null}
+                      onViewAll={() => setActiveTab("complaints")}
+                    />
                   </div>
                 </div>
               </div>
             )}
 
+
             {/* TAB 2: LEDGER */}
             {activeTab === "ledger" && (
-              <div className="max-w-6xl mx-auto space-y-8">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="max-w-[1180px] mx-auto space-y-8">
+                <LedgerHeader
+                  firstName={firstName}
+                  dateLabel={ledgerDateLabel}
+                  isFiltered={isDateFiltered}
+                  onOpenPicker={() => setLedgerPickerOpen(true)}
+                  onPrint={() => window.print()}
+                />
+
+                <div>
+                  <h2 className="text-[22px] font-bold tracking-tight text-slate-900">Tenant Ledger</h2>
+                  <p className="text-slate-400 mt-1 text-[14px]">
+                    Complete logs of all monthly rent charges, payments, and owner adjustments.
+                  </p>
+                </div>
+
+                <LedgerSummaryCards
+                  outstanding={ledgerStats.outstanding}
+                  totalDebits={ledgerStats.totalDebits}
+                  totalCredits={ledgerStats.totalCredits}
+                  netBalance={ledgerStats.net}
+                  debitCount={ledgerStats.debitCount}
+                  creditCount={ledgerStats.creditCount}
+                  debitTrend={ledgerStats.debitTrend}
+                  creditTrend={ledgerStats.creditTrend}
+                  asOfDate={todayLabel.split(", ")[1] || todayLabel}
+                />
+
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                  <div className="xl:col-span-2">
+                    <BalanceChart data={ledgerChart} />
+                  </div>
                   <div>
-                    <h2 className="text-3xl font-bold text-slate-900">Tenant Ledger Statement</h2>
-                    <p className="text-slate-500 mt-1">Complete logs of all monthly rent charges, payments, and owner adjustments.</p>
-                  </div>
-                  <button 
-                    onClick={() => window.print()}
-                    className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold px-4 py-2 rounded-xl transition"
-                  >
-                    <i data-lucide="printer" className="w-4 h-4"></i> Print Statement
-                  </button>
-                </div>
-
-                {/* Ledger Balance Card */}
-                <div className={`p-6 rounded-2xl border ${
-                  ledgerBalance > 0 
-                    ? "bg-rose-50 border-rose-200" 
-                    : ledgerBalance < 0 
-                    ? "bg-emerald-50 border-emerald-200"
-                    : "bg-slate-50 border-slate-200"
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Outstanding Balance</p>
-                      <h3 className={`text-4xl font-extrabold mt-1 ${
-                        ledgerBalance > 0 ? "text-rose-600" : ledgerBalance < 0 ? "text-emerald-600" : "text-slate-700"
-                      }`}>
-                        {formatCurrency(ledgerBalance)}
-                      </h3>
-                      <p className="text-sm text-slate-600 mt-2">
-                        {ledgerBalance > 0 
-                          ? "You have outstanding rent or other dues. Please clear them as soon as possible." 
-                          : ledgerBalance < 0 
-                          ? "You have an advance credit balance on your ledger."
-                          : "Your account balance is fully settled."
-                        }
-                      </p>
-                    </div>
-                    <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
-                      ledgerBalance > 0 ? "bg-rose-100 text-rose-600" : "bg-emerald-100 text-emerald-600"
-                    }`}>
-                      <i data-lucide={ledgerBalance > 0 ? "alert-circle" : "check-circle"} className="w-8 h-8"></i>
-                    </div>
+                    <SummaryPanel
+                      opening={0}
+                      totalDebits={ledgerStats.totalDebits}
+                      totalCredits={ledgerStats.totalCredits}
+                      current={ledgerStats.net}
+                    />
                   </div>
                 </div>
 
-                {/* Ledger Entries Table */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                  <div className="overflow-x-auto">
-                    {loadingLedger ? (
-                      <div className="p-8 text-center text-slate-500">Loading ledger statement...</div>
-                    ) : ledgerEntries.length === 0 ? (
-                      <div className="p-8 text-center text-slate-500">No ledger transactions found.</div>
-                    ) : (
-                      <table className="w-full text-left border-collapse text-sm">
-                        <thead>
-                          <tr className="bg-slate-50 text-slate-500 uppercase text-xs tracking-wider border-b border-slate-200">
-                            <th className="px-6 py-4 font-semibold">Date</th>
-                            <th className="px-6 py-4 font-semibold">Transaction Details</th>
-                            <th className="px-6 py-4 font-semibold text-right">Debit (+)</th>
-                            <th className="px-6 py-4 font-semibold text-right">Credit (-)</th>
-                            <th className="px-6 py-4 font-semibold text-right">Running Balance</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {ledgerEntries.map((entry) => (
-                            <tr key={entry.id} className="hover:bg-slate-50/50 transition">
-                              <td className="px-6 py-4 text-slate-600 whitespace-nowrap">{entry.date}</td>
-                              <td className="px-6 py-4 font-medium text-slate-800">{entry.details}</td>
-                              <td className="px-6 py-4 text-right text-rose-600 whitespace-nowrap">
-                                {entry.debit > 0 ? `+ ₹${entry.debit.toLocaleString()}` : "—"}
-                              </td>
-                              <td className="px-6 py-4 text-right text-emerald-600 whitespace-nowrap">
-                                {entry.credit > 0 ? `- ₹${entry.credit.toLocaleString()}` : "—"}
-                              </td>
-                              <td className={`px-6 py-4 text-right font-semibold whitespace-nowrap ${
-                                entry.balance > 0 ? "text-rose-600" : entry.balance < 0 ? "text-emerald-600" : "text-slate-600"
-                              }`}>
-                                {formatCurrency(entry.balance)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
+                <LedgerFilters
+                  dateLabel={ledgerDateLabel}
+                  isFiltered={isDateFiltered}
+                  onOpenPicker={() => setLedgerPickerOpen(true)}
+                  type={ledgerType}
+                  setType={setLedgerType}
+                  category={ledgerCategory}
+                  setCategory={setLedgerCategory}
+                  typeOptions={["All Transactions", "Debits", "Credits"]}
+                  categoryOptions={["All Categories", "Rent", "Payment"]}
+                  onDownloadCsv={downloadLedgerCsv}
+                />
+
+                <DateRangePicker
+                  isOpen={ledgerPickerOpen}
+                  from={ledgerDateFrom}
+                  to={ledgerDateTo}
+                  onApply={(f, t) => { setLedgerDateFrom(f); setLedgerDateTo(t); }}
+                  onClear={() => { setLedgerDateFrom(""); setLedgerDateTo(""); }}
+                  onClose={() => setLedgerPickerOpen(false)}
+                />
+
+                <div className="space-y-4">
+                  <LedgerTable rows={pagedLedgerRows} loading={loadingLedger} />
+                  {!loadingLedger && filteredLedgerRows.length > 0 && (
+                    <Pagination
+                      page={ledgerPage}
+                      pageCount={ledgerPageCount}
+                      total={filteredLedgerRows.length}
+                      shown={pagedLedgerRows.length}
+                      onPage={setLedgerPage}
+                    />
+                  )}
                 </div>
               </div>
             )}
 
             {/* TAB 3: KYC */}
             {activeTab === "kyc" && (
-              <div className="max-w-4xl mx-auto space-y-8">
+              <div className="max-w-[1180px] mx-auto space-y-8">
+                <KycHeader
+                  firstName={firstName}
+                  subtitle="Here's your KYC verification status and details."
+                />
+
                 <div>
-                  <h2 className="text-3xl font-bold text-slate-900">KYC Verification</h2>
-                  <p className="text-slate-500 mt-1">Submit your identity cards and documentation to complete compliance check.</p>
+                  <h2 className="text-[22px] font-bold tracking-tight text-slate-900">KYC Verification</h2>
+                  <p className="text-slate-400 mt-1 text-[14px]">View your identity details and verification status.</p>
                 </div>
 
-                {/* Status banner */}
-                <div className={`p-5 rounded-2xl border flex items-start gap-4 ${
-                  tenant?.kycStatus === "verified"
-                    ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                    : tenant?.kycStatus === "submitted"
-                    ? "bg-blue-50 border-blue-200 text-blue-800"
-                    : tenant?.kycStatus === "rejected"
-                    ? "bg-rose-50 border-rose-200 text-rose-800"
-                    : "bg-amber-50 border-amber-200 text-amber-800"
-                }`}>
-                  <div className="pt-0.5">
-                    <i data-lucide={
-                      tenant?.kycStatus === "verified" ? "check-circle" :
-                      tenant?.kycStatus === "submitted" ? "clock-3" :
-                      tenant?.kycStatus === "rejected" ? "alert-triangle" : "file-warning"
-                    } className="w-6 h-6"></i>
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-lg">
-                      {tenant?.kycStatus === "verified" && "KYC Approved & Verified"}
-                      {tenant?.kycStatus === "submitted" && "KYC Verification Under Review"}
-                      {tenant?.kycStatus === "rejected" && "KYC Rejected - Action Required"}
-                      {(!tenant?.kycStatus || tenant?.kycStatus === "pending") && "KYC Pending Upload"}
-                    </h4>
-                    <p className="text-sm mt-1 opacity-90">
-                      {tenant?.kycStatus === "verified" && "Your identity proof check is completed. No further action is required."}
-                      {tenant?.kycStatus === "submitted" && "Your documents are uploaded successfully. Owner is reviewing them. Please check back later."}
-                      {tenant?.kycStatus === "rejected" && "Your documents did not meet verification criteria. Please check details and re-upload."}
-                      {(!tenant?.kycStatus || tenant?.kycStatus === "pending") && "Please enter your Aadhaar & PAN details and upload clear photo scans to enable your stay agreement."}
-                    </p>
-                  </div>
-                </div>
+                {/* Verification status (hero) */}
+                <VerificationStatusCard status={kycStatusVal} />
 
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
+                {/* Identity: read-only when submitted/verified, upload form when action needed */}
+                {kycActionRequired ? (
+                  <div className={`rounded-[22px] border border-[#eceef3] bg-white p-6 md:p-8 shadow-[0_6px_28px_-16px_rgba(15,23,42,0.16)]`}>
                   <form onSubmit={handleKycSubmit} className="space-y-6">
                     <div className="grid md:grid-cols-2 gap-6">
                       <div className="space-y-2">
@@ -1688,7 +1696,7 @@ export default function Tenantdashboard() {
                         <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Aadhaar Front Scan *</label>
                         {aadhaarFrontUrl && (
                           <a href={aadhaarFrontUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline mb-2 font-medium">
-                            <i data-lucide="eye" className="w-3.5 h-3.5"></i> View Uploaded Front
+                            <Eye className="w-3.5 h-3.5" /> View Uploaded Front
                           </a>
                         )}
                         <input
@@ -1704,7 +1712,7 @@ export default function Tenantdashboard() {
                         <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Aadhaar Back Scan *</label>
                         {aadhaarBackUrl && (
                           <a href={aadhaarBackUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline mb-2 font-medium">
-                            <i data-lucide="eye" className="w-3.5 h-3.5"></i> View Uploaded Back
+                            <Eye className="w-3.5 h-3.5" /> View Uploaded Back
                           </a>
                         )}
                         <input
@@ -1720,7 +1728,7 @@ export default function Tenantdashboard() {
                         <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Address Proof (Electricity Bill, etc)</label>
                         {addressProofUrl && (
                           <a href={addressProofUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline mb-2 font-medium">
-                            <i data-lucide="eye" className="w-3.5 h-3.5"></i> View Uploaded Proof
+                            <Eye className="w-3.5 h-3.5" /> View Uploaded Proof
                           </a>
                         )}
                         <input
@@ -1745,12 +1753,24 @@ export default function Tenantdashboard() {
                         disabled={uploadingKyc}
                         className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-50"
                       >
-                        <i data-lucide="upload" className="w-5 h-5"></i>
+                        <Upload className="w-5 h-5" />
                         {uploadingKyc ? "Uploading and submitting..." : "Submit KYC Documents"}
                       </button>
                     )}
                   </form>
-                </div>
+                  </div>
+                ) : (
+                  <IdentityInformationCard
+                    aadhaar={maskedAadhaar}
+                    aadhaarPhone={aadhaarPhoneVal}
+                    pan={panVal}
+                    name={nameOnDoc}
+                    relationship={relationshipVal}
+                  />
+                )}
+
+                {/* Verification timeline */}
+                <VerificationTimeline status={kycStatusVal} date={kycDate} digilockerVerified={kycDigilocker} />
               </div>
             )}
 
@@ -1773,11 +1793,10 @@ export default function Tenantdashboard() {
                     : "bg-amber-50 border-amber-200 text-amber-800"
                 }`}>
                   <div className="pt-0.5">
-                    <i data-lucide={
-                      tenant?.policeVerification?.status === "verified" ? "check-circle" :
-                      tenant?.policeVerification?.status === "submitted" ? "clock-3" :
-                      tenant?.policeVerification?.status === "rejected" ? "alert-triangle" : "file-warning"
-                    } className="w-6 h-6"></i>
+                    {tenant?.policeVerification?.status === "verified" && <CheckCircle className="w-6 h-6" />}
+                    {tenant?.policeVerification?.status === "submitted" && <Clock3 className="w-6 h-6" />}
+                    {tenant?.policeVerification?.status === "rejected" && <AlertTriangle className="w-6 h-6" />}
+                    {(!tenant?.policeVerification?.status || tenant?.policeVerification?.status === "pending") && <FileWarning className="w-6 h-6" />}
                   </div>
                   <div>
                     <h4 className="font-bold text-lg">
@@ -1816,7 +1835,7 @@ export default function Tenantdashboard() {
                           onClick={(e) => { e.preventDefault(); alert("Template downloading initiated..."); }}
                           className="mt-3 flex items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-1.5 rounded-lg transition"
                         >
-                          <i data-lucide="download" className="w-3 h-3"></i> Download
+                          <Download className="w-3 h-3" /> Download
                         </a>
                       </div>
                     ))}
@@ -1833,7 +1852,7 @@ export default function Tenantdashboard() {
                       {policeReceiptUrl && (
                         <div className="pt-2">
                           <a href={policeReceiptUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline font-medium">
-                            <i data-lucide="eye" className="w-3.5 h-3.5"></i> View Uploaded Receipt
+                            <Eye className="w-3.5 h-3.5" /> View Uploaded Receipt
                           </a>
                         </div>
                       )}
@@ -1861,7 +1880,7 @@ export default function Tenantdashboard() {
                         disabled={uploadingPolice}
                         className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-50"
                       >
-                        <i data-lucide="upload" className="w-5 h-5"></i>
+                        <Upload className="w-5 h-5" />
                         {uploadingPolice ? "Uploading receipt..." : "Submit Receipt Form"}
                       </button>
                     )}
@@ -1872,17 +1891,25 @@ export default function Tenantdashboard() {
 
             {/* TAB 5: MOVEOUT */}
             {activeTab === "moveout" && (
-              <div className="max-w-3xl mx-auto space-y-8">
-                <div>
-                  <h2 className="text-3xl font-bold text-slate-900">Move-out Request</h2>
-                  <p className="text-slate-500 mt-1">Submit your checkout notice to the property management team.</p>
+              <div className="max-w-2xl mx-auto space-y-7">
+                <div className="pb-5 border-b border-slate-100">
+                  <WelcomeHeader firstName={firstName} subtitle="Here's your move-out request details." />
                 </div>
+
+                <Breadcrumb
+                  items={[
+                    { label: "Move-out Notice" },
+                    { label: "Submit Exit Move-out Notice", active: true },
+                  ]}
+                />
+
+                <MoveOutHero />
 
                 {/* Status-based views */}
                 {tenant?.moveoutRequest?.status === "pending" && (
                   <div className="bg-blue-50 border border-blue-200 p-6 rounded-2xl text-blue-900 space-y-4 shadow-sm">
                     <div className="flex gap-3 items-start">
-                      <i data-lucide="clock" className="w-6 h-6 text-blue-600 mt-0.5"></i>
+                      <Clock className="w-6 h-6 text-blue-600 mt-0.5" />
                       <div>
                         <h4 className="font-bold text-lg">Exit Notice Pending Review</h4>
                         <p className="text-sm mt-1 opacity-90">
@@ -1901,7 +1928,7 @@ export default function Tenantdashboard() {
                 {tenant?.moveoutRequest?.status === "approved" && (
                   <div className="bg-emerald-50 border border-emerald-200 p-6 rounded-2xl text-emerald-950 space-y-4 shadow-sm">
                     <div className="flex gap-3 items-start">
-                      <i data-lucide="check-circle" className="w-6 h-6 text-emerald-600 mt-0.5"></i>
+                      <CheckCircle className="w-6 h-6 text-emerald-600 mt-0.5" />
                       <div>
                         <h4 className="font-bold text-lg text-emerald-900">Exit Cleared & Approved</h4>
                         <p className="text-sm mt-1 opacity-90">
@@ -1928,7 +1955,7 @@ export default function Tenantdashboard() {
                 {tenant?.moveoutRequest?.status === "rejected" && (
                   <div className="bg-rose-50 border border-rose-200 p-5 rounded-2xl text-rose-800 mb-6 flex items-start gap-4">
                     <div className="pt-0.5">
-                      <i data-lucide="x-circle" className="w-6 h-6 text-rose-600"></i>
+                      <XCircle className="w-6 h-6 text-rose-600" />
                     </div>
                     <div>
                       <h4 className="font-bold text-lg">Exit Notice Rejected</h4>
@@ -1940,48 +1967,19 @@ export default function Tenantdashboard() {
                 )}
 
                 {(!tenant?.moveoutRequest || tenant?.moveoutRequest?.status === "none" || tenant?.moveoutRequest?.status === "rejected") && (
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
-                    <form onSubmit={handleMoveoutSubmit} className="space-y-6">
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Intended Exit Date *</label>
-                        <input
-                          type="date"
-                          required
-                          min={new Date().toISOString().split("T")[0]}
-                          value={moveoutDate}
-                          onChange={(e) => setMoveoutDate(e.target.value)}
-                          className="w-full h-12 px-4 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Reason for Moving Out *</label>
-                        <textarea
-                          required
-                          rows={4}
-                          value={moveoutReason}
-                          onChange={(e) => setMoveoutReason(e.target.value)}
-                          placeholder="State why you are checkout (e.g. course end, workplace relocation, etc.)"
-                          className="w-full p-4 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                        ></textarea>
-                      </div>
-
-                      {moveoutMsg && (
-                        <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl text-sm text-slate-700">
-                          {moveoutMsg}
-                        </div>
-                      )}
-
-                      <button
-                        type="submit"
-                        disabled={submittingMoveout}
-                        className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        <i data-lucide="send" className="w-5 h-5"></i>
-                        {submittingMoveout ? "Submitting Notice..." : "Submit Exit Notice"}
-                      </button>
-                    </form>
-                  </div>
+                  <>
+                    <MoveOutForm
+                      date={moveoutDate}
+                      setDate={setMoveoutDate}
+                      reason={moveoutReason}
+                      setReason={setMoveoutReason}
+                      msg={moveoutMsg}
+                      submitting={submittingMoveout}
+                      onSubmit={handleMoveoutSubmit}
+                      minDate={new Date().toISOString().split("T")[0]}
+                    />
+                    <ImportantNoteCard />
+                  </>
                 )}
               </div>
             )}
@@ -2064,7 +2062,7 @@ export default function Tenantdashboard() {
                       disabled={submittingFeedback}
                       className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                      <i data-lucide="star" className="w-5 h-5"></i>
+                      <Star className="w-5 h-5" />
                       {submittingFeedback ? "Submitting review..." : "Submit Feedback"}
                     </button>
                   </form>
@@ -2074,281 +2072,125 @@ export default function Tenantdashboard() {
 
             {/* TAB: COMPLAINTS */}
             {activeTab === "complaints" && (
-              <div className="max-w-5xl mx-auto space-y-8">
-                <div>
-                  <h2 className="text-3xl font-bold text-slate-900">Complaints & Requests</h2>
-                  <p className="text-slate-500 mt-1">Lodge a complaint or maintenance request, and track its status.</p>
+              <div className="max-w-5xl mx-auto space-y-9">
+                <div className="space-y-3">
+                  <WelcomeHeader firstName={firstName} subtitle="Here's your complaints & requests center." />
+                  <Breadcrumb home items={[
+                    { label: "Lodge Complaint", active: false },
+                    { label: "Submit Complaint", active: true },
+                  ]} />
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-8">
-                  {/* Left Column: Form */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                    <h3 className="font-bold text-lg text-slate-800 mb-4 border-b pb-2">New Request</h3>
-                    <form onSubmit={handleComplaintSubmit} className="space-y-4">
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1">Category</label>
-                        <select 
-                          value={complaintCategory} 
-                          onChange={(e) => setComplaintCategory(e.target.value)}
-                          className="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                        >
-                          <option value="Plumbing">Plumbing</option>
-                          <option value="Electrical">Electrical</option>
-                          <option value="Furniture">Furniture</option>
-                          <option value="Appliances">Appliances</option>
-                          <option value="Cleaning">Cleaning</option>
-                          <option value="Internet">Internet</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
+                <ComplaintHero />
 
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1">Priority</label>
-                        <select 
-                          value={complaintPriority} 
-                          onChange={(e) => setComplaintPriority(e.target.value)}
-                          className="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                        >
-                          <option value="Low">Low</option>
-                          <option value="Medium">Medium</option>
-                          <option value="High">High</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1">Description</label>
-                        <textarea
-                          required
-                          rows={4}
-                          value={complaintDesc}
-                          onChange={(e) => setComplaintDesc(e.target.value)}
-                          placeholder="Describe the issue in detail..."
-                          className="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                        ></textarea>
-                      </div>
-
-                      {complaintStatusMsg && (
-                        <div className={`p-3 rounded-xl text-sm ${complaintStatusMsg.includes("success") ? "bg-green-50 text-green-700" : "bg-blue-50 text-blue-700"}`}>
-                          {complaintStatusMsg}
-                        </div>
-                      )}
-
-                      <button
-                        type="submit"
-                        disabled={complaintBusy}
-                        className="w-full h-12 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        <i data-lucide="flag" className="w-5 h-5"></i>
-                        {complaintBusy ? "Submitting..." : "Submit Complaint"}
-                      </button>
-                    </form>
-                  </div>
-
-                  {/* Right Column: History */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col h-[600px]">
-                    <h3 className="font-bold text-lg text-slate-800 mb-4 border-b pb-2">My Requests History</h3>
-                    <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-                      {myComplaints.length === 0 ? (
-                        <div className="text-center py-12 text-slate-400">
-                          <i data-lucide="inbox" className="w-10 h-10 mx-auto mb-3 opacity-40"></i>
-                          <p>No complaints raised yet.</p>
-                        </div>
-                      ) : (
-                        myComplaints.map(c => (
-                          <div key={c._id} className="p-4 border rounded-xl border-slate-200 hover:border-purple-300 transition-colors bg-slate-50">
-                            <div className="flex justify-between items-start mb-2">
-                              <span className="font-bold text-slate-800 text-sm">{c.category || "Complaint"}</span>
-                              <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
-                                c.status === "Resolved" ? "bg-green-100 text-green-700" : 
-                                c.status === "In Progress" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"
-                              }`}>
-                                {c.status || "Open"}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-600 mb-2 line-clamp-2">{c.description}</p>
-                            <div className="flex justify-between items-center text-[10px] text-slate-400">
-                              <span>Priority: {c.priority || "Low"}</span>
-                              <span>{new Date(c.createdAt).toLocaleDateString()}</span>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
+                <div className="grid lg:grid-cols-2 gap-7 items-start">
+                  <ComplaintForm
+                    category={complaintCategory} setCategory={setComplaintCategory}
+                    priority={complaintPriority} setPriority={setComplaintPriority}
+                    desc={complaintDesc} setDesc={setComplaintDesc}
+                    msg={complaintStatusMsg} busy={complaintBusy}
+                    onSubmit={handleComplaintSubmit}
+                  />
+                  <ComplaintHistory complaints={myComplaints} />
                 </div>
               </div>
             )}
 
             {/* TAB: VISITOR PASS */}
-            {activeTab === "visitor" && (
-              <div className="max-w-5xl mx-auto space-y-8">
-                <div>
-                  <h2 className="text-3xl font-bold text-slate-900">Request Visitor Pass</h2>
-                  <p className="text-slate-500 mt-1">Pre-approve your guests for easy entry at the security gate.</p>
-                </div>
-                <div className="grid md:grid-cols-2 gap-8">
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                    <h3 className="font-bold text-lg text-slate-800 mb-4 border-b pb-2">New Visitor</h3>
-                    <form onSubmit={handleVisitorSubmit} className="space-y-4">
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1">Visitor Name *</label>
-                        <input
-                          type="text"
-                          required
-                          value={visitorName}
-                          onChange={(e) => setVisitorName(e.target.value)}
-                          className="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+            {activeTab === "visitor" && (() => {
+              const propertyAddress = tenant?.property?.address || tenant?.address || "";
+              // Most recent request drives the right column (history is sorted newest-first).
+              const latestPass = (myVisitors && myVisitors[0]) || null;
+              const passStatus = latestPass?.status || null;
+              const isApproved = passStatus === "Approved";
+              const origin = typeof window !== "undefined" ? window.location.origin : "";
+              const verifyUrl = latestPass?.qrToken
+                ? `${origin}/visitor-verify?token=${latestPass.qrToken}`
+                : "";
+              const fmtDay = (v) =>
+                v ? new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "";
+              return (
+                <div className="max-w-5xl mx-auto space-y-6">
+                  <WelcomeHeader firstName={firstName} subtitle="Here's your visitor pass center." />
+                  <Breadcrumb items={[
+                    { label: "Visitor Pass", active: false },
+                    { label: "Request Visitor Pass", active: true },
+                  ]} />
+
+                  <div className="grid lg:grid-cols-[52fr_48fr] gap-6 items-start">
+                    {/* LEFT: form */}
+                    <div className="space-y-5">
+                      <VisitorHero />
+                      <VisitorDetailsCard
+                        visitorName={visitorName} setVisitorName={setVisitorName}
+                        visitorPhone={visitorPhone} setVisitorPhone={setVisitorPhone}
+                        visitorExpectedTime={visitorExpectedTime} setVisitorExpectedTime={setVisitorExpectedTime}
+                        onSubmit={handleVisitorSubmit} busy={complaintBusy} msg={visitorMsg}
+                      />
+                      <VisitorNoteCard />
+                    </div>
+
+                    {/* RIGHT: approved pass, else status placeholder */}
+                    <div>
+                      {isApproved ? (
+                        <VisitorPassCard
+                          visitorName={latestPass.name}
+                          visitorPhone={latestPass.phone}
+                          tenantName={latestPass.hostName}
+                          expectedTime={latestPass.expectedEntryTime}
+                          propertyName={propertyName}
+                          propertyAddress={propertyAddress}
+                          passId={latestPass.passId}
+                          passDate={fmtDay(latestPass.approvedAt)}
+                          approvedBy={latestPass.approvedBy}
+                          verifyUrl={verifyUrl}
                         />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1">Phone Number *</label>
-                        <input
-                          type="text"
-                          required
-                          value={visitorPhone}
-                          onChange={(e) => setVisitorPhone(e.target.value)}
-                          className="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1">Expected Entry Time *</label>
-                        <input
-                          type="datetime-local"
-                          required
-                          value={visitorExpectedTime}
-                          onChange={(e) => setVisitorExpectedTime(e.target.value)}
-                          className="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                        />
-                      </div>
-                      {visitorMsg && (
-                        <div className="p-3 rounded-xl text-sm bg-blue-50 text-blue-700">
-                          {visitorMsg}
-                        </div>
-                      )}
-                      <button
-                        type="submit"
-                        disabled={complaintBusy}
-                        className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        <i data-lucide="user-plus" className="w-5 h-5"></i>
-                        {complaintBusy ? "Generating Pass..." : "Generate Pass"}
-                      </button>
-                    </form>
-                  </div>
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col h-[500px]">
-                    <h3 className="font-bold text-lg text-slate-800 mb-4 border-b pb-2">My Visitors History</h3>
-                    <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-                      {myVisitors.length === 0 ? (
-                        <div className="text-center py-12 text-slate-400">
-                          <p>No visitor passes created yet.</p>
-                        </div>
                       ) : (
-                        myVisitors.map(v => (
-                          <div key={v._id} className="p-4 border rounded-xl border-slate-200 bg-slate-50">
-                            <div className="flex justify-between items-start mb-2">
-                              <span className="font-bold text-slate-800 text-sm">{v.visitorName}</span>
-                              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                                {v.status || "Pre-approved"}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-600 mb-1">Phone: {v.visitorPhone}</p>
-                            <p className="text-xs text-slate-600 mb-1">Expected: {new Date(v.expectedEntryTime).toLocaleString()}</p>
-                          </div>
-                        ))
+                        <VisitorPassStatusCard
+                          status={passStatus}
+                          visitorName={latestPass?.name}
+                          requestedOn={fmtDay(latestPass?.createdAt)}
+                        />
                       )}
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 {/* leave request tenant */}
             {/* TAB: LEAVE REQUEST */}
             {activeTab === "leave" && (
-              <div className="max-w-5xl mx-auto space-y-8">
-                <div>
-                  <h2 className="text-3xl font-bold text-slate-900">Leave Requests</h2>
-                  <p className="text-slate-500 mt-1">Submit your long-term absence or holiday leave dates.</p>
+              <div className="max-w-5xl mx-auto space-y-9">
+                <div className="space-y-3">
+                  <WelcomeHeader firstName={firstName} subtitle="Here's your leave management center." />
+                  <Breadcrumb items={[
+                    { label: "Leave Request", active: false },
+                    { label: "Submit Leave Request", active: true },
+                  ]} />
                 </div>
-                <div className="grid md:grid-cols-2 gap-8">
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                    <h3 className="font-bold text-lg text-slate-800 mb-4 border-b pb-2">New Leave Application</h3>
-                    <form onSubmit={handleLeaveSubmit} className="space-y-4">
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1">Start Date *</label>
-                        <input
-                          type="date"
-                          required
-                          value={leaveStartDate}
-                          onChange={(e) => setLeaveStartDate(e.target.value)}
-                          className="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1">Return Date *</label>
-                        <input
-                          type="date"
-                          required
-                          value={leaveEndDate}
-                          onChange={(e) => setLeaveEndDate(e.target.value)}
-                          className="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1">Reason *</label>
-                        <textarea
-                          required
-                          rows={3}
-                          value={leaveReason}
-                          onChange={(e) => setLeaveReason(e.target.value)}
-                          placeholder="e.g. Going home for holidays"
-                          className="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                        ></textarea>
-                      </div>
-                      {leaveMsg && (
-                        <div className="p-3 rounded-xl text-sm bg-blue-50 text-blue-700">
-                          {leaveMsg}
-                        </div>
-                      )}
-                      <button
-                        type="submit"
-                        disabled={complaintBusy}
-                        className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        <i data-lucide="calendar-off" className="w-5 h-5"></i>
-                        {complaintBusy ? "Submitting..." : "Submit Leave"}
-                      </button>
-                    </form>
-                  </div>
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col h-[500px]">
-                    <h3 className="font-bold text-lg text-slate-800 mb-4 border-b pb-2">My Leaves History</h3>
-                    <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-                      {myLeaves.length === 0 ? (
-                        <div className="text-center py-12 text-slate-400">
-                          <p>No leave requests found.</p>
-                        </div>
-                      ) : (
-                        myLeaves.map(l => (
-                          <div key={l._id} className="p-4 border rounded-xl border-slate-200 bg-slate-50">
-                            <div className="flex justify-between items-start mb-2">
-                              <span className="font-bold text-slate-800 text-sm">{new Date(l.startDate).toLocaleDateString()} - {new Date(l.endDate).toLocaleDateString()}</span>
-                              <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
-                                l.status === "Approved" ? "bg-green-100 text-green-700" :
-                                l.status === "Rejected" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
-                              }`}>
-                                {l.status || "Pending"}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-600 mb-1">Reason: {l.reason}</p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
+
+                <LeaveHero />
+
+                <div className="grid lg:grid-cols-2 gap-7 items-start">
+                  <LeaveForm
+                    startDate={leaveStartDate} setStartDate={setLeaveStartDate}
+                    endDate={leaveEndDate} setEndDate={setLeaveEndDate}
+                    reason={leaveReason} setReason={setLeaveReason}
+                    msg={leaveMsg} submitting={complaintBusy}
+                    onSubmit={handleLeaveSubmit}
+                    minDate={new Date().toISOString().split("T")[0]}
+                  />
+                  <LeaveHistory leaves={myLeaves} />
                 </div>
+
+                <LeaveNoteCard />
               </div>
             )}
           </main>
         </div>
+
+        {/* Mobile-only bottom navigation (hidden on md+) */}
+        <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
       </div>
 
       {/* Pay Modal */}
@@ -2364,7 +2206,7 @@ export default function Tenantdashboard() {
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-slate-800">Make Payment</h3>
               <button onClick={() => setPayOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <i data-lucide="x"></i>
+                <X className="w-5 h-5" />
               </button>
             </div>
             <div className="text-center mb-8">
@@ -2377,7 +2219,7 @@ export default function Tenantdashboard() {
                 disabled={actionBusy || isPaid}
                 className="w-full p-4 border border-slate-200 rounded-xl flex items-center hover:border-blue-600 hover:bg-blue-50 transition group disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <i data-lucide="credit-card" className="w-5 h-5 mr-4 text-blue-600"></i>
+                <CreditCard className="w-5 h-5 mr-4 text-blue-600" />
                 <div className="text-left">
                   <span className="font-semibold text-slate-700">Pay Online</span>
                   <p className="text-xs text-slate-500">Cards • UPI • Wallets • Netbanking</p>
@@ -2388,7 +2230,7 @@ export default function Tenantdashboard() {
                 disabled={actionBusy || isPaid}
                 className="w-full p-4 border border-slate-200 rounded-xl flex items-center hover:border-amber-500 hover:bg-amber-50 transition group disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <i data-lucide="hand-coins" className="w-5 h-5 mr-4 text-amber-600"></i>
+                <HandCoins className="w-5 h-5 mr-4 text-amber-600" />
                 <div className="text-left">
                   <span className="font-semibold text-slate-700">Pay by Cash</span>
                   <p className="text-xs text-slate-500">Request owner collection and verify OTP</p>
@@ -2429,7 +2271,7 @@ export default function Tenantdashboard() {
       {visitorModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setVisitorModalOpen(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setVisitorModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i data-lucide="x" className="w-5 h-5"></i></button>
+            <button onClick={() => setVisitorModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
             <h3 className="text-xl font-bold text-slate-900 mb-4">Generate Visitor Pass</h3>
             <form onSubmit={handleCreateVisitorPass} className="space-y-4">
               <div>
@@ -2455,7 +2297,7 @@ export default function Tenantdashboard() {
       {leaveModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setLeaveModalOpen(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setLeaveModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i data-lucide="x" className="w-5 h-5"></i></button>
+            <button onClick={() => setLeaveModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
             <h3 className="text-xl font-bold text-slate-900 mb-4">Submit Leave Request</h3>
             <form onSubmit={handleCreateLeaveRequest} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -2493,7 +2335,7 @@ export default function Tenantdashboard() {
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-slate-900">{genericModal.title}</h3>
               <button onClick={() => setGenericModal(null)} className="text-slate-400 hover:text-slate-600">
-                <i data-lucide="x" className="w-5 h-5"></i>
+                <X className="w-5 h-5" />
               </button>
             </div>
             <div>{genericModal.body}</div>
@@ -2525,7 +2367,7 @@ export default function Tenantdashboard() {
                 </p>
               </div>
               <button onClick={closeDocumentViewer} className="text-slate-400 hover:text-slate-600">
-                <i data-lucide="x" className="w-5 h-5"></i>
+                <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(85vh-140px)]">
@@ -2541,7 +2383,7 @@ export default function Tenantdashboard() {
                   disabled={pdfBusy}
                   className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg transition disabled:opacity-60"
                 >
-                  <i data-lucide="download" className="w-4 h-4"></i>
+                  <Download className="w-4 h-4" />
                   {pdfBusy ? "Generating..." : "Download PDF"}
                 </button>
               ) : null}

@@ -7,8 +7,18 @@ import routes from "./routes";
 import { getOwnerSession } from "./utils/ownerSession";
 import SharedShell from "./components/SharedShell";
 import { OwnerPanelShell } from "./components/propertyowner/OwnerPanelErrorBoundary";
+import TenantProtectedRoute from "./pages/tenant/TenantProtectedRoute";
 import { Toaster } from "react-hot-toast";
 import InstallPWA from "./components/InstallPWA";
+
+// Routes that require the user to be an authenticated tenant.
+// /tenant/tenantlogin and /visitor-verify are deliberately excluded (public).
+const PROTECTED_TENANT_PATHS = new Set([
+  "/tenant/tenantdashboard",
+  "/tenant/tenantcomplints",
+  "/tenant/tenantchat",
+  "/tenant/tenantagreement",
+]);
 
 const PageLoader = () => (
   <div className="min-h-[40vh] flex items-center justify-center px-4 py-12 text-sm text-slate-500">
@@ -304,9 +314,24 @@ export default function App() {
                 </Route>
 
                 {/* Other standalone routes (tenant, website, staff, etc.) */}
-                {otherStandaloneRoutes.map(route => (
-                  <Route key={route.path} path={route.path} element={route.element} />
-                ))}
+                {otherStandaloneRoutes.map(route => {
+                  if (PROTECTED_TENANT_PATHS.has(route.path)) {
+                    return (
+                      <Route
+                        key={route.path}
+                        path={route.path}
+                        element={
+                          <TenantProtectedRoute>
+                            {route.element}
+                          </TenantProtectedRoute>
+                        }
+                      />
+                    );
+                  }
+                  return (
+                    <Route key={route.path} path={route.path} element={route.element} />
+                  );
+                })}
 
                 <Route path="/" element={<Navigate to={resolveHostHome()} replace />} />
                 <Route path="/superadmin" element={<Navigate to="/superadmin/index" replace />} />

@@ -1,5 +1,6 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { useHtmlPage } from "../../utils/htmlPage";
+import { MessageCircle } from "lucide-react";
 
 export default function Tenantchat() {
   useHtmlPage({
@@ -14,13 +15,10 @@ export default function Tenantchat() {
       { href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap", rel: "stylesheet" },
       { rel: "stylesheet", href: "/tenant/assets/css/tenantchat.css" }
     ],
-    scripts: [{ src: "https://cdn.tailwindcss.com" }, { src: "https://unpkg.com/lucide@latest" }],
+    scripts: [{ src: "https://cdn.tailwindcss.com" }],
     inlineScripts: []
   });
 
-  useEffect(() => {
-    if (window?.lucide) window.lucide.createIcons();
-  }, []);
 
   return (
     <div className="html-page">
@@ -41,7 +39,7 @@ export default function Tenantchat() {
 
         <div className="flex-1 flex flex-col bg-white items-center justify-center">
           <div className="text-center text-gray-400">
-            <i data-lucide="message-circle" className="w-16 h-16 mx-auto mb-4 opacity-30"></i>
+            <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-30" />
             <p>Chat support will be enabled shortly.</p>
           </div>
         </div>
