@@ -121,8 +121,12 @@ export default function ReportsPage() {
   const [generating, setGenerating] = useState(false);
   const [generatedData, setGeneratedData] = useState(null);
   const [successMsg, setSuccessMsg] = useState("");
-  const [activeTab, setActiveTab]   = useState("reports"); // "reports" | "history"
+  const [activeTab, setActiveTab]   = useState("reports"); // "reports" | "history" | "demand"
   const [properties, setProperties] = useState([]);
+  
+  const [demandData, setDemandData]       = useState([]);
+  const [demandLoading, setDemandLoading] = useState(false);
+  const [optimizingId, setOptimizingId]   = useState(null);
 
   const [filters, setFilters] = useState({
     startDate: new Date(new Date().setDate(1)).toISOString().split("T")[0],
@@ -148,13 +152,50 @@ export default function ReportsPage() {
     finally { setHistoryLoading(false); }
   }, [owner.loginId]);
 
+  const fetchDemandData = useCallback(async () => {
+    setDemandLoading(true);
+    try {
+      const res = await apiFetch(`/api/reports/demand/${owner.loginId}`);
+      if (res?.success) {
+        setDemandData(res.properties || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch demand data:", err);
+    } finally {
+      setDemandLoading(false);
+    }
+  }, [owner.loginId]);
+
+  const handleOptimizeRent = async (propertyId, newRent) => {
+    setOptimizingId(propertyId);
+    try {
+      const res = await apiFetch(`/api/properties/${propertyId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ monthlyRent: Number(newRent) }),
+      });
+      if (res?.success) {
+        setSuccessMsg(`Rent updated successfully to ₹${newRent.toLocaleString('en-IN')}`);
+        setTimeout(() => setSuccessMsg(""), 4000);
+        await Promise.all([fetchDemandData(), fetchSummary()]);
+      } else {
+        alert(res?.message || "Failed to update rent");
+      }
+    } catch (err) {
+      alert("Error updating rent: " + err.message);
+    } finally {
+      setOptimizingId(null);
+    }
+  };
+
   useEffect(() => {
     fetchSummary();
     fetchHistory();
+    fetchDemandData();
     fetchOwnerProperties(owner.loginId, true)
       .then(list => setProperties(list || []))
       .catch(() => {});
-  }, [fetchSummary, fetchHistory, owner.loginId]);
+  }, [fetchSummary, fetchHistory, fetchDemandData, owner.loginId]);
 
   const openModal = (report, catId) => {
     setSelectedReport({ ...report, category: catId });
@@ -278,7 +319,11 @@ export default function ReportsPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-slate-100 p-1 rounded-2xl w-fit">
-        {[{ id: "reports", label: "Generate Reports" }, { id: "history", label: "Report History" }].map(t => (
+        {[
+          { id: "reports", label: "Generate Reports" }, 
+          { id: "history", label: "Report History" },
+          { id: "demand", label: "Property Demand & Price Suggestions" }
+        ].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)}
             className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === t.id ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
             {t.label}
@@ -396,6 +441,136 @@ export default function ReportsPage() {
                   </span>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Demand Analytics Tab */}
+      {activeTab === "demand" && (
+        <div className="space-y-6">
+          {demandLoading ? (
+            <div className="py-20 flex flex-col items-center justify-center bg-white rounded-3xl border border-slate-100 shadow-sm">
+              <Loader2 className="w-10 h-10 text-blue-600 animate-spin mb-4" />
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Calculating demand metrics...</p>
+            </div>
+          ) : demandData.length === 0 ? (
+            <div className="py-20 text-center bg-white rounded-3xl border border-slate-100 shadow-sm">
+              <AlertCircle size={36} className="text-slate-300 mx-auto mb-3" />
+              <p className="font-bold text-slate-500">No properties found</p>
+              <p className="text-xs text-slate-400 mt-1">Please ensure your properties are active and approved.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6">
+              
+              {/* Revenue Forecasting Summary Card */}
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-[2rem] text-white shadow-xl shadow-blue-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-black">Monthly Revenue Forecast</h3>
+                  <p className="text-blue-100 text-xs mt-1">Estimated earnings for next month based on current occupancy matrix across all hostels.</p>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md border border-white/20 px-6 py-3 rounded-2xl shrink-0 text-center md:text-right">
+                  <p className="text-2xl font-black">₹{demandData.reduce((sum, p) => sum + (p.forecastedRevenue || 0), 0).toLocaleString('en-IN')}</p>
+                  <p className="text-[9px] font-black uppercase tracking-wider text-blue-200 mt-0.5">Projected Revenue</p>
+                </div>
+              </div>
+
+              {demandData.map((p) => {
+                const isHighDemand = p.status.includes("High");
+                const isLowDemand = p.status.includes("Low") || p.status.includes("Interest");
+                const isStable = p.status.includes("Stable");
+
+                return (
+                  <div key={p.id} className="bg-white rounded-[2rem] border border-slate-100 p-6 shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row gap-6 items-start lg:items-center">
+                    
+                    {/* Property Image & Details */}
+                    <div className="flex items-center gap-4 shrink-0 w-full lg:w-72">
+                      <img 
+                        src={p.featuredImage || "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=150&h=110&fit=crop"} 
+                        alt={p.title} 
+                        className="w-24 h-20 rounded-2xl object-cover shadow-sm"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                            isHighDemand ? "bg-amber-100 text-amber-800 border border-amber-200" :
+                            isLowDemand ? "bg-rose-100 text-rose-800 border border-rose-200" :
+                            "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                          }`}>
+                            {p.status}
+                          </span>
+                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                            p.healthGrade === 'A' ? "bg-amber-500 text-white shadow-sm shadow-amber-500/10" :
+                            p.healthGrade === 'B' ? "bg-blue-600 text-white shadow-sm shadow-blue-600/10" :
+                            p.healthGrade === 'C' ? "bg-slate-600 text-white shadow-sm shadow-slate-600/10" :
+                            "bg-rose-600 text-white shadow-sm shadow-rose-600/10"
+                          }`}>
+                            Grade {p.healthGrade}
+                          </span>
+                        </div>
+                        <h4 className="font-black text-slate-800 text-sm leading-snug truncate">{p.title}</h4>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">{p.locality}, {p.city}</p>
+                        <p className="text-xs font-extrabold text-slate-900 mt-1">₹{p.monthlyRent.toLocaleString('en-IN')}/mo</p>
+                      </div>
+                    </div>
+
+                    {/* Funnel Metrics */}
+                    <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
+                      <div className="bg-slate-50/50 rounded-2xl p-3 border border-slate-100 text-center">
+                        <p className="text-lg font-black text-slate-800">{p.views}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Views</p>
+                      </div>
+                      <div className="bg-slate-50/50 rounded-2xl p-3 border border-slate-100 text-center">
+                        <p className="text-lg font-black text-slate-800">{p.clicks}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Clicks</p>
+                        <p className="text-[8px] text-blue-600 font-black mt-0.5">{p.ctr}% CTR</p>
+                      </div>
+                      <div className="bg-slate-50/50 rounded-2xl p-3 border border-slate-100 text-center">
+                        <p className="text-lg font-black text-slate-800">{p.inquiryCount}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Inquiries</p>
+                        <p className="text-[8px] text-indigo-600 font-black mt-0.5">{p.leadConv}% Conv</p>
+                      </div>
+                      <div className="bg-slate-50/50 rounded-2xl p-3 border border-slate-100 text-center">
+                        <p className="text-lg font-black text-slate-800">{p.occupancyPct}%</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Occupancy</p>
+                        <div className="w-full bg-slate-200 h-1 rounded-full mt-2 overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full ${p.occupancyPct >= 80 ? "bg-amber-500" : p.occupancyPct < 50 ? "bg-rose-500" : "bg-emerald-500"}`} 
+                            style={{ width: `${p.occupancyPct}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Recommendation & Direct Action */}
+                    <div className="w-full lg:w-80 bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col justify-between self-stretch">
+                      <div>
+                        <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1 mb-1">
+                          Smart Suggestion
+                        </span>
+                        <p className="text-[11px] text-slate-600 font-bold leading-relaxed">{p.recommendation}</p>
+                      </div>
+                      
+                      {p.actionType === "optimize" && p.suggestionValue && (
+                        <div className="mt-4 flex items-center gap-3">
+                          <button
+                            onClick={() => handleOptimizeRent(p.id, p.suggestionValue)}
+                            disabled={optimizingId === p.id}
+                            className="flex-1 h-9 bg-slate-900 hover:bg-blue-600 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                          >
+                            {optimizingId === p.id ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <>Optimize Rent to ₹{p.suggestionValue.toLocaleString('en-IN')}</>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

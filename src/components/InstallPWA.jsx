@@ -21,6 +21,8 @@ export default function InstallPWA() {
     const handler = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
+      // Expose to other parts of the app so user-gesture handlers can trigger the prompt
+      try { window.deferredPwaPrompt = e; } catch (_) {}
       console.log('PWA: beforeinstallprompt event captured and stored.');
     };
 
@@ -98,6 +100,7 @@ export default function InstallPWA() {
     
     // We've used the prompt, and can't use it again, throw it away
     setDeferredPrompt(null);
+    try { window.deferredPwaPrompt = null; } catch (_) {}
   };
 
   const handleClose = () => {

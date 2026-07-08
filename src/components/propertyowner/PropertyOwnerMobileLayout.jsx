@@ -362,6 +362,34 @@ export default function PropertyOwnerMobileLayout({
             <ChevronRight size={20} className="text-emerald-300" />
           </Link>
 
+          <Link to="/propertyowner/add-staff" onClick={() => {
+              setQuickActionsOpen(false);
+              // If the PWA beforeinstallprompt was captured, prompt now (must be a user gesture)
+              try {
+                if (window.deferredPwaPrompt) {
+                  window.deferredPwaPrompt.prompt();
+                  window.deferredPwaPrompt.userChoice.then(choice => {
+                    if (choice.outcome === 'accepted') {
+                      localStorage.setItem('pwa_prompt_installed', 'true');
+                    } else {
+                      const hideUntil = Date.now() + 24 * 60 * 60 * 1000;
+                      localStorage.setItem('pwa_prompt_dismissed_until', hideUntil.toString());
+                    }
+                    try { window.deferredPwaPrompt = null; } catch (_) {}
+                  }).catch(() => { try { window.deferredPwaPrompt = null; } catch (_) {} });
+                }
+              } catch (_) {}
+            }} className="w-full flex items-center gap-4 p-4 rounded-2xl bg-violet-50 border border-violet-100 hover:bg-violet-100 transition-colors">
+            <div className="w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center shrink-0">
+              <UserPlus size={24} className="text-violet-600" />
+            </div>
+            <div className="flex-1 text-left">
+              <h4 className="text-[15px] font-black text-violet-900 leading-tight">Add Staff</h4>
+              <p className="text-[11px] font-semibold text-violet-600/70 mt-0.5">Register a guard, cleaner or manager</p>
+            </div>
+            <ChevronRight size={20} className="text-violet-300" />
+          </Link>
+
           <Link to="/propertyowner/booking" onClick={() => setQuickActionsOpen(false)} className="w-full flex items-center gap-4 p-4 rounded-2xl bg-amber-50 border border-amber-100 hover:bg-amber-100 transition-colors">
             <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
               <CalendarCheck size={24} className="text-amber-600" />

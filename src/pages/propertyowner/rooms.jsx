@@ -5,9 +5,10 @@ import { X, Plus, Building2, ChevronDown, UploadCloud, Loader2, Wind, Table as T
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getApiBase, getAuthHeader } from "../../utils/api";
 import {
-  assignTenant, clearOwnerFetchCache, clearOwnerRuntimeSession, createRoom, updateRoom, deleteRoom,
+  assignTenant, clearOwnerFetchCache, clearOwnerRuntimeSession, createRoom, updateRoom, deleteRoom, bulkCreateRooms,
   fetchOwnerProperties, fetchOwnerRooms, fetchOwnerTenants, getOwnerRuntimeSession
 } from "../../utils/propertyowner";
+import BulkRoomModal from "../../components/propertyowner/BulkRoomModal";
 
 const cn = (...c) => c.filter(Boolean).join(" ");
 
@@ -90,6 +91,29 @@ export default function Rooms() {
   const [newTenantForm, setNewTenantForm] = useState({ name: "", phone: "", email: "" });
   const [isAssigning, setIsAssigning] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
+
+  const handleBulkSave = async (roomsArray) => {
+    if (!owner?.loginId) return;
+    const propId = currentProperty?._id || "";
+    if (!propId) {
+      toast.error("Please add a property first.");
+      return;
+    }
+    try {
+      setIsBulkSaving(true);
+      await bulkCreateRooms({ propertyId: propId, rooms: roomsArray, ownerLoginId: owner.loginId });
+      toast.success(`${roomsArray.length} rooms created successfully!`);
+      setBulkModalOpen(false);
+      clearOwnerFetchCache(owner.loginId);
+      await load(owner, 1, ROOMS_PER_PAGE, true);
+    } catch (e) {
+      toast.error(e?.message || "Failed to create rooms");
+    } finally {
+      setIsBulkSaving(false);
+    }
+  };
 
   const [showFilter, setShowFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -563,9 +587,17 @@ const handleAddTenant = (room) => {
                           {allPropRooms.length} rooms · {pOcc}/{pTotal} beds occupied
                         </div>
                       </div>
-                      <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold",
-                        pct > 90 ? "bg-blue-50 text-blue-600" : pct > 0 ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"
-                      )}>{pct}% full</span>
+                      <div className="flex items-center gap-3">
+                        <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold",
+                          pct > 90 ? "bg-blue-50 text-blue-600" : pct > 0 ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"
+                        )}>{pct}% full</span>
+                        <button type="button" onClick={() => setBulkModalOpen(true)} className="inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-slate-900 text-white text-[12px] font-semibold hover:bg-slate-800 transition-colors">
+                          <Plus size={14}/> Bulk Add
+                        </button>
+                        <button type="button" onClick={() => { setRoomForm({...defaultRoomForm, propertyId: propId}); setRoomModalOpen(true); }} className="inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-blue-600 text-white text-[12px] font-semibold hover:bg-blue-700 transition-colors">
+                          <Plus size={14}/> Add Room
+                        </button>
+                      </div>
                     </div>
 
                     {/* Room Cards Grid */}
@@ -736,6 +768,15 @@ const handleAddTenant = (room) => {
             </>
           )}
         </div>
+
+      {/* Bulk Room Modal */}
+      <BulkRoomModal 
+        isOpen={bulkModalOpen} 
+        onClose={() => setBulkModalOpen(false)} 
+        propertyId={currentProperty?._id} 
+        onSave={handleBulkSave} 
+        isSaving={isBulkSaving} 
+      />
 
       {/* Add Room Modal */}
       <div className={cn("fixed inset-0 z-[100] flex items-center justify-center bg-black/70 transition-all", roomModalOpen?"opacity-100 pointer-events-auto":"opacity-0 pointer-events-none")}>

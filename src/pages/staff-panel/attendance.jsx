@@ -439,9 +439,30 @@ export default function StaffAttendancePage() {
     if (bulkMarking || tenants.length === 0) return;
     setBulkMarking(true);
     try {
-      await Promise.all(tenants.map(t => markTenantAttendance(t, status)));
-      setTenantMsg(`All tenants marked ${status} ✓`);
-      setTimeout(() => setTenantMsg(""), 2000);
+      const res = await fetch(`${apiBase}/api/tenant-attendance/bulk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({
+          ownerLoginId: parentLoginId,
+          date: tenantDate,
+          status,
+          tenantDataList: tenants.map(t => ({
+            id: t.loginId || t._id,
+            name: t.name,
+            roomNo: t.roomNo
+          }))
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        const newMap = { ...tenantAttMap };
+        tenants.forEach(t => { newMap[t.loginId || t._id] = status; });
+        setTenantAttMap(newMap);
+        setTenantMsg(`All tenants marked ${status} ✓`);
+        setTimeout(() => setTenantMsg(""), 2000);
+      }
+    } catch (_) {
+      showMsg("Failed to bulk update attendance", "error");
     } finally { setBulkMarking(false); }
   };
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
-import { fetchInvoices, fetchPenaltyConfigs, sendReminder, recordPayment } from "../../utils/rentCollectionApi";
+import { fetchInvoices, fetchPenaltyConfigs, sendReminder, sendBulkReminders, recordPayment } from "../../utils/rentCollectionApi";
 import { Search, Send, IndianRupee, RefreshCw, Smartphone, CreditCard, Banknote } from "lucide-react";
 
 function calcDaysSinceDue(dueDate) {
@@ -160,6 +160,23 @@ export default function DuesReportPage() {
     }
   };
 
+  const [bulkReminding, setBulkReminding] = useState(false);
+  const handleBulkRemind = async () => {
+    const ids = filtered.map(d => d.id);
+    if (!ids.length) return;
+    setBulkReminding(true);
+    try {
+      const res = await sendBulkReminders(ids);
+      if (res.success) {
+        showToast(`Sent ${res.sentCount} reminders. Failed: ${res.failedCount}.`, res.failedCount > 0 ? "error" : "success");
+      }
+    } catch (err) {
+      showToast(err.message || "Failed to send bulk reminders", "error");
+    } finally {
+      setBulkReminding(false);
+    }
+  };
+
   const handleRecordPayment = async (row) => {
     const amt = parseFloat(payAmount);
     if (!amt || amt <= 0) { showToast("Enter a valid amount", "error"); return; }
@@ -204,10 +221,16 @@ export default function DuesReportPage() {
           <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Outstanding Dues</h1>
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">Monitor outstanding balances, track aging schedules, and trigger reminders.</p>
         </div>
-        <button onClick={load} disabled={loading}
-          className="inline-flex items-center gap-2 h-9 px-4 rounded-xl border border-border text-[13px] font-medium hover:bg-muted/40 disabled:opacity-50 shrink-0">
-          <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} /> Refresh
-        </button>
+        <div className="flex gap-3">
+          <button onClick={handleBulkRemind} disabled={bulkReminding || filtered.length === 0}
+            className="inline-flex items-center gap-2 h-9 px-4 rounded-xl bg-slate-900 text-white text-[13px] font-medium hover:bg-slate-800 disabled:opacity-50 shrink-0">
+            {bulkReminding ? <RefreshCw className="size-4 animate-spin" /> : <Send className="size-4" />} Bulk Remind
+          </button>
+          <button onClick={load} disabled={loading}
+            className="inline-flex items-center gap-2 h-9 px-4 rounded-xl border border-border text-[13px] font-medium hover:bg-muted/40 disabled:opacity-50 shrink-0">
+            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </button>
+        </div>
       </div>
 
       {/* Stats — Desktop 3-col grid */}

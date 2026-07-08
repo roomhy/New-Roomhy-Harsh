@@ -45,6 +45,12 @@ export const sendReminder = (invoiceId, tenantEmail, tenantName) =>
     body: JSON.stringify({ tenantEmail, tenantName }),
   });
 
+export const sendBulkReminders = (invoiceIds) =>
+  fetchJson(`${base()}/invoices/remind/bulk`, {
+    method: 'POST',
+    body: JSON.stringify({ invoiceIds }),
+  });
+
 export const waivePenalty = (invoiceId, reason, waivedAmount) =>
   fetchJson(`${base()}/invoices/${invoiceId}/waive`, {
     method: 'PATCH',

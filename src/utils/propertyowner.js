@@ -441,6 +441,15 @@ export const createRoom = async (payload) => {
   return response?.room || response?.data || response;
 };
 
+export const bulkCreateRooms = async (payload) => {
+  const response = await fetchJson("/api/rooms/bulk", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  clearOwnerFetchCache(payload?.ownerLoginId);
+  return response?.rooms || response?.data || response;
+};
+
 export const updateRoom = async (roomId, payload) => fetchJson(`/api/rooms/${encodeURIComponent(roomId)}`, {
   method: "PUT",
   body: JSON.stringify(payload)
