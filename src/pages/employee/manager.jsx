@@ -205,6 +205,21 @@ export default function Manager() {
     return [];
   };
 
+  const loadPasswordStore = () => {
+    try {
+      return JSON.parse(localStorage.getItem("roomhy_employee_pw_store") || "{}");
+    } catch (_) { return {}; }
+  };
+
+  const saveToPasswordStore = (loginId, password) => {
+    if (!loginId || !password || isBcryptHash(password)) return;
+    try {
+      const store = loadPasswordStore();
+      store[loginId.toUpperCase()] = password;
+      localStorage.setItem("roomhy_employee_pw_store", JSON.stringify(store));
+    } catch (_) {}
+  };
+
   const syncEmployeesFromBackend = async () => {
     setLoadingEmployees(true);
     let merged = [];
@@ -214,9 +229,13 @@ export default function Manager() {
         const data = await res.json();
         if (data.data && Array.isArray(data.data)) {
           const localCache = loadEmployeesFromCache();
+          const pwStore = loadPasswordStore();
           merged = data.data.map((emp) => {
             const cached = localCache.find((c) => c.loginId === emp.loginId) || {};
-            const password = isBcryptHash(emp.password) ? cached.password || emp.password || "" : emp.password || cached.password || "";
+            const storedPlaintext = pwStore[(emp.loginId || "").toUpperCase()] || "";
+            const password = isBcryptHash(emp.password)
+              ? storedPlaintext || cached.password || ""
+              : emp.password || storedPlaintext || cached.password || "";
             return {
               id: emp._id || emp.id,
               name: emp.name,
@@ -502,6 +521,7 @@ export default function Manager() {
           body: JSON.stringify(payload)
         });
         if (!res.ok) console.warn("Employee update API returned", res.status);
+        else if (password) saveToPasswordStore(finalLoginId, password);
       } catch (err) {
         console.warn("Employee update API failed:", err.message);
       }
@@ -518,6 +538,7 @@ export default function Manager() {
         body: JSON.stringify(payload)
       });
       if (res.ok) {
+        saveToPasswordStore(finalLoginId, password);
         await syncEmployeesFromBackend();
         closeEmployeeModal();
 

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "../../utils/api";
 import { cacheGet, cacheSet } from "../../utils/cache";
+import { STAFF_MODULE_GROUPS } from "../../utils/staffAccess";
 
 const ROLE_COLORS = {
   Warden: "bg-blue-100 text-blue-700",
@@ -56,6 +57,50 @@ export default function AllStaffPage() {
   const [loading, setLoading] = useState(true);
   const [detailStaff, setDetailStaff] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
+  const [editingPerms, setEditingPerms] = useState(false);
+  const [permDraft, setPermDraft] = useState([]);
+  const [savingPerms, setSavingPerms] = useState(false);
+
+  const closeDetail = () => { setDetailStaff(null); setEditingPerms(false); };
+  const openPermsEditor = () => { setPermDraft(detailStaff?.permissions || []); setEditingPerms(true); };
+  const togglePermDraft = (key) =>
+    setPermDraft(d => d.includes(key) ? d.filter(p => p !== key) : [...d, key]);
+
+  const savePerms = async () => {
+    if (!detailStaff) return;
+    setSavingPerms(true);
+
+    // Saving is a mutation on a sometimes-cold backend, so give it a longer
+    // window than the default 12s and retry once on a timeout before failing.
+    const patchWithRetry = async (attempt = 1) => {
+      try {
+        return await apiFetch(`/api/employees/${detailStaff.loginId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ permissions: permDraft }),
+          timeout: 30000,
+        });
+      } catch (err) {
+        if ((err?.name === "TimeoutError" || err?.status === 408) && attempt < 2) {
+          return patchWithRetry(attempt + 1);
+        }
+        throw err;
+      }
+    };
+
+    try {
+      await patchWithRetry();
+      const newStaff = staff.map(e => e.id === detailStaff.id ? { ...e, permissions: permDraft } : e);
+      setStaff(newStaff);
+      setDetailStaff(d => ({ ...d, permissions: permDraft }));
+      cacheSet(`staff:${owner.loginId}`, { staff: newStaff, stats }, 2 * 60 * 1000);
+      setEditingPerms(false);
+    } catch (err) {
+      alert("Failed to save permissions: " + (err?.message || "Please try again."));
+    } finally {
+      setSavingPerms(false);
+    }
+  };
 
   const fetchStaff = useCallback(async ({ silent = false } = {}) => {
     const CACHE_KEY = `staff:${owner.loginId}`;
@@ -304,7 +349,7 @@ export default function AllStaffPage() {
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-black text-slate-900 text-lg">Staff Profile</h3>
-              <button onClick={() => setDetailStaff(null)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
+              <button onClick={closeDetail} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
                 <X size={18} className="text-slate-500" />
               </button>
             </div>
@@ -338,26 +383,81 @@ export default function AllStaffPage() {
                 ))}
               </div>
 
-              {detailStaff.permissions?.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Permissions</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {detailStaff.permissions.map(p => (
-                      <span key={p} className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg">{p}</span>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Permissions</p>
+                  {!editingPerms && (
+                    <button onClick={openPermsEditor}
+                      className="flex items-center gap-1 text-[10px] font-black text-blue-600 hover:text-blue-700 uppercase tracking-wider">
+                      <Edit3 size={12} /> Edit
+                    </button>
+                  )}
+                </div>
+
+                {!editingPerms ? (
+                  detailStaff.permissions?.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {detailStaff.permissions.map(p => (
+                        <span key={p} className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg">{p}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 font-medium">No permissions assigned.</p>
+                  )
+                ) : (
+                  <div className="space-y-4">
+                    {Object.entries(STAFF_MODULE_GROUPS).map(([groupName, mods]) => (
+                      <div key={groupName}>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{groupName}</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {mods.map(mod => {
+                            const active = permDraft.includes(mod.key);
+                            return (
+                              <button
+                                key={mod.key}
+                                type="button"
+                                onClick={() => togglePermDraft(mod.key)}
+                                className={`flex items-center gap-2 p-2 rounded-lg border text-left transition-all ${active
+                                  ? "bg-blue-600 border-blue-600 text-white"
+                                  : "border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600"}`}
+                              >
+                                <div className={`w-3.5 h-3.5 rounded border-2 flex items-center justify-center shrink-0 ${active ? "border-white" : "border-slate-300"}`}>
+                                  {active && <CheckCircle2 size={9} className="text-white" />}
+                                </div>
+                                <span className="text-[11px] font-bold truncate">{mod.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     ))}
                   </div>
+                )}
+              </div>
+
+              {editingPerms ? (
+                <div className="flex gap-3 pt-2">
+                  <button onClick={() => setEditingPerms(false)} disabled={savingPerms}
+                    className="flex-1 h-10 border border-slate-200 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-60">Cancel</button>
+                  <button onClick={savePerms} disabled={savingPerms}
+                    className="flex-1 h-10 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white transition-all disabled:opacity-60 flex items-center justify-center gap-2">
+                    {savingPerms
+                      ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      : <CheckCircle2 size={14} />}
+                    Save Permissions
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-3 pt-2">
+                  <button onClick={closeDetail} className="flex-1 h-10 border border-slate-200 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all">Close</button>
+                  <button
+                    onClick={() => { handleToggle(detailStaff); closeDetail(); }}
+                    className={`flex-1 h-10 rounded-xl text-xs font-black transition-all ${detailStaff.status === "Active" ? "bg-rose-600 hover:bg-rose-700 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"}`}
+                  >
+                    {detailStaff.status === "Active" ? "Deactivate" : "Activate"}
+                  </button>
                 </div>
               )}
-
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => setDetailStaff(null)} className="flex-1 h-10 border border-slate-200 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all">Close</button>
-                <button
-                  onClick={() => { handleToggle(detailStaff); setDetailStaff(null); }}
-                  className={`flex-1 h-10 rounded-xl text-xs font-black transition-all ${detailStaff.status === "Active" ? "bg-rose-600 hover:bg-rose-700 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"}`}
-                >
-                  {detailStaff.status === "Active" ? "Deactivate" : "Activate"}
-                </button>
-              </div>
             </div>
           </div>
         </div>

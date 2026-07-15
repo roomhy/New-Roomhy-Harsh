@@ -19,13 +19,13 @@ export function numberToWords(num) {
 }
 
 export function buildReceiptHtml(r) {
-  const originalRent  = r.amount || 0;
-  const penalty       = r.penalty || 0;
-  const electricity   = r.electricity || 0;
-  const totalDue      = r.totalDue || (originalRent + penalty + electricity);
-  const paidAmt       = r.paid ?? originalRent;
-  const balance       = Math.max(0, totalDue - paidAmt);
-  const isPaid        = balance === 0;
+  const originalRent = r.amount || 0;
+  const penalty = r.penalty || 0;
+  const electricity = r.electricity || 0;
+  const totalDue = originalRent + penalty + electricity;
+  const paidAmt = (r.paid && r.paid > 0) ? r.paid : totalDue;
+  const balance = Math.max(0, totalDue - paidAmt);
+  const isPaid = balance === 0;
 
   return `<!DOCTYPE html>
 <html>
@@ -181,13 +181,13 @@ export function buildReceiptHtml(r) {
 }
 
 export function RentReceiptModal({ receipt, onClose }) {
-  const originalRent  = receipt.amount || 0;
-  const penalty       = receipt.penalty || 0;
-  const electricity   = receipt.electricity || 0;
-  const totalDue      = receipt.totalDue || (originalRent + penalty + electricity);
-  const paidAmt       = receipt.paid ?? originalRent;
-  const balance       = Math.max(0, totalDue - paidAmt);
-  const isPaid        = balance === 0;
+  const originalRent = receipt.amount || 0;
+  const penalty = receipt.penalty || 0;
+  const electricity = receipt.electricity || 0;
+  const totalDue = receipt.totalDue || (originalRent + penalty + electricity);
+  const paidAmt = receipt.paid ?? originalRent;
+  const balance = Math.max(0, totalDue - paidAmt);
+  const isPaid = balance === 0;
 
   const handlePrint = () => {
     const win = window.open("", "_blank", "width=860,height=960");
@@ -198,10 +198,10 @@ export function RentReceiptModal({ receipt, onClose }) {
   };
 
   const S = {
-    label:   { fontSize: 11, color: "#555", whiteSpace: "nowrap" },
-    value:   { fontSize: 12.5, fontWeight: 600, color: "#000", textAlign: "right" },
+    label: { fontSize: 11, color: "#555", whiteSpace: "nowrap" },
+    value: { fontSize: 12.5, fontWeight: 600, color: "#000", textAlign: "right" },
     boxHead: { background: "#f5f5f5", padding: "8px 14px", fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#444", borderBottom: "1px solid #d1d5db" },
-    box:     { border: "1px solid #d1d5db", borderRadius: 4, overflow: "hidden", flex: 1 },
+    box: { border: "1px solid #d1d5db", borderRadius: 4, overflow: "hidden", flex: 1 },
   };
 
   return (

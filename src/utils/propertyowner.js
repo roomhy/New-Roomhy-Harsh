@@ -1,5 +1,6 @@
 import { fetchJson, getApiBase } from "./api";
 import { getOwnerSession } from "./ownerSession";
+import { getStaffSession } from "./staffAccess";
 
 const OWNER_LOGIN_ID_REGEX = /^ROOMHY\d{4,}$/i;
 const WEBSITE_USER_ID_REGEX = /^roomhyweb\d{6}$/i;
@@ -134,7 +135,28 @@ export const getOwnerRuntimeSession = () => {
   if (session?.loginId) return session;
   if (typeof window === "undefined") return null;
   const loginId = new URLSearchParams(window.location.search).get("loginId");
-  return loginId ? { loginId: String(loginId).toUpperCase(), name: "Owner" } : null;
+  if (loginId) return { loginId: String(loginId).toUpperCase(), name: "Owner" };
+
+  // Staff proxy: an owner-scoped staff member who was granted an Owner Panel
+  // feature acts on behalf of their parent owner, so owner pages resolve and
+  // fetch data for that parent owner. Route access is still gated per-permission
+  // by canAccessOwnerPathAsStaff (see App.jsx StaffRouteGuard).
+  const staff = getStaffSession();
+  if (staff?.parentLoginId) {
+    return {
+      loginId: String(staff.parentLoginId).toUpperCase(),
+      name: staff.name || "Staff",
+      role: staff.role || "Staff",
+      isStaffProxy: true,
+      staffLoginId: staff.loginId,
+      permissions: Array.isArray(staff.permissions) ? staff.permissions : [],
+      // Staff are locked to their assigned property — the switcher uses these to
+      // hide "All Properties" and pin their context (owners are unrestricted).
+      assignedProperty: staff.assignedProperty || "",
+      assignedPropertyName: staff.assignedPropertyName || "",
+    };
+  }
+  return null;
 };
 
 export const clearOwnerRuntimeSession = () => {

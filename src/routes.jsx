@@ -173,16 +173,19 @@ const routeEntries = [
   ["/propertyowner/tenantrec", "./pages/propertyowner/tenantrec.jsx"],
   ["/propertyowner/tenants", "./pages/propertyowner/tenants.jsx"],
   
-  // New Demo Panels
-  ["/staff/login", "./pages/staff-panel/login.jsx"],
-  ["/staff", "./pages/staff-panel/dashboard.jsx"],
-  ["/staff/tenants", "./pages/staff-panel/tenants.jsx"],
-  ["/staff/rooms", "./pages/staff-panel/rooms.jsx"],
-  ["/staff/complaints", "./pages/staff-panel/complaints.jsx"],
-  ["/staff/tasks", "./pages/staff-panel/tasks.jsx"],
-  ["/staff/visitors", "./pages/staff-panel/visitors.jsx"],
-  ["/staff/attendance", "./pages/staff-panel/attendance.jsx"],
-  ["/staff/electricity", "./pages/staff-panel/electricity.jsx"],
+  // Staff self-service screens — re-homed INSIDE the single Property Owner Panel.
+  // (The former standalone /staff/* panel has been removed; see redirects in App.jsx.)
+  ["/propertyowner/staff-home", "./pages/staff-panel/dashboard.jsx"],
+  ["/propertyowner/my-attendance", "./pages/staff-panel/attendance.jsx"],
+  ["/propertyowner/my-tasks", "./pages/staff-panel/tasks.jsx"],
+  // Operational staff screens (staff-designed, simpler than the owner versions),
+  // shown only when the owner grants the matching permission.
+  ["/propertyowner/staff-complaints", "./pages/staff-panel/complaints.jsx"],
+  ["/propertyowner/staff-visitors", "./pages/staff-panel/visitors.jsx"],
+  ["/propertyowner/staff-visitor-passes", "./pages/staff-panel/visitor-passes.jsx"],
+  ["/propertyowner/staff-electricity", "./pages/staff-panel/electricity.jsx"],
+  ["/propertyowner/staff-tenants", "./pages/staff-panel/tenants.jsx"],
+  ["/propertyowner/staff-rooms", "./pages/staff-panel/rooms.jsx"],
 
   ["/hostelowner", "./pages/owner-panel/dashboard.jsx"],
   ["/hostelowner/properties", "./pages/owner-panel/properties.jsx"],
@@ -200,7 +203,13 @@ const routeEntries = [
   ["/tenant/tenantcomplints", "./pages/tenant/tenantcomplints.jsx"],
   ["/tenant/tenantdashboard", "./pages/tenant/tenantdashboard.jsx"],
   ["/tenant/tenantlogin", "./pages/tenant/tenantlogin.jsx"],
-  
+
+  // Public visitor pass verification (opened when a pass QR is scanned).
+  // Clean path form `/visitor-verify/<token>`; the bare path keeps the old
+  // `?token=` query form working for any previously generated codes.
+  ["/visitor-verify/:token", "./pages/tenant/visitor-verify.jsx"],
+  ["/visitor-verify", "./pages/tenant/visitor-verify.jsx"],
+
   // Digital Checkin Routes
   ["/digital-checkin/index", "./pages/digital-checkin/index.jsx"],
   ["/digital-checkin/ownerkyc", "./pages/digital-checkin/ownerkyc.jsx"],

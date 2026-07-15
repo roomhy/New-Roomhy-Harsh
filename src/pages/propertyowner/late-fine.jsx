@@ -7,9 +7,9 @@ import { AlertTriangle, Search, ShieldCheck, RefreshCw, Settings } from "lucide-
 // ── Live penalty calculation (mirrors penaltyEngine.js) ──────────────────────
 
 function calcDaysSinceDue(dueDate) {
-  const now     = new Date();
+  const now = new Date();
   const todayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const dueMs   = new Date(new Date(dueDate).toDateString()).getTime();
+  const dueMs = new Date(new Date(dueDate).toDateString()).getTime();
   return Math.round((todayMs - dueMs) / 86400000);
 }
 
@@ -21,37 +21,37 @@ function calcLivePenalties(inv, config) {
   const minorDay = config.minorPenaltyDay ?? 1;
   const majorDay = config.majorPenaltyDay ?? 2;
 
-  const daysSinceDue    = calcDaysSinceDue(inv.dueDate);
-  const phase           = daysSinceDue < minorDay ? 1 : daysSinceDue < majorDay ? 2 : 3;
-  const rentPaid        = inv.rentPaidAmount ?? inv.paidAmount ?? 0;
+  const daysSinceDue = calcDaysSinceDue(inv.dueDate);
+  const phase = daysSinceDue < minorDay ? 1 : daysSinceDue < majorDay ? 2 : 3;
+  const rentPaid = inv.rentPaidAmount ?? inv.paidAmount ?? 0;
   const outstandingBase = Math.max(0, (inv.rentAmount || 0) - rentPaid);
-  const daysInPhase2    = Math.max(0, Math.min(daysSinceDue + 1, majorDay) - minorDay);
-  const daysInPhase3    = Math.max(0, daysSinceDue - majorDay + 1);
+  const daysInPhase2 = Math.max(0, Math.min(daysSinceDue + 1, majorDay) - minorDay);
+  const daysInPhase3 = Math.max(0, daysSinceDue - majorDay + 1);
 
   let minorPenalty = 0;
   let majorPenalty = 0;
 
   if (phase >= 2 && config.minorPenalty?.enabled) {
     const mp = config.minorPenalty;
-    if (mp.type === 'percentage')  minorPenalty = Math.round(outstandingBase * (mp.value / 100));
+    if (mp.type === 'percentage') minorPenalty = Math.round(outstandingBase * (mp.value / 100));
     else if (mp.type === 'per_day') minorPenalty = Math.round((mp.value || 0) * daysInPhase2);
-    else                            minorPenalty = mp.value || 0; // fixed
+    else minorPenalty = mp.value || 0; // fixed
   }
 
   if (phase >= 3 && config.majorPenalty?.enabled) {
     const daysOverMajor = Math.max(0, daysSinceDue - majorDay);
     const mp = config.majorPenalty;
-    if (mp.type === 'percentage')   majorPenalty = Math.round(outstandingBase * (mp.value / 100));
-    else if (mp.type === 'fixed')   majorPenalty = mp.value || 0;
+    if (mp.type === 'percentage') majorPenalty = Math.round(outstandingBase * (mp.value / 100));
+    else if (mp.type === 'fixed') majorPenalty = mp.value || 0;
     else if (mp.type === 'per_day') majorPenalty = Math.round((mp.value || 0) * daysInPhase3);
-    else if (mp.type === 'daily_fixed')  majorPenalty = (mp.value || 0) + daysOverMajor * (mp.incrementValue || 0);
+    else if (mp.type === 'daily_fixed') majorPenalty = (mp.value || 0) + daysOverMajor * (mp.incrementValue || 0);
     else if (mp.type === 'weekly_fixed') majorPenalty = (mp.value || 0) + Math.floor(daysOverMajor / 7) * (mp.incrementValue || 0);
     if (mp.maxCap && majorPenalty > mp.maxCap) majorPenalty = mp.maxCap;
     majorPenalty = Math.round(majorPenalty);
   }
 
   const totalPenalty = minorPenalty + majorPenalty;
-  const totalDue     = outstandingBase + totalPenalty;
+  const totalDue = outstandingBase + totalPenalty;
 
   return { daysSinceDue, phase, daysInPhase2, daysInPhase3, minorPenalty, majorPenalty, totalPenalty, totalDue, outstandingBase };
 }
@@ -74,28 +74,28 @@ export default function LatePaymentsPage() {
     return null;
   }
 
-  const [invoices,      setInvoices]      = useState([]);
+  const [invoices, setInvoices] = useState([]);
   const [penaltyConfig, setPenaltyConfig] = useState(null);
-  const [loading,       setLoading]       = useState(true);
-  const [search,        setSearch]        = useState("");
-  const [waiverModal,   setWaiverModal]   = useState(null);
-  const [waiverReason,  setWaiverReason]  = useState("");
-  const [saving,        setSaving]        = useState(false);
-  const [toast,         setToast]         = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [waiverModal, setWaiverModal] = useState(null);
+  const [waiverReason, setWaiverReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState(null);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   };
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (force = false) => {
     if (!owner?._id && !owner?.loginId) return;
     setLoading(true);
     try {
       const ownerId = owner._id || owner.loginId;
       const [invoiceData, configData] = await Promise.all([
-        fetchInvoices({ ownerId, status: "PENDING,PARTIAL", limit: 200 }),
-        fetchPenaltyConfigs(ownerId),
+        fetchInvoices({ ownerId, status: "PENDING,PARTIAL", limit: 200 }, force),
+        fetchPenaltyConfigs(ownerId, force),
       ]);
 
       // Use owner's global config; fall back to system defaults
@@ -129,9 +129,9 @@ export default function LatePaymentsPage() {
     (inv.invoiceNumber || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalPenalty     = filtered.reduce((s, i) => s + (i.live.totalPenalty || 0), 0);
-  const totalOutstanding = filtered.reduce((s, i) => s + (i.live.totalDue     || 0), 0);
-  const phase3Count      = filtered.filter(i => i.live.phase === 3).length;
+  const totalPenalty = filtered.reduce((s, i) => s + (i.live.totalPenalty || 0), 0);
+  const totalOutstanding = filtered.reduce((s, i) => s + (i.live.totalDue || 0), 0);
+  const phase3Count = filtered.filter(i => i.live.phase === 3).length;
 
   const handleWaive = async () => {
     if (!waiverModal || !waiverReason.trim()) return;
@@ -171,7 +171,7 @@ export default function LatePaymentsPage() {
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">Live-calculated phase penalties based on current penalty settings.</p>
         </div>
         <div className="flex gap-2 items-start md:mt-2">
-          <button onClick={loadData} className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-lg border border-border bg-card text-[13px] font-medium hover:border-primary/40 transition-colors">
+          <button onClick={() => loadData(true)} className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-lg border border-border bg-card text-[13px] font-medium hover:border-primary/40 transition-colors">
             <RefreshCw className="size-3.5" /> Refresh
           </button>
           <button onClick={() => window.location.href = "/propertyowner/penalty-config"} className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-lg bg-foreground text-background text-[13px] font-medium hover:opacity-90 transition-opacity">
@@ -183,9 +183,9 @@ export default function LatePaymentsPage() {
       {/* Mobile Stat Strip */}
       <div className="flex md:hidden overflow-x-auto gap-3 pb-2 mb-5" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {[
-          { title: "Penalties",   value: loading ? "..." : fmt(totalPenalty),    subtext: "Accrued fines",   icon: AlertTriangle, bg: "bg-rose-50",   ic: "text-rose-600" },
-          { title: "Outstanding", value: loading ? "..." : fmt(totalOutstanding), subtext: "Total due",       icon: RefreshCw,     bg: "bg-amber-50",  ic: "text-amber-600" },
-          { title: "Critical",    value: loading ? "..." : phase3Count,           subtext: "Phase 3 tenants", icon: ShieldCheck,   bg: "bg-slate-50",  ic: "text-slate-600" },
+          { title: "Penalties", value: loading ? "..." : fmt(totalPenalty), subtext: "Accrued fines", icon: AlertTriangle, bg: "bg-rose-50", ic: "text-rose-600" },
+          { title: "Outstanding", value: loading ? "..." : fmt(totalOutstanding), subtext: "Total due", icon: RefreshCw, bg: "bg-amber-50", ic: "text-amber-600" },
+          { title: "Critical", value: loading ? "..." : phase3Count, subtext: "Phase 3 tenants", icon: ShieldCheck, bg: "bg-slate-50", ic: "text-slate-600" },
         ].map(({ title, value, subtext, icon: Icon, bg, ic }) => (
           <div key={title} className="shrink-0 w-[130px] bg-white rounded-[20px] p-4 shadow-sm border border-slate-100 flex flex-col justify-between">
             <div className="flex items-start mb-2">

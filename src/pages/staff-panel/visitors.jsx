@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
 import StaffLayout from "../../components/StaffLayout";
 import { UserPlus, Search, ChevronRight, LogOut, CheckCircle2, X } from "lucide-react";
-import { getApiBase } from "../../utils/api";
+import { useOwnerVisitors, useCreateVisitor, useUpdateVisitorStatus } from "../../hooks/useVisitors";
 
 function getStaffSession() {
   try {
@@ -17,89 +17,51 @@ export default function StaffVisitors() {
   const staff = getStaffSession();
   const parentLoginId = staff?.parentLoginId || "";
 
-  const [visitors, setVisitors] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // ── Server state: React Query ──
+  const { data: visitors = [], isLoading: loading } = useOwnerVisitors(parentLoginId);
+  const createVisitorMut = useCreateVisitor(parentLoginId);
+  const updateVisitorMut = useUpdateVisitorStatus(parentLoginId);
+  const submitting = createVisitorMut.isPending;
+
+  // ── UI-only local state ──
   const [search, setSearch] = useState("");
-  
   const [showAddModal, setShowAddModal] = useState(false);
   const [vName, setVName] = useState("");
   const [vPhone, setVPhone] = useState("");
   const [vHost, setVHost] = useState("");
   const [vRoom, setVRoom] = useState("");
   const [vPurpose, setVPurpose] = useState("Social");
-  const [submitting, setSubmitting] = useState(false);
 
-  const fetchVisitors = useCallback(async () => {
-    if (!parentLoginId) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await fetch(`${getApiBase()}/api/visitors/owner/${parentLoginId}`);
-      const data = await res.json();
-      if (data.success) {
-        setVisitors(data.visitors || []);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [parentLoginId]);
-
-  useEffect(() => {
-    fetchVisitors();
-  }, [fetchVisitors]);
-
-  const handleAddVisitor = async (e) => {
+  const handleAddVisitor = (e) => {
     e.preventDefault();
     if (!parentLoginId || !vName || !vPhone || !vHost || !vRoom) return;
-    setSubmitting(true);
-    try {
-      const res = await fetch(`${getApiBase()}/api/visitors`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ownerLoginId: parentLoginId,
-          name: vName,
-          phone: vPhone,
-          hostName: vHost,
-          hostRoom: vRoom,
-          purpose: vPurpose,
-          status: 'Inside'
-        })
-      });
-      const data = await res.json();
-      if (data.success) {
-        fetchVisitors();
-        setShowAddModal(false);
-        setVName(""); setVPhone(""); setVHost(""); setVRoom("");
-      } else {
-        alert("Failed to add visitor");
+    createVisitorMut.mutate(
+      {
+        ownerLoginId: parentLoginId,
+        name: vName,
+        phone: vPhone,
+        hostName: vHost,
+        hostRoom: vRoom,
+        purpose: vPurpose,
+        status: 'Inside',
+      },
+      {
+        onSuccess: (data) => {
+          if (data?.success) {
+            setShowAddModal(false);
+            setVName(""); setVPhone(""); setVHost(""); setVRoom("");
+          } else {
+            alert("Failed to add visitor");
+          }
+        },
+        onError: () => alert("Error adding visitor"),
       }
-    } catch (err) {
-      alert("Error adding visitor");
-    } finally {
-      setSubmitting(false);
-    }
+    );
   };
 
-  const handleCheckout = async (id) => {
+  const handleCheckout = (id) => {
     if (!window.confirm("Check out this visitor?")) return;
-    try {
-      const res = await fetch(`${getApiBase()}/api/visitors/${id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'Exited' })
-      });
-      const data = await res.json();
-      if (data.success) {
-        fetchVisitors();
-      }
-    } catch (err) {
-      alert("Error checking out visitor");
-    }
+    updateVisitorMut.mutate({ id, status: 'Exited' }, { onError: () => alert("Error checking out visitor") });
   };
 
   const filteredVisitors = visitors.filter(v => 

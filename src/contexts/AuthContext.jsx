@@ -19,10 +19,11 @@ const getAuthApiUrl = () =>
 const AUTH_STORAGE_KEYS = [
   "token", "staff_token", "user", "staff_user", "manager_user",
   "website_token", "website_user", "userData", "owner_user",
-  "owner_session", "tenant_user", "accessToken"
+  "owner_session", "tenant_user", "accessToken",
+  "staff_session", "employee_session"
 ];
 
-const clearAllAuthKeys = () => {
+export const clearAllAuthKeys = () => {
   AUTH_STORAGE_KEYS.forEach((k) => {
     try { localStorage.removeItem(k); } catch (_) {}
     try { sessionStorage.removeItem(k); } catch (_) {}
@@ -63,7 +64,8 @@ export const AuthProvider = ({ children }) => {
           if (backendUser && typeof backendUser === "object" && backendUser.role) {
             setUser(backendUser);
           } else {
-            setUser(JSON.parse(rawUser));
+            // Backend returned 200 but no recognisable user shape — treat as auth failure.
+            clearAllAuthKeys();
           }
         } catch {
           clearAllAuthKeys();
@@ -71,7 +73,9 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
       })
       .catch(() => {
-        try { setUser(JSON.parse(rawUser)); } catch { clearAllAuthKeys(); }
+        // Network failure, timeout, or any fetch error — never trust cached localStorage.
+        // Require a fresh login so the server remains the sole authentication authority.
+        clearAllAuthKeys();
         setLoading(false);
       });
   }, []);
@@ -79,6 +83,7 @@ export const AuthProvider = ({ children }) => {
   const login = (userData, token) => {
     setUser(userData);
     localStorage.setItem('token', token);
+    sessionStorage.setItem('token', token);
     localStorage.setItem('userData', JSON.stringify(userData));
   };
 

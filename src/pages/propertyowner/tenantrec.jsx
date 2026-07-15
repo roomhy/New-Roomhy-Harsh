@@ -574,6 +574,29 @@ export default function TenantRec() {
             });
           }
         }
+
+        // Final fallback: the property-scoped endpoint can return nothing when the
+        // room records are linked to the owner (ownerLoginId) rather than to this
+        // exact property _id. Pull the owner's rooms — the same endpoint the Rooms
+        // pages use — and keep the ones for the selected property (or all, if the
+        // room records carry no property reference to filter on).
+        if (roomList.length === 0 && owner?.loginId) {
+          try {
+            const ownerData = await fetchJson(`/api/rooms/owner/${owner.loginId}`);
+            if (!active) return;
+            const ownerRooms = Array.isArray(ownerData) ? ownerData : (ownerData?.rooms || ownerData?.data || []);
+            const pid = String(roomAssignment.propertyId);
+            const selProp = properties.find(p => String(p._id) === pid || String(p.visitId) === pid || String(p.propertyId) === pid);
+            const pName = String(selProp?.title || selProp?.name || "").trim().toLowerCase();
+            roomList = ownerRooms.filter(r => {
+              const rpId = String(r.propertyId || r.property?._id || r.property || r.property_id || "");
+              const rpName = String(r.propertyName || r.property?.title || r.property?.name || "").trim().toLowerCase();
+              if (!rpId && !rpName) return true; // room carries no property reference → include
+              return rpId === pid || (!!pName && rpName === pName);
+            });
+          } catch (_) { /* keep roomList as-is */ }
+        }
+
         console.log("DEBUG loadRooms: final roomList =", roomList);
         setRooms(roomList);
 

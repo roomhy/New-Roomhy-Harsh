@@ -10,7 +10,7 @@ const clearAllAuthStorage = () => {
   const keys = [
     "token", "staff_token", "user", "staff_user", "manager_user",
     "owner_user", "owner_session", "tenant_user", "website_token",
-    "website_user", "accessToken", "userData"
+    "website_user", "accessToken", "userData", "staff_session", "employee_session"
   ];
   keys.forEach((k) => {
     try { localStorage.removeItem(k); } catch (_) {}
@@ -133,6 +133,7 @@ export const useSuperadminLogin = () => {
             sessionStorage.setItem("user", JSON.stringify(safeUser));
             localStorage.setItem("user", JSON.stringify(safeUser));
             localStorage.setItem("token", data.token);
+            sessionStorage.setItem("token", data.token);
             sessionStorage.removeItem("owner_session");
             localStorage.removeItem("owner_user");
             window.location.href = resolvePanelPath("superadmin", "superadmin");
@@ -177,6 +178,7 @@ export const useSuperadminLogin = () => {
             sessionStorage.setItem("owner_session", JSON.stringify(sessionUser));
             localStorage.setItem("owner_user", JSON.stringify(sessionUser));
             localStorage.setItem("token", data.token);
+            sessionStorage.setItem("token", data.token);
             window.location.href = resolvePanelPath("propertyowner", "admin");
             return;
           }
@@ -216,6 +218,7 @@ export const useSuperadminLogin = () => {
             localStorage.setItem("user", JSON.stringify(user));
             localStorage.setItem("staff_user", JSON.stringify(user));
             localStorage.setItem("token", data.token);
+            sessionStorage.setItem("token", data.token);
             sessionStorage.removeItem("owner_session");
             localStorage.removeItem("owner_user");
             window.location.href = resolvePanelPath("employee", "areaadmin");
@@ -252,6 +255,7 @@ export const useSuperadminLogin = () => {
             localStorage.setItem("user", JSON.stringify(user));
             localStorage.setItem("staff_user", JSON.stringify(user));
             localStorage.setItem("token", data.token);
+            sessionStorage.setItem("token", data.token);
             sessionStorage.removeItem("owner_session");
             localStorage.removeItem("owner_user");
             window.location.href = resolvePanelPath("employee", "areaadmin");
@@ -302,6 +306,7 @@ export const useSuperadminLogin = () => {
             localStorage.setItem("tenant_user", JSON.stringify(tenantUser));
             localStorage.setItem("user", JSON.stringify(tenantUser));
             localStorage.setItem("token", data.token);
+            sessionStorage.setItem("token", data.token);
             window.location.href = resolvePanelPath("tenant", "tenantdashboard");
             return;
           }

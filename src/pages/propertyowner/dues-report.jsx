@@ -7,7 +7,7 @@ import { Search, Send, IndianRupee, RefreshCw, Smartphone, CreditCard, Banknote 
 function calcDaysSinceDue(dueDate) {
   if (!dueDate) return 0;
   const todayMs = new Date(new Date().toDateString()).getTime();
-  const dueMs   = new Date(new Date(dueDate).toDateString()).getTime();
+  const dueMs = new Date(new Date(dueDate).toDateString()).getTime();
   return Math.max(0, Math.round((todayMs - dueMs) / 86400000));
 }
 
@@ -15,12 +15,12 @@ function calcLivePenalties(inv, config) {
   if (!inv?.dueDate || !config) {
     return { phase: 1, totalPenalty: 0, totalDue: inv?.outstandingAmount || inv?.rentAmount || 0 };
   }
-  const minorDay     = config.minorPenaltyDay ?? 7;
-  const majorDay     = config.majorPenaltyDay ?? 12;
+  const minorDay = config.minorPenaltyDay ?? 7;
+  const majorDay = config.majorPenaltyDay ?? 12;
   const daysSinceDue = calcDaysSinceDue(inv.dueDate);
-  const phase        = daysSinceDue < minorDay ? 1 : daysSinceDue < majorDay ? 2 : 3;
-  const rentPaid     = inv.rentPaidAmount ?? inv.paidAmount ?? 0;
-  const base         = Math.max(0, (inv.rentAmount || 0) - rentPaid);
+  const phase = daysSinceDue < minorDay ? 1 : daysSinceDue < majorDay ? 2 : 3;
+  const rentPaid = inv.rentPaidAmount ?? inv.paidAmount ?? 0;
+  const base = Math.max(0, (inv.rentAmount || 0) - rentPaid);
   const daysInPhase2 = Math.max(0, Math.min(daysSinceDue + 1, majorDay) - minorDay);
   const daysInPhase3 = Math.max(0, daysSinceDue - majorDay + 1);
 
@@ -29,39 +29,39 @@ function calcLivePenalties(inv, config) {
 
   if (phase >= 2 && config.minorPenalty?.enabled) {
     const mp = config.minorPenalty;
-    if (mp.type === "percentage")   minorPenalty = Math.round(base * (mp.value / 100));
+    if (mp.type === "percentage") minorPenalty = Math.round(base * (mp.value / 100));
     else if (mp.type === "per_day") minorPenalty = Math.round((mp.value || 0) * daysInPhase2);
-    else                            minorPenalty = mp.value || 0;
+    else minorPenalty = mp.value || 0;
   }
 
   if (phase >= 3 && config.majorPenalty?.enabled) {
     const daysOverMajor = Math.max(0, daysSinceDue - majorDay);
     const mp = config.majorPenalty;
-    if (mp.type === "percentage")        majorPenalty = Math.round(base * (mp.value / 100));
-    else if (mp.type === "fixed")        majorPenalty = mp.value || 0;
-    else if (mp.type === "per_day")      majorPenalty = Math.round((mp.value || 0) * daysInPhase3);
-    else if (mp.type === "daily_fixed")  majorPenalty = (mp.value || 0) + daysOverMajor * (mp.incrementValue || 0);
+    if (mp.type === "percentage") majorPenalty = Math.round(base * (mp.value / 100));
+    else if (mp.type === "fixed") majorPenalty = mp.value || 0;
+    else if (mp.type === "per_day") majorPenalty = Math.round((mp.value || 0) * daysInPhase3);
+    else if (mp.type === "daily_fixed") majorPenalty = (mp.value || 0) + daysOverMajor * (mp.incrementValue || 0);
     else if (mp.type === "weekly_fixed") majorPenalty = (mp.value || 0) + Math.floor(daysOverMajor / 7) * (mp.incrementValue || 0);
     if (mp.maxCap && majorPenalty > mp.maxCap) majorPenalty = mp.maxCap;
     majorPenalty = Math.round(majorPenalty);
   }
 
   const totalPenalty = minorPenalty + majorPenalty;
-  const elec         = inv.electricityBill || 0;
-  const totalDue     = base + totalPenalty + elec;
+  const elec = inv.electricityBill || 0;
+  const totalDue = base + totalPenalty + elec;
   return { phase, daysSinceDue, totalPenalty, totalDue };
 }
 
 const PHASE_BADGE = {
-  1: { label: "Phase 1",        cls: "bg-blue-50 text-blue-700" },
-  2: { label: "Phase 2 · Minor",cls: "bg-amber-50 text-amber-700" },
-  3: { label: "Phase 3 · Final",cls: "bg-rose-50 text-rose-700" },
+  1: { label: "Phase 1", cls: "bg-blue-50 text-blue-700" },
+  2: { label: "Phase 2 · Minor", cls: "bg-amber-50 text-amber-700" },
+  3: { label: "Phase 3 · Final", cls: "bg-rose-50 text-rose-700" },
 };
 
 function fmtMonth(billingMonth) {
   if (!billingMonth) return "—";
   const [y, m] = billingMonth.split("-");
-  const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return `${names[parseInt(m, 10) - 1]} ${y}`;
 }
 
@@ -74,41 +74,41 @@ export default function DuesReportPage() {
     return null;
   }
 
-  const [rawInvoices, setRawInvoices]   = useState([]);
+  const [rawInvoices, setRawInvoices] = useState([]);
   const [penaltyConfig, setPenaltyConfig] = useState(null);
-  const [loading, setLoading]           = useState(true);
-  const [search, setSearch]             = useState("");
-  const [toast, setToast]               = useState(null);
-  const [reminding, setReminding]       = useState(null);
-  const [payingId, setPayingId]         = useState(null);
-  const [payAmount, setPayAmount]       = useState("");
-  const [payMethod, setPayMethod]       = useState("cash");
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [toast, setToast] = useState(null);
+  const [reminding, setReminding] = useState(null);
+  const [payingId, setPayingId] = useState(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [payMethod, setPayMethod] = useState("cash");
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   };
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     const ownerId = owner._id || owner.loginId;
     setLoading(true);
     try {
       const [invData, configData] = await Promise.allSettled([
-        fetchInvoices({ ownerId, status: "PENDING,PARTIAL", limit: 200 }),
-        fetchPenaltyConfigs(ownerId),
+        fetchInvoices({ ownerId, status: "PENDING,PARTIAL", limit: 200 }, force),
+        fetchPenaltyConfigs(ownerId, force),
       ]);
       if (invData.status === "fulfilled") {
         setRawInvoices(invData.value?.invoices || []);
       }
       if (configData.status === "fulfilled") {
         const cfg = configData.value;
-        const g   = cfg?.globalDefaults || {};
-        const c   = cfg?.configs?.[0]   || {};
+        const g = cfg?.globalDefaults || {};
+        const c = cfg?.configs?.[0] || {};
         setPenaltyConfig({
           minorPenaltyDay: c.minorPenaltyDay ?? g.minorPenaltyDay ?? 7,
           majorPenaltyDay: c.majorPenaltyDay ?? g.majorPenaltyDay ?? 12,
-          minorPenalty:    c.minorPenalty    ?? g.minorPenalty    ?? null,
-          majorPenalty:    c.majorPenalty    ?? g.majorPenalty    ?? null,
+          minorPenalty: c.minorPenalty ?? g.minorPenalty ?? null,
+          majorPenalty: c.majorPenalty ?? g.majorPenalty ?? null,
         });
       }
       if (invData.status === "rejected") showToast(invData.reason?.message || "Failed to load dues", "error");
@@ -123,24 +123,24 @@ export default function DuesReportPage() {
   const dues = rawInvoices.map(inv => {
     const live = calcLivePenalties(inv, penaltyConfig);
     return {
-      id:               inv._id,
-      invoiceId:        inv._id,
-      name:             inv.tenantId?.name  || inv.tenantName  || "Unknown Tenant",
-      email:            inv.tenantId?.email || inv.tenantEmail || "",
-      phone:            inv.tenantId?.phone || inv.tenantPhone || "",
-      roomNo:           inv.tenantId?.roomNo || "—",
-      bedNo:            inv.tenantId?.bedNo  || "",
-      billingMonth:     inv.billingMonth,
-      rentAmount:       inv.rentAmount || 0,
-      penalty:          live.totalPenalty,
-      outstanding:      live.totalDue,
-      electricityBill:  inv.electricityBill || 0,
+      id: inv._id,
+      invoiceId: inv._id,
+      name: inv.tenantId?.name || inv.tenantName || "Unknown Tenant",
+      email: inv.tenantId?.email || inv.tenantEmail || "",
+      phone: inv.tenantId?.phone || inv.tenantPhone || "",
+      roomNo: inv.tenantId?.roomNo || "—",
+      bedNo: inv.tenantId?.bedNo || "",
+      billingMonth: inv.billingMonth,
+      rentAmount: inv.rentAmount || 0,
+      penalty: live.totalPenalty,
+      outstanding: live.totalDue,
+      electricityBill: inv.electricityBill || 0,
       electricityUnits: inv.electricityUnitsConsumed || 0,
       electricityAdded: inv.electricityReadingAdded || false,
-      dueDate:          inv.dueDate,
-      daysOverdue:      live.daysSinceDue,
-      phase:            live.phase,
-      status:           inv.status,
+      dueDate: inv.dueDate,
+      daysOverdue: live.daysSinceDue,
+      phase: live.phase,
+      status: inv.status,
     };
   }).sort((a, b) => b.daysOverdue - a.daysOverdue);
 
@@ -194,9 +194,8 @@ export default function DuesReportPage() {
     >
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-[13px] font-medium ${
-          toast.type === "error" ? "bg-rose-600" : "bg-emerald-600"
-        }`}>{toast.msg}</div>
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-[13px] font-medium ${toast.type === "error" ? "bg-rose-600" : "bg-emerald-600"
+          }`}>{toast.msg}</div>
       )}
 
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
@@ -204,7 +203,7 @@ export default function DuesReportPage() {
           <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Outstanding Dues</h1>
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">Monitor outstanding balances, track aging schedules, and trigger reminders.</p>
         </div>
-        <button onClick={load} disabled={loading}
+        <button onClick={() => load(true)} disabled={loading}
           className="inline-flex items-center gap-2 h-9 px-4 rounded-xl border border-border text-[13px] font-medium hover:bg-muted/40 disabled:opacity-50 shrink-0">
           <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} /> Refresh
         </button>
@@ -233,9 +232,9 @@ export default function DuesReportPage() {
       {/* Mobile Stat Strip */}
       <div className="flex overflow-x-auto gap-3 pb-2 mb-5 md:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {[
-          { title: "Outstanding", value: loading ? "..." : fmt(totalOutstanding), subtext: "Total dues",     icon: IndianRupee, bg: "bg-rose-50",   ic: "text-rose-600" },
-          { title: "Defaulters",  value: loading ? "..." : dues.length,           subtext: "Tenants",       icon: RefreshCw,   bg: "bg-amber-50",  ic: "text-amber-600" },
-          { title: "Avg Days",    value: loading ? "..." : `${avgDays}d`,          subtext: "Overdue avg",   icon: Search,      bg: "bg-indigo-50", ic: "text-indigo-600" },
+          { title: "Outstanding", value: loading ? "..." : fmt(totalOutstanding), subtext: "Total dues", icon: IndianRupee, bg: "bg-rose-50", ic: "text-rose-600" },
+          { title: "Defaulters", value: loading ? "..." : dues.length, subtext: "Tenants", icon: RefreshCw, bg: "bg-amber-50", ic: "text-amber-600" },
+          { title: "Avg Days", value: loading ? "..." : `${avgDays}d`, subtext: "Overdue avg", icon: Search, bg: "bg-indigo-50", ic: "text-indigo-600" },
         ].map(({ title, value, subtext, icon: Icon, bg, ic }) => (
           <div key={title} className="shrink-0 w-[130px] bg-white rounded-[20px] p-4 shadow-sm border border-slate-100 flex flex-col justify-between">
             <div className="flex items-start mb-2">
@@ -313,9 +312,9 @@ export default function DuesReportPage() {
                       <td className="px-6 py-4">
                         {d.electricityAdded
                           ? <div>
-                              <div className="font-medium text-amber-600">{fmt(d.electricityBill)}</div>
-                              <div className="text-[11px] text-muted-foreground">{d.electricityUnits} units</div>
-                            </div>
+                            <div className="font-medium text-amber-600">{fmt(d.electricityBill)}</div>
+                            <div className="text-[11px] text-muted-foreground">{d.electricityUnits} units</div>
+                          </div>
                           : <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">⚡ Pending</span>
                         }
                       </td>
@@ -328,9 +327,8 @@ export default function DuesReportPage() {
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                          d.daysOverdue > 30 ? "bg-rose-50 text-rose-600" : d.daysOverdue > 10 ? "bg-amber-50 text-amber-600" : "bg-blue-50 text-blue-600"
-                        }`}>
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ${d.daysOverdue > 30 ? "bg-rose-50 text-rose-600" : d.daysOverdue > 10 ? "bg-amber-50 text-amber-600" : "bg-blue-50 text-blue-600"
+                          }`}>
                           {d.daysOverdue} Days
                         </span>
                       </td>
@@ -363,9 +361,9 @@ export default function DuesReportPage() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-[12px] text-muted-foreground font-medium shrink-0">Payment method:</span>
                               {[
-                                { key: "upi",          label: "UPI Received",  Icon: Smartphone },
+                                { key: "upi", label: "UPI Received", Icon: Smartphone },
                                 { key: "bank_transfer", label: "Bank Transfer", Icon: CreditCard },
-                                { key: "cash",         label: "Cash Given",    Icon: Banknote },
+                                { key: "cash", label: "Cash Given", Icon: Banknote },
                               ].map(({ key, label, Icon }) => (
                                 <button
                                   key={key}

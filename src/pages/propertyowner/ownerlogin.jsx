@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useHtmlPage } from "../../utils/htmlPage";
 import { fetchJson } from "../../utils/api";
 import { User, Key, Eye, EyeOff, ArrowRight, Lock, X } from "lucide-react";
+import { isStaffLoginId, setStaffSession, STAFF_HOME_PATH } from "../../utils/staffAccess";
 
 const resolvePanelPath = (folder, fileName) => {
   const path = (window.location.pathname || "").toLowerCase();
@@ -35,6 +36,11 @@ export default function Ownerlogin() {
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  // Staff (owner-scoped employee) first-login reset context — the same login
+  // form authenticates staff and drives their first-login password reset.
+  const [isStaffFlow, setIsStaffFlow] = useState(false);
+  const [staffRecord, setStaffRecord] = useState(null);
+  const [staffResetToken, setStaffResetToken] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -71,9 +77,45 @@ export default function Ownerlogin() {
     sessionStorage.setItem("owner_session", JSON.stringify(sessionUser));
   };
 
+  // Staff members (owner-scoped employees) authenticate through this same form.
+  // They use the employee auth endpoint and land in the staff experience.
+  const handleStaffLogin = async () => {
+    setErrorMsg("");
+    setLoading(true);
+    try {
+      const data = await fetchJson("/api/employees/login", {
+        method: "POST",
+        body: JSON.stringify({ loginId: loginId.trim(), password })
+      });
+      const emp = data.data || {};
+      if (data.requirePasswordReset || emp.requirePasswordReset) {
+        setStaffRecord(emp);
+        setStaffResetToken(data.resetToken || "");
+        setIsStaffFlow(true);
+        setStep("setPassword");
+        return;
+      }
+      setStaffSession(emp, data.token);
+      window.location.href = STAFF_HOME_PATH;
+    } catch (err) {
+      let msg = "Login failed.";
+      try {
+        const parsed = JSON.parse(err?.body || "{}");
+        msg = parsed?.message || parsed?.error || err?.message || msg;
+      } catch (_) { msg = err?.message || msg; }
+      setErrorMsg(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogin = async () => {
     if (!loginId || !password) {
       setErrorMsg("Please enter your login ID and password.");
+      return;
+    }
+    if (isStaffLoginId(loginId)) {
+      await handleStaffLogin();
       return;
     }
     setErrorMsg("");
@@ -135,6 +177,30 @@ export default function Ownerlogin() {
     }
     setErrorMsg("");
     setLoading(true);
+
+    // Staff first-login: set password via the employee endpoint, then sign in.
+    if (isStaffFlow) {
+      try {
+        const resetRes = await fetchJson(`/api/employees/${loginId.trim()}/reset-password`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${staffResetToken}` },
+          body: JSON.stringify({ newPassword })
+        });
+        setStaffSession(staffRecord || { loginId: loginId.trim() }, resetRes?.token);
+        window.location.href = STAFF_HOME_PATH;
+      } catch (err) {
+        let msg = "Failed to set password.";
+        try {
+          const parsed = JSON.parse(err?.body || "{}");
+          msg = parsed?.message || parsed?.error || err?.message || msg;
+        } catch (_) { msg = err?.message || msg; }
+        setErrorMsg(msg);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     try {
       await fetchJson("/api/auth/owner/set-password", {
         method: "POST",
@@ -240,7 +306,7 @@ export default function Ownerlogin() {
         {step === "login" && (
           <div className="fade-in">
             <h1 className="text-2xl font-semibold text-gray-800 mb-2">Portal Login</h1>
-            <p className="text-gray-500 mb-6">Enter your Owner ID or Phone Number.</p>
+            <p className="text-gray-500 mb-6">Enter your Owner ID, Staff ID, or Phone Number.</p>
 
             <div className="mb-4">
               <label htmlFor="loginIdInput" className="block text-sm font-medium text-gray-700 text-left mb-2">Login ID or Phone Number</label>

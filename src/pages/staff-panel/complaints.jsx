@@ -1,8 +1,12 @@
 import React from "react";
 import StaffLayout from "../../components/StaffLayout";
 import { AlertCircle, Clock, CheckCircle2, Home, User, Plus, Search, Filter, ArrowRight, MessageSquare } from "lucide-react";
-import { getApiBase } from "../../utils/api";
+import { getApiBase, getAuthHeader } from "../../utils/api";
 import { toast } from "react-hot-toast";
+import { useMutation } from "@tanstack/react-query";
+import { queryKeys } from "../../lib/queryKeys";
+import { queryClient } from "../../lib/queryClient";
+import { useStaffComplaints } from "../../hooks/useStaffLists";
 
 function getStaffSession() {
   try {
@@ -13,80 +17,64 @@ function getStaffSession() {
 }
 
 export default function StaffComplaints() {
-  const [complaints, setComplaints] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
+  const staff = getStaffSession();
+  const parentLoginId = staff?.parentLoginId || "";
+  const staffId = staff?._id || staff?.id || "";
+  const staffLoginId = staff?.loginId || "";
+
   const [statusFilter, setStatusFilter] = React.useState("All");
   const [search, setSearch] = React.useState("");
 
-  const fetchComplaints = async () => {
-    try {
-      setLoading(true);
-      const staff = getStaffSession();
-      if (!staff) {
-        setLoading(false);
-        return;
-      }
-      
-      const parentLoginId = staff.parentLoginId || "";
-      const staffId = staff._id || staff.id || "";
-      const staffLoginId = staff.loginId || "";
-      
-      if (!parentLoginId) {
-        setLoading(false);
-        return;
-      }
-      
-      const compRes = await fetch(`${getApiBase()}/api/complaints/owner/${parentLoginId}`);
-      const compData = await compRes.json();
-      
-      if (compData && compData.complaints) {
-          // Filter complaints assigned to this staff member
-          const assigned = compData.complaints.filter(c => {
-             const assignedIdStr = c.assignedStaffId?._id || c.assignedStaffId || "";
-             return String(assignedIdStr) === String(staffId) || 
-                    (c.assignedTo && String(c.assignedTo).toUpperCase() === String(staffLoginId).toUpperCase());
-          });
-          
-          setComplaints(assigned.map(c => ({
-              dbId: c._id,
-              id: `#CMP-${c._id.substring(c._id.length-4).toUpperCase()}`,
-              room: c.roomNo || "N/A",
-              tenant: c.tenantName || "Unknown",
-              issue: c.category + " - " + c.description,
-              priority: c.priority || "Low",
-              status: c.status,
-              time: new Date(c.createdAt).toLocaleDateString('en-IN', {day:'numeric',month:'short'})
-          })));
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: complaints = [], isLoading: loading } = useStaffComplaints(parentLoginId, {
+    select: (raw = []) => raw.filter(c => {
+      const assignedIdStr = c.assignedStaffId?._id || c.assignedStaffId || "";
+      return String(assignedIdStr) === String(staffId) ||
+        (c.assignedTo && String(c.assignedTo).toUpperCase() === String(staffLoginId).toUpperCase());
+    }).map(c => ({
+      dbId: c._id,
+      id: `#CMP-${c._id.substring(c._id.length-4).toUpperCase()}`,
+      room: c.roomNo || "N/A",
+      tenant: c.tenantName || "Unknown",
+      issue: c.category + " - " + c.description,
+      priority: c.priority || "Low",
+      status: c.status,
+      time: new Date(c.createdAt).toLocaleDateString('en-IN', {day:'numeric',month:'short'})
+    })),
+  });
 
-  React.useEffect(() => {
-    fetchComplaints();
-  }, []);
-
-  const updateStatus = async (dbId, newStatus) => {
-    try {
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ dbId, newStatus }) => {
       const res = await fetch(`${getApiBase()}/api/complaints/${dbId}/status`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
         body: JSON.stringify({ status: newStatus })
       });
-      const data = await res.json();
-      if (data?.success !== false) {
-        setComplaints(prev => prev.map(c => c.dbId === dbId ? { ...c, status: newStatus } : c));
-        toast.success(`Complaint marked as "${newStatus}" ✓`);
-      } else {
+      return res.json();
+    },
+    onMutate: async ({ dbId, newStatus }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.complaints.byOwner(parentLoginId) });
+      const previous = queryClient.getQueryData(queryKeys.complaints.byOwner(parentLoginId));
+      queryClient.setQueryData(queryKeys.complaints.byOwner(parentLoginId), (old = []) =>
+        old.map((c) => (c._id === dbId ? { ...c, status: newStatus } : c))
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(queryKeys.complaints.byOwner(parentLoginId), ctx.previous);
+    },
+    onSuccess: (data) => {
+      if (data?.success === false) {
         toast.error(data.error || "Failed to update status");
+        return;
       }
-    } catch (_) {
-      toast.error("Failed to update status");
-    }
-  };
+      toast.success(`Complaint updated ✓`);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.complaints.byOwner(parentLoginId) });
+    },
+  });
+
+  const updateStatus = (dbId, newStatus) => updateStatusMutation.mutate({ dbId, newStatus });
 
   const pendingCount = complaints.filter(c => c.status === "Open" || c.status === "In Progress" || c.status === "Taken").length;
   const resolvedCount = complaints.filter(c => c.status === "Resolved" || c.status === "Closed").length;

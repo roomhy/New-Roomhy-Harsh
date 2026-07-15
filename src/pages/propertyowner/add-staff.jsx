@@ -6,6 +6,12 @@ import {
   Clock, IndianRupee, Phone, Mail, Shield, Briefcase, Calendar, MapPin, User
 } from "lucide-react";
 import { apiFetch } from "../../utils/api";
+import {
+  DEFAULT_STAFF_PERMISSIONS as DEFAULT_PERMISSIONS,
+  ALL_STAFF_PERMISSION_KEYS,
+  STAFF_MODULE_GROUPS,
+  getDefaultPermissionsForRole,
+} from "../../utils/staffAccess";
 
 const ROLES = ["Warden", "Reception", "Accountant", "Housekeeping", "Maintenance", "Property Manager", "Custom"];
 const SHIFTS = [
@@ -15,10 +21,6 @@ const SHIFTS = [
   { label: "Night Shift (10:00 PM – 06:00 AM)", start: "10:00 PM", end: "06:00 AM" },
   { label: "Flexible Hours", start: "09:00 AM", end: "06:00 PM" },
 ];
-const DEFAULT_PERMISSIONS = ["Dashboard", "Rooms", "Tenants", "Complaints", "Attendance", "Tasks", "Electricity Readings"];
-
-// ── Defined OUTSIDE component — never recreated on re-render ──
-const ALL_MODULES = ["Dashboard", "Properties", "Rooms", "Tenants", "Leads", "Bookings", "Rent Collection", "Payments", "Complaints", "Attendance", "Tasks", "Reports", "Documents", "Electricity Readings"];
 
 const inputCls = "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-[13px] font-medium text-slate-800 outline-none focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:text-slate-400";
 
@@ -131,7 +133,7 @@ export default function AddStaffPage() {
           role: roleFinal,
           parentLoginId: owner.loginId,
           photoDataUrl: formData.photoDataUrl,
-          permissions: formData.role === "Warden" ? DEFAULT_PERMISSIONS : formData.permissions,
+          permissions: formData.role === "Warden" ? getDefaultPermissionsForRole("Warden") : formData.permissions,
           isActive: formData.status === "Active",
           requirePasswordReset: true,
           joiningDate: formData.joiningDate,
@@ -425,36 +427,46 @@ export default function AddStaffPage() {
                 <Shield size={16} className="text-blue-500" /> Module Permissions
               </h2>
               <p className="text-xs text-slate-500 font-medium -mt-2">
-                Select which modules this staff member can access. These can be changed later.
+                Select which modules this staff member can access — both Staff Panel screens and
+                Owner Panel features. Just like Super Admin grants modules to employees, these can be changed later.
               </p>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {ALL_MODULES.map(mod => {
-                  const active = formData.permissions.includes(mod);
-                  return (
-                    <button
-                      key={mod}
-                      type="button"
-                      onClick={() => togglePermission(mod)}
-                      className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${active
-                        ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-600/20"
-                        : "border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600"}`}
-                    >
-                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all ${active ? "border-white" : "border-slate-300"}`}>
-                        {active && <CheckCircle2 size={10} className="text-white" />}
-                      </div>
-                      <span className="text-xs font-bold">{mod}</span>
-                    </button>
-                  );
-                })}
+              <div className="space-y-6">
+                {Object.entries(STAFF_MODULE_GROUPS).map(([groupName, mods]) => (
+                  <div key={groupName}>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2.5">{groupName}</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {mods.map(mod => {
+                        const active = formData.permissions.includes(mod.key);
+                        const Icon = mod.icon;
+                        return (
+                          <button
+                            key={mod.key}
+                            type="button"
+                            onClick={() => togglePermission(mod.key)}
+                            className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${active
+                              ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-600/20"
+                              : "border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600"}`}
+                          >
+                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all ${active ? "border-white" : "border-slate-300"}`}>
+                              {active && <CheckCircle2 size={10} className="text-white" />}
+                            </div>
+                            {Icon && <Icon size={14} className={active ? "text-white" : "text-slate-400"} />}
+                            <span className="text-xs font-bold">{mod.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <div className="flex items-center gap-2 mt-4">
-                <button type="button" onClick={() => setFormData(f => ({ ...f, permissions: ALL_MODULES }))}
+                <button type="button" onClick={() => setFormData(f => ({ ...f, permissions: [...ALL_STAFF_PERMISSION_KEYS] }))}
                   className="px-4 py-1.5 text-xs font-black text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-all">
                   Select All
                 </button>
-                <button type="button" onClick={() => handleChange("permissions", ["Dashboard"])}
+                <button type="button" onClick={() => handleChange("permissions", [...DEFAULT_PERMISSIONS])}
                   className="px-4 py-1.5 text-xs font-black text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 transition-all">
                   Reset to Default
                 </button>
