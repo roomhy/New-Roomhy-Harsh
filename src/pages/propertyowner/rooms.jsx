@@ -94,9 +94,11 @@ export default function Rooms() {
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [isBulkSaving, setIsBulkSaving] = useState(false);
 
+  const [bulkTargetPropertyId, setBulkTargetPropertyId] = useState("");
+
   const handleBulkSave = async (roomsArray) => {
     if (!owner?.loginId) return;
-    const propId = currentProperty?._id || "";
+    const propId = bulkTargetPropertyId || currentProperty?._id || "";
     if (!propId) {
       toast.error("Please add a property first.");
       return;
@@ -247,7 +249,9 @@ const handleAddTenant = (room) => {
     e.preventDefault();
     if (!owner?.loginId) return;
     
-    const propId = currentProperty?._id || "";
+    // Use roomForm.propertyId first (set when clicking per-property "Add Room" button)
+    // Fall back to currentProperty only if not set
+    const propId = roomForm.propertyId || currentProperty?._id || "";
     if (!propId && !roomForm._id) {
       setErrorMsg("Please wait for properties to load or add a property first.");
       return;
@@ -590,7 +594,7 @@ const handleAddTenant = (room) => {
                         <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold",
                           pct > 90 ? "bg-blue-50 text-blue-600" : pct > 0 ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"
                         )}>{pct}% full</span>
-                        <button type="button" onClick={() => setBulkModalOpen(true)} className="inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-slate-900 text-white text-[12px] font-semibold hover:bg-slate-800 transition-colors">
+                        <button type="button" onClick={() => { setBulkTargetPropertyId(propId); setBulkModalOpen(true); }} className="inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-slate-900 text-white text-[12px] font-semibold hover:bg-slate-800 transition-colors">
                           <Plus size={14}/> Bulk Add
                         </button>
                         <button type="button" onClick={() => { setRoomForm({...defaultRoomForm, propertyId: propId}); setRoomModalOpen(true); }} className="inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-blue-600 text-white text-[12px] font-semibold hover:bg-blue-700 transition-colors">
@@ -771,8 +775,8 @@ const handleAddTenant = (room) => {
       {/* Bulk Room Modal */}
       <BulkRoomModal 
         isOpen={bulkModalOpen} 
-        onClose={() => setBulkModalOpen(false)} 
-        propertyId={currentProperty?._id} 
+        onClose={() => { setBulkModalOpen(false); setBulkTargetPropertyId(""); }} 
+        propertyId={bulkTargetPropertyId || currentProperty?._id} 
         onSave={handleBulkSave} 
         isSaving={isBulkSaving} 
       />
