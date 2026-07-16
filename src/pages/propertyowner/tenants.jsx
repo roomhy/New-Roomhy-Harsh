@@ -76,12 +76,15 @@ export default function Tenants() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingTenant, setEditingTenant] = useState(null);
   const [editForm, setEditForm] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    roomNo: "",
-    bedNo: "",
-    agreedRent: 0
+    name: "", phone: "", email: "",
+    dob: "", gender: "",
+    idProofType: "Aadhaar Card", idProofNumber: "",
+    roomNo: "", bedNo: "",
+    agreedRent: "", depositAmount: "",
+    moveInDate: "", paymentFrequency: "Monthly",
+    floor: "", building: "",
+    emergencyName: "", emergencyPhone: "", relationship: "",
+    occupation: "", permanentAddress: "", remarks: ""
   });
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(0);
@@ -103,9 +106,31 @@ export default function Tenants() {
   });
 
   const handleEditClick = (t) => {
-    // Open full Add Tenant form pre-filled with tenant data
-    const tenantId = t._id || t.id;
-    window.location.href = `/propertyowner/tenantrec?edit=${tenantId}`;
+    setEditingTenant(t);
+    setEditForm({
+      name: t.name || "",
+      phone: t.phone || "",
+      email: t.email || t.gmail || "",
+      dob: t.dob ? new Date(t.dob).toISOString().split('T')[0] : "",
+      gender: t.gender || "",
+      idProofType: t.idProof?.type || t.idProofType || "Aadhaar Card",
+      idProofNumber: t.idProof?.number || t.idProofNumber || "",
+      roomNo: t.roomNo || "",
+      bedNo: t.bedNo || "",
+      agreedRent: t.agreedRent || t.rent || "",
+      depositAmount: t.securityDepositTotal || t.depositAmount || "",
+      moveInDate: t.moveInDate ? new Date(t.moveInDate).toISOString().split('T')[0] : "",
+      paymentFrequency: t.paymentFrequency || "Monthly",
+      floor: t.floor || "",
+      building: t.building || "",
+      emergencyName: t.additional?.emergencyName || t.emergencyName || "",
+      emergencyPhone: t.additional?.emergencyPhone || t.emergencyPhone || "",
+      relationship: t.additional?.relationship || t.relationship || "",
+      occupation: t.additional?.occupation || t.occupation || "",
+      permanentAddress: t.additional?.permanentAddress || t.permanentAddress || "",
+      remarks: t.additional?.remarks || t.remarks || "",
+    });
+    setEditModalOpen(true);
   };
 
   const handleSaveEdit = async (e) => {
@@ -118,20 +143,30 @@ export default function Tenants() {
         name: editForm.name,
         phone: editForm.phone,
         email: editForm.email,
+        dob: editForm.dob,
+        gender: editForm.gender,
+        idProof: { type: editForm.idProofType, number: editForm.idProofNumber },
         roomNo: editForm.roomNo,
         bedNo: editForm.bedNo,
-        agreedRent: Number(editForm.agreedRent)
+        agreedRent: Number(editForm.agreedRent),
+        securityDepositTotal: Number(editForm.depositAmount) || 0,
+        moveInDate: editForm.moveInDate,
+        paymentFrequency: editForm.paymentFrequency,
+        floor: editForm.floor,
+        building: editForm.building,
+        additional: {
+          emergencyName: editForm.emergencyName,
+          emergencyPhone: editForm.emergencyPhone,
+          relationship: editForm.relationship,
+          occupation: editForm.occupation,
+          permanentAddress: editForm.permanentAddress,
+          remarks: editForm.remarks,
+        }
       });
-      
-      // Update tenant in local state
-      setTenants(prev => prev.map(t => (t._id === editingTenant._id || t.id === editingTenant.id || t._id === updated._id || t.id === updated.id) ? { ...t, ...updated } : t));
+      setTenants(prev => prev.map(t => (t._id === editingTenant._id || t.id === editingTenant.id) ? { ...t, ...updated } : t));
       setEditModalOpen(false);
       setEditingTenant(null);
-      
-      // Clear owner fetch cache so that re-fetch gives fresh data
-      if (owner?.loginId) {
-        clearOwnerFetchCache(owner.loginId);
-      }
+      if (owner?.loginId) clearOwnerFetchCache(owner.loginId);
     } catch (err) {
       setErrorMsg(err?.body || err?.message || "Failed to update tenant details.");
     } finally {
@@ -1015,7 +1050,7 @@ export default function Tenants() {
       {/* Edit Tenant Modal */}
       {editModalOpen && editingTenant && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/60 backdrop-blur-sm">
-          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh] border border-border">
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] border border-border">
             {/* Header */}
             <div className="px-6 py-5 border-b border-border flex items-center justify-between bg-muted/30">
               <div className="flex items-center gap-3">
@@ -1037,71 +1072,87 @@ export default function Tenants() {
 
             {/* Form Body */}
             <form onSubmit={handleSaveEdit} className="flex flex-col flex-1 overflow-hidden">
-              <div className="p-6 overflow-y-auto space-y-4 flex-1 text-left">
+              <div className="p-6 overflow-y-auto space-y-5 flex-1 text-left">
+
+                {/* Section: Basic Info */}
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Personal Details</div>
                 <div>
-                  <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Tenant Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={editForm.name}
-                    onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  />
+                  <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Tenant Name *</label>
+                  <input required value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Phone Number</label>
-                    <input
-                      type="tel"
-                      required
-                      value={editForm.phone}
-                      onChange={e => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
-                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    />
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Phone *</label>
+                    <input type="tel" required value={editForm.phone} onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20" />
                   </div>
                   <div>
-                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Email Address</label>
-                    <input
-                      type="email"
-                      value={editForm.email}
-                      onChange={e => setEditForm(prev => ({ ...prev, email: e.target.value }))}
-                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    />
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Email</label>
+                    <input type="email" value={editForm.email} onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20" />
                   </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Date of Birth</label>
+                    <input type="date" value={editForm.dob} onChange={e => setEditForm(p => ({ ...p, dob: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Gender</label>
+                    <select value={editForm.gender} onChange={e => setEditForm(p => ({ ...p, gender: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+                      <option value="">Select</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">ID Proof Type</label>
+                    <select value={editForm.idProofType} onChange={e => setEditForm(p => ({ ...p, idProofType: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+                      <option>Aadhaar Card</option>
+                      <option>PAN Card</option>
+                      <option>Passport</option>
+                      <option>Voter ID</option>
+                      <option>Driving License</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">ID Proof Number</label>
+                    <input value={editForm.idProofNumber} onChange={e => setEditForm(p => ({ ...p, idProofNumber: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                  </div>
+                </div>
+
+                {/* Section: Room & Rent */}
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest pt-2 mb-1 border-t border-border">Room & Rent</div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Room Number</label>
-                    <select
-                      value={editForm.roomNo}
-                      onChange={e => {
-                        const targetRoomNo = e.target.value;
-                        setEditForm(prev => ({ ...prev, roomNo: targetRoomNo, bedNo: "" }));
-                      }}
-                      required
-                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
-                    >
+                    <select value={editForm.roomNo} onChange={e => setEditForm(p => ({ ...p, roomNo: e.target.value, bedNo: "" }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
                       <option value="">Select room...</option>
                       {(() => {
                         const tenantPropId = editingTenant.property?._id || editingTenant.property || editingTenant.propertyId;
                         return rooms.filter(r => String(r.property?._id || r.property || r.propertyId) === String(tenantPropId)).map(room => (
-                          <option key={room._id || room.id} value={room.roomNo || room.number}>
-                            Room {room.roomNo || room.number}
-                          </option>
+                          <option key={room._id || room.id} value={room.roomNo || room.number}>Room {room.roomNo || room.number}</option>
                         ));
                       })()}
                     </select>
                   </div>
                   <div>
                     <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Bed Number</label>
-                    <select
-                      value={editForm.bedNo}
-                      onChange={e => setEditForm(prev => ({ ...prev, bedNo: e.target.value }))}
-                      required
-                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
-                    >
+                    <select value={editForm.bedNo} onChange={e => setEditForm(p => ({ ...p, bedNo: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
                       <option value="">Select bed...</option>
                       {(() => {
                         const tenantPropId = editingTenant.property?._id || editingTenant.property || editingTenant.propertyId;
@@ -1109,32 +1160,86 @@ export default function Tenants() {
                         const selRoom = propRooms.find(r => r.roomNo === editForm.roomNo || r.number === editForm.roomNo);
                         if (!selRoom) return null;
                         const capacity = selRoom.capacity || selRoom.totalBeds || 1;
-                        const bedAssignments = selRoom.bedAssignments || [];
                         return Array.from({ length: capacity }, (_, idx) => {
                           const bedNum = String(idx + 1);
-                          const assignment = bedAssignments[idx];
-                          const isOccupied = assignment && assignment.tenantId && String(assignment.tenantId) !== String(editingTenant._id);
-                          return (
-                            <option key={bedNum} value={bedNum} disabled={isOccupied}>
-                              Bed {bedNum} {isOccupied ? `(Occupied by ${assignment.tenantName || "Another tenant"})` : "(Vacant)"}
-                            </option>
-                          );
+                          const assignment = (selRoom.bedAssignments || [])[idx];
+                          const isOccupied = assignment?.tenantId && String(assignment.tenantId) !== String(editingTenant._id);
+                          return <option key={bedNum} value={bedNum} disabled={isOccupied}>Bed {bedNum}{isOccupied ? ` (${assignment.tenantName || 'Occupied'})` : " (Vacant)"}</option>;
                         });
                       })()}
                     </select>
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Monthly Rent (₹)</label>
-                  <input
-                    type="number"
-                    required
-                    value={editForm.agreedRent}
-                    onChange={e => setEditForm(prev => ({ ...prev, agreedRent: e.target.value }))}
-                    className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Monthly Rent (₹) *</label>
+                    <input type="number" required value={editForm.agreedRent} onChange={e => setEditForm(p => ({ ...p, agreedRent: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Security Deposit (₹)</label>
+                    <input type="number" value={editForm.depositAmount} onChange={e => setEditForm(p => ({ ...p, depositAmount: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Move-in Date</label>
+                    <input type="date" value={editForm.moveInDate} onChange={e => setEditForm(p => ({ ...p, moveInDate: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Payment Frequency</label>
+                    <select value={editForm.paymentFrequency} onChange={e => setEditForm(p => ({ ...p, paymentFrequency: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+                      <option>Monthly</option>
+                      <option>Quarterly</option>
+                      <option>Half-Yearly</option>
+                      <option>Yearly</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Section: Emergency Contact */}
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest pt-2 mb-1 border-t border-border">Emergency Contact</div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Emergency Name</label>
+                    <input value={editForm.emergencyName} onChange={e => setEditForm(p => ({ ...p, emergencyName: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Emergency Phone</label>
+                    <input type="tel" value={editForm.emergencyPhone} onChange={e => setEditForm(p => ({ ...p, emergencyPhone: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Relationship</label>
+                    <input value={editForm.relationship} onChange={e => setEditForm(p => ({ ...p, relationship: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Occupation</label>
+                    <input value={editForm.occupation} onChange={e => setEditForm(p => ({ ...p, occupation: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Permanent Address</label>
+                  <textarea rows={2} value={editForm.permanentAddress} onChange={e => setEditForm(p => ({ ...p, permanentAddress: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none" />
+                </div>
+                <div>
+                  <label className="block text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Remarks</label>
+                  <textarea rows={2} value={editForm.remarks} onChange={e => setEditForm(p => ({ ...p, remarks: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg bg-background border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none" />
+                </div>
+
+                {errorMsg && <div className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-lg">{errorMsg}</div>}
               </div>
 
               {/* Footer */}
