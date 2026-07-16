@@ -458,6 +458,8 @@ export default function TenantRec() {
   const [confirmDetails, setConfirmDetails] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [newTenant, setNewTenant] = useState(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editTenantId, setEditTenantId] = useState(null);
 
   useEffect(() => {
     const initializeData = async () => {
@@ -466,9 +468,76 @@ export default function TenantRec() {
         const props = await fetchOwnerProperties(owner.loginId);
         setProperties(props);
 
-        // 2. Parse URL query params
-        const urlParams = new URLSearchParams(window.location.search);
-        const pId = urlParams.get('propertyId');
+      // ── EDIT MODE: prefill from existing tenant ──
+      const urlParams = new URLSearchParams(window.location.search);
+      const editId = urlParams.get('edit');
+      if (editId) {
+        setEditMode(true);
+        setEditTenantId(editId);
+        try {
+          const res = await fetchJson(`/api/tenants/${editId}`);
+          const t = res?.tenant || res?.data || res;
+          if (t) {
+            setBasicDetails(prev => ({
+              ...prev,
+              fullName: t.name || t.fullName || "",
+              email: t.email || t.gmail || "",
+              phone: t.phone || t.mobile || "",
+              dob: t.dob ? new Date(t.dob).toISOString().split('T')[0] : "",
+              gender: t.gender || "",
+              idProofType: t.idProof?.type || t.idProofType || "Aadhaar Card",
+              idProofNumber: t.idProof?.number || t.idProofNumber || "",
+              idProofFile: t.idProof?.file || t.idProofFile || null,
+            }));
+            setRoomAssignment(prev => ({
+              ...prev,
+              propertyId: t.property?._id || t.propertyId || t.property || "",
+              building: t.building || "",
+              floor: t.floor || "",
+              roomUnit: t.roomNo || t.room?.title || "",
+              roomType: t.accommodationType || t.roomType || "",
+              bed: t.bedNo || "",
+              rentAgreementType: t.rentAgreementType || "Standard",
+              propertyAddress: t.propertyAddress || "",
+            }));
+            setTenancyDetails(prev => ({
+              ...prev,
+              baseRoomRent: String(t.baseRoomRent || t.agreedRent || t.rent || ""),
+              rentAmount: String(t.agreedRent || t.rent || ""),
+              depositAmount: String(t.securityDepositTotal || t.depositAmount || ""),
+              moveInDate: t.moveInDate ? new Date(t.moveInDate).toISOString().split('T')[0] : "",
+              minStay: String(t.minStay || "11"),
+              noticePeriod: String(t.noticePeriod || "30"),
+              rentDueDate: String(t.rentDueDate || "5"),
+              paymentFrequency: t.paymentFrequency || "Monthly",
+              lateFee: String(t.lateFee || ""),
+              licenseDuration: String(t.licenseDuration || ""),
+              moveOutCharges: String(t.moveOutCharges || "0"),
+              noticePeriodCharges: String(t.noticePeriodCharges || "0"),
+              inclusions: t.inclusions || "",
+              gstCharges: String(t.gstCharges || "0"),
+            }));
+            setAdditionalDetails(prev => ({
+              ...prev,
+              occupation: t.additional?.occupation || t.occupation || "",
+              company: t.additional?.company || t.company || "",
+              emergencyName: t.additional?.emergencyName || t.emergencyName || "",
+              emergencyPhone: t.additional?.emergencyPhone || t.emergencyPhone || "",
+              relationship: t.additional?.relationship || t.relationship || "",
+              permanentAddress: t.additional?.permanentAddress || t.permanentAddress || "",
+              remarks: t.additional?.remarks || t.remarks || "",
+            }));
+          }
+        } catch (err) {
+          console.error('Failed to load tenant for edit:', err);
+          toast.error('Could not load tenant data');
+        }
+        return; // skip normal URL param processing below
+      }
+
+      // 2. Parse URL query params (normal add mode)
+      const pId = urlParams.get('propertyId');
+
         const room = urlParams.get('room');
         const nameParam = urlParams.get('name') || urlParams.get('fullName');
         const emailParam = urlParams.get('email');
@@ -645,18 +714,15 @@ export default function TenantRec() {
   const handleSubmit = async () => {
     if (submitting) return;
 
-    if (!validateForm()) {
-      toast.error("Please fill all required fields correctly.");
-      return;
-    }
     if (!confirmDetails) {
       toast.error("Please confirm the details are correct.");
       return;
     }
 
-    if (!window.confirm("Are you sure you want to onboard this tenant?")) {
-      return;
-    }
+    const confirmMsg = editMode
+      ? "Are you sure you want to update this tenant's details?"
+      : "Are you sure you want to onboard this tenant?";
+    if (!window.confirm(confirmMsg)) return;
 
     setSubmitting(true);
     try {
@@ -698,32 +764,48 @@ export default function TenantRec() {
           file: basicDetails.idProofFile
         },
         additional: additionalDetails,
-        status: "pending"
       };
 
-      const res = await fetch(`${apiUrl}/api/tenants/assign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      let res;
+      if (editMode && editTenantId) {
+        // UPDATE existing tenant
+        res = await fetch(`${apiUrl}/api/tenants/${editTenantId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", ...getAuthHeader() },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        // ADD new tenant
+        payload.status = "pending";
+        res = await fetch(`${apiUrl}/api/tenants/assign`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
 
       const json = await res.json();
       if (res.ok) {
-        setNewTenant(json.tenant);
-        setShowSuccess(true);
-        toast.success("Tenant Onboarded Successfully!");
-        // Invalidate rooms/tenants cache so Rooms page shows updated occupancy immediately
         clearOwnerFetchCache(owner.loginId);
+        if (editMode) {
+          toast.success("Tenant updated successfully!");
+          setTimeout(() => window.location.href = "/propertyowner/tenants", 1000);
+        } else {
+          setNewTenant(json.tenant);
+          setShowSuccess(true);
+          toast.success("Tenant Onboarded Successfully!");
+        }
       } else {
-        toast.error(json.message || "Failed to onboard tenant");
+        toast.error(json.message || (editMode ? "Failed to update tenant" : "Failed to onboard tenant"));
       }
     } catch (err) {
       console.error(err);
-      toast.error("An error occurred while adding tenant");
+      toast.error("An error occurred");
     } finally {
       setSubmitting(false);
     }
   };
+
 
   const handlePhotoUpload = async (file) => {
     if (!file) return;
@@ -765,13 +847,17 @@ export default function TenantRec() {
   return (
     <PropertyOwnerLayout
       owner={owner}
-      title="Add Tenant"
+      title={editMode ? "Edit Tenant" : "Add Tenant"}
       onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
     >
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8 pb-4 border-b border-border">
         <div>
-          <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Add New Tenant</h1>
-          <p className="mt-1.5 text-[13.5px] text-muted-foreground">Register details, assign beds and trigger automatic E-KYC verification.</p>
+          <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">
+            {editMode ? 'Edit Tenant Details' : 'Add New Tenant'}
+          </h1>
+          <p className="mt-1.5 text-[13.5px] text-muted-foreground">
+            {editMode ? 'Update tenant information, room assignment and tenancy details.' : 'Register details, assign beds and trigger automatic E-KYC verification.'}
+          </p>
         </div>
         <div className="flex items-center gap-2 md:mt-2">
           <button onClick={() => navigate(-1)} className="px-4 h-10 rounded-lg border border-border text-xs font-bold hover:bg-muted transition-colors">

@@ -103,16 +103,9 @@ export default function Tenants() {
   });
 
   const handleEditClick = (t) => {
-    setEditingTenant(t);
-    setEditForm({
-      name: t.name || "",
-      phone: t.phone || "",
-      email: t.email || "",
-      roomNo: t.roomNo || "",
-      bedNo: t.bedNo || "",
-      agreedRent: t.agreedRent || t.rent || 0
-    });
-    setEditModalOpen(true);
+    // Open full Add Tenant form pre-filled with tenant data
+    const tenantId = t._id || t.id;
+    window.location.href = `/propertyowner/tenantrec?edit=${tenantId}`;
   };
 
   const handleSaveEdit = async (e) => {
