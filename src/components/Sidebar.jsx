@@ -107,8 +107,8 @@ const NAV = [
           children: [
             { label: "Monthly Payment Receipt", path: "/superadmin/accounting/invoices" },
             { label: "Payment History", path: "/superadmin/accounting/transactions" },
-            { label: "Other Charges", path: "/superadmin/accounting/transactions" },
-            { label: "Payment Tracking", path: "/superadmin/accounting/transactions" },
+            { label: "Other Charges", path: "/superadmin/accounting/other-charges" },
+            { label: "Payment Tracking", path: "/superadmin/accounting/tracking" },
           ]
         },
         { 

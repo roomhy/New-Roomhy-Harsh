@@ -3,7 +3,8 @@ import WebsiteFooter from "../../components/website/WebsiteFooter";
 import MobileBottomNav from "../../components/website/MobileBottomNav";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { fetchPropertyByVisitId, getPropertyReviews, getPropertyReviewStats, checkUserReview, submitReview, trackPropertyView, trackPropertyClick } from "../../utils/api";
+import { fetchPropertyByVisitId, getPropertyReviews, getPropertyReviewStats, checkUserReview, submitReview, trackPropertyView, trackPropertyClick, fetchJson } from "../../utils/api";
+import useSEO from "../../hooks/useSEO";
 
 // Extract city from property name (e.g., "HOSTEL - Vastrapur, Ahmedabad" -> "Ahmedabad")
 const extractCityFromName = (name) => {
@@ -354,6 +355,45 @@ export default function PropertyDetailsPage() {
   const [selectedImage, setSelectedImage] = useState(0);
   const [loadingInstitutes, setLoadingInstitutes] = useState(false);
   const [showQuickBookingModal, setShowQuickBookingModal] = useState(false);
+
+  // Layout sections from CMS editor
+  const [layoutSections, setLayoutSections] = useState([]);
+
+  useEffect(() => {
+    const fetchLayout = async () => {
+      try {
+        const timeoutPromise = new Promise(r => setTimeout(() => r({ success: false }), 3000));
+        const apiPromise = fetchJson('/api/page-layouts/property-details');
+        const res = await Promise.race([apiPromise, timeoutPromise]);
+        if (res?.success && res?.data?.sections) {
+          setLayoutSections(res.data.sections.sort((a, b) => a.order - b.order));
+        }
+      } catch (err) {
+        console.warn('Failed to load property details layout:', err);
+      }
+    };
+    fetchLayout();
+  }, []);
+
+  // Helper to get section content from CMS layout
+  const getSectionContent = (sectionId, defaults = {}) => {
+    const section = layoutSections.find(s => s.id === sectionId);
+    if (section?.content) return { ...defaults, ...section.content };
+    return defaults;
+  };
+
+  const isSectionVisible = (sectionId) => {
+    if (layoutSections.length === 0) return true;
+    const sec = layoutSections.find(s => s.id === sectionId);
+    return sec ? sec.visible !== false : true;
+  };
+
+  // Dynamic SEO from property data (updates once property loads)
+  useSEO({
+    pageKey: 'property-details',
+    fallbackTitle: property ? `${property.name} - Roomhy` : 'Property Details - Roomhy',
+    fallbackDescription: property ? `Book ${property.name} in ${property.location}. ${property.type ? property.type.toUpperCase() + ' -' : ''} Starting ₹${property.price || property.monthlyRent}/month. Verified, broker-free.` : undefined
+  });
 
   // Handle Book Now button click
   const handleBookNow = () => {

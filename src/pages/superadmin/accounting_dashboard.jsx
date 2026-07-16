@@ -41,7 +41,7 @@ export default function SuperadminAccountingDashboard() {
 
       if (statsRes.success) {
         setStats(statsRes.stats);
-        setTrend(statsRes.trend.map(t => ({ name: t.name, collection: t.revenue, payout: t.revenue * 0.7 }))); // Simulated payout for trend
+        setTrend(statsRes.trend);
       }
 
       if (txRes.success) {
@@ -89,13 +89,15 @@ export default function SuperadminAccountingDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
          <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-bold text-slate-800 tracking-tight leading-none">Financial Intelligence</h1>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Global Revenue Flow & Settlement Governance</p>
+            <h1 className="text-2xl font-bold text-slate-800 tracking-tight leading-none">Overview</h1>
+            <p className="text-xs font-semibold text-slate-500 mt-1">
+               Track collections, payouts, and earnings across all {stats.totalTransactions || 0} transactions.
+            </p>
          </div>
          <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-100 shadow-sm">
                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-               <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Cycle: May 22-28</span>
+               <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">May 22-28</span>
             </div>
             <button onClick={loadDashboard} className="p-2 rounded-xl bg-slate-800 text-white shadow-lg shadow-slate-800/10 hover:bg-slate-900 transition-all"><RefreshCw className="w-3.5 h-3.5" /></button>
          </div>
@@ -103,21 +105,21 @@ export default function SuperadminAccountingDashboard() {
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        <StatCardHorizontal label="Total Collection" value={`₹${(stats.totalRevenue/100000).toFixed(1)}L`} trend="+12.5% Flux" up icon={IndianRupee} color="blue" />
-        <StatCardHorizontal label="Total Payout" value={`₹${(stats.paidPayouts/100000).toFixed(1)}L`} trend="+8.2% Delta" up icon={Wallet} color="rose" />
-        <StatCardHorizontal label="Roomhy Yield" value={`₹${(stats.commissionEarned/100000).toFixed(1)}L`} trend="+15.7% Growth" up icon={BarChart3} color="emerald" />
-        <StatCardHorizontal label="Wallet Balance" value={`₹${(stats.walletBalance/100000).toFixed(1)}L`} trend="Live" up={true} icon={Database} color="indigo" />
-        <StatCardHorizontal label="Pending Payouts" value={`₹${(stats.pendingPayouts/100000).toFixed(1)}L`} trend="Action Req." up={false} icon={RotateCcw} color="amber" />
+        <StatCardHorizontal label="Collections" value={`₹${(stats.totalRevenue || 0).toLocaleString('en-IN')}`} trend="Total" up icon={IndianRupee} color="blue" />
+        <StatCardHorizontal label="Payouts" value={`₹${(stats.paidPayouts || 0).toLocaleString('en-IN')}`} trend="Settled" up icon={Wallet} color="rose" />
+        <StatCardHorizontal label="Revenue" value={`₹${(stats.commissionEarned || 0).toLocaleString('en-IN')}`} trend="Commission" up icon={BarChart3} color="emerald" />
+        <StatCardHorizontal label="Liquidity" value={`₹${(stats.walletBalance || 0).toLocaleString('en-IN')}`} trend="Net Wallet" up={true} icon={Database} color="indigo" />
+        <StatCardHorizontal label="Liability" value={`₹${(stats.pendingPayouts || 0).toLocaleString('en-IN')}`} trend="Pending" up={false} icon={RotateCcw} color="amber" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Trend Area */}
         <div className="lg:col-span-8 bg-white rounded-2xl p-6 border border-slate-100 shadow-lg shadow-slate-200/50">
            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-[10px] font-bold text-slate-800 uppercase tracking-widest">Settlement Velocity</h3>
+              <h3 className="text-[10px] font-bold text-slate-800 uppercase tracking-widest">Revenue & Payouts Trend</h3>
               <div className="flex items-center gap-3">
-                 <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-blue-600" /><span className="text-[8px] font-bold text-slate-400 uppercase">Collection</span></div>
-                 <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-rose-600" /><span className="text-[8px] font-bold text-slate-400 uppercase">Payout</span></div>
+                 <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-blue-600" /><span className="text-[8px] font-bold text-slate-400 uppercase">Collections</span></div>
+                 <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-rose-600" /><span className="text-[8px] font-bold text-slate-400 uppercase">Payouts</span></div>
               </div>
            </div>
            <div className="h-64">
@@ -131,7 +133,7 @@ export default function SuperadminAccountingDashboard() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 9, fontWeight: 700}} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 9, fontWeight: 700}} tickFormatter={(v) => `${v/100000}L`} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 9, fontWeight: 700}} tickFormatter={(v) => `₹${v.toLocaleString('en-IN')}`} />
                     <Tooltip contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '10px', fontWeight: 700}} />
                     <Area type="monotone" dataKey="collection" stroke="#2563eb" fillOpacity={1} fill="url(#colorColl)" strokeWidth={3} />
                     <Area type="monotone" dataKey="payout" stroke="#ef4444" fill="none" strokeWidth={3} />
@@ -143,8 +145,8 @@ export default function SuperadminAccountingDashboard() {
         {/* Recent Ledger */}
         <div className="lg:col-span-4 bg-white rounded-2xl p-6 border border-slate-100 shadow-lg shadow-slate-200/50 flex flex-col">
            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-[10px] font-bold text-slate-800 uppercase tracking-widest">Transaction Pulse</h3>
-              <button className="text-[9px] font-bold text-blue-600 hover:underline uppercase tracking-widest">Global Audit</button>
+              <h3 className="text-[10px] font-bold text-slate-800 uppercase tracking-widest">Recent Transactions</h3>
+              <button onClick={() => window.location.href = '/superadmin/accounting/transactions'} className="text-[9px] font-bold text-blue-600 hover:underline uppercase tracking-widest">View All</button>
            </div>
            <div className="flex-1 space-y-4">
               {txs.map((tx, i) => (
@@ -180,7 +182,7 @@ export default function SuperadminAccountingDashboard() {
 
       {/* Bottom Distribution Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <DonutCard title="Due Rent Mix" data={dueRentData} total={`₹${((stats.pendingPayouts || 420000)/100000).toFixed(1)}L`} />
+        <DonutCard title="Rent Due Status" data={dueRentData} total={`₹${(stats.pendingPayouts || 0).toLocaleString('en-IN')}`} />
         <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-lg shadow-slate-200/50">
            <div className="flex items-center justify-between mb-8">
               <h3 className="text-[10px] font-bold text-slate-800 uppercase tracking-widest">Revenue Sources</h3>
@@ -202,13 +204,13 @@ export default function SuperadminAccountingDashboard() {
         <div className="bg-slate-900 rounded-2xl p-6 text-white flex flex-col justify-between shadow-lg shadow-slate-900/20">
            <div>
               <div className="flex items-center justify-between mb-2">
-                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Export Core</h3>
+                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Export Data</h3>
                  <Download className="w-4 h-4 text-slate-500" />
               </div>
-              <h4 className="text-xl font-bold tracking-tight mb-2">Audit Intelligence</h4>
-              <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed">Generate certified financial reports for the current settlement cycle.</p>
+              <h4 className="text-xl font-bold tracking-tight mb-2">Financial Reports</h4>
+              <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed">Download financial ledger reports and summaries.</p>
            </div>
-           <button className="w-full py-3 bg-blue-600 text-white rounded-xl text-[9px] font-bold uppercase tracking-widest shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all">Generate Ledger Report</button>
+           <button onClick={() => window.location.href = '/superadmin/accounting/reports'} className="w-full py-3 bg-blue-600 text-white rounded-xl text-[9px] font-bold uppercase tracking-widest shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all">Download Report</button>
         </div>
       </div>
     </div>

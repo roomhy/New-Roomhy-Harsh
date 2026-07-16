@@ -331,6 +331,7 @@ export default function StaffAttendancePage() {
   const [tenantMsg, setTenantMsg] = useState("");
   const [tenantSearch, setTenantSearch] = useState("");
   const [bulkMarking, setBulkMarking] = useState(false);
+  const [selectedTenantIds, setSelectedTenantIds] = useState([]);
 
   const [msg, setMsg] = useState({ text: "", type: "" });
   const showMsg = (text, type = "success") => {
@@ -464,6 +465,57 @@ export default function StaffAttendancePage() {
     } catch (_) {
       showMsg("Failed to bulk update attendance", "error");
     } finally { setBulkMarking(false); }
+  };
+
+  const markSelectedTenants = async (status) => {
+    if (bulkMarking || selectedTenantIds.length === 0) return;
+    setBulkMarking(true);
+    try {
+      const selectedTenantsData = tenants.filter(t => selectedTenantIds.includes(t.loginId || t._id));
+      const res = await fetch(`${apiBase}/api/tenant-attendance/bulk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({
+          ownerLoginId: parentLoginId,
+          date: tenantDate,
+          status,
+          tenantDataList: selectedTenantsData.map(t => ({
+            id: t.loginId || t._id,
+            name: t.name,
+            roomNo: t.roomNo
+          }))
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        const newMap = { ...tenantAttMap };
+        selectedTenantIds.forEach(id => { newMap[id] = status; });
+        setTenantAttMap(newMap);
+        setSelectedTenantIds([]);
+        setTenantMsg(`${selectedTenantIds.length} tenants marked ${status} ✓`);
+        setTimeout(() => setTenantMsg(""), 2000);
+      }
+    } catch (_) {
+      showMsg("Failed to update selected attendance", "error");
+    } finally {
+      setBulkMarking(false);
+    }
+  };
+
+  const toggleSelectAllTenants = () => {
+    const visibleIds = filteredTenants.map(t => t.loginId || t._id);
+    const allSelected = visibleIds.every(id => selectedTenantIds.includes(id));
+    if (allSelected) {
+      setSelectedTenantIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    } else {
+      setSelectedTenantIds(prev => [...new Set([...prev, ...visibleIds])]);
+    }
+  };
+
+  const toggleSelectTenant = (id) => {
+    setSelectedTenantIds(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
   };
 
   const exportTenantReport = () => {
@@ -892,7 +944,13 @@ export default function StaffAttendancePage() {
                 </div>
 
                 {/* column headers (desktop only) */}
-                <div className="hidden md:grid md:grid-cols-[1fr_100px_130px_110px] gap-4 px-6 py-3 bg-slate-50/60 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <div className="hidden md:grid md:grid-cols-[40px_1fr_100px_130px_110px] gap-4 px-6 py-3 bg-slate-50/60 text-[10px] font-bold text-slate-400 uppercase tracking-wider items-center">
+                  <input
+                    type="checkbox"
+                    checked={filteredTenants.length > 0 && filteredTenants.every(t => selectedTenantIds.includes(t.loginId || t._id))}
+                    onChange={toggleSelectAllTenants}
+                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                  />
                   <span>Tenant</span>
                   <span>Room</span>
                   <span>Status</span>
@@ -916,7 +974,15 @@ export default function StaffAttendancePage() {
                       const initials = (tenant.name || "T").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 
                       return (
-                        <div key={loginId} className="flex md:grid md:grid-cols-[1fr_100px_130px_110px] items-center gap-3 md:gap-4 px-4 sm:px-6 py-3.5 hover:bg-slate-50/70 transition-colors">
+                        <div key={loginId} className="flex md:grid md:grid-cols-[40px_1fr_100px_130px_110px] items-center gap-3 md:gap-4 px-4 sm:px-6 py-3.5 hover:bg-slate-50/70 transition-colors">
+                          {/* Checkbox */}
+                          <input
+                            type="checkbox"
+                            checked={selectedTenantIds.includes(loginId)}
+                            onChange={() => toggleSelectTenant(loginId)}
+                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer shrink-0"
+                          />
+
                           {/* Tenant */}
                           <div className="flex items-center gap-3 min-w-0 flex-1">
                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold text-xs shrink-0">
@@ -1037,27 +1103,54 @@ export default function StaffAttendancePage() {
                     <Zap size={16} className="text-indigo-500" /> Quick Actions
                   </h3>
                   <div className="grid grid-cols-3 gap-3">
-                    <button
-                      onClick={() => markAllTenants("Present")}
-                      disabled={bulkMarking || tenants.length === 0}
-                      className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 text-emerald-700 transition-all disabled:opacity-50">
-                      {bulkMarking ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
-                      <span className="text-[11px] font-bold text-center leading-tight">Mark All<br />Present</span>
-                    </button>
-                    <button
-                      onClick={() => markAllTenants("Absent")}
-                      disabled={bulkMarking || tenants.length === 0}
-                      className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 transition-all disabled:opacity-50">
-                      {bulkMarking ? <Loader2 size={18} className="animate-spin" /> : <UserX size={18} />}
-                      <span className="text-[11px] font-bold text-center leading-tight">Mark All<br />Absent</span>
-                    </button>
-                    <button
-                      onClick={exportTenantReport}
-                      disabled={tenants.length === 0}
-                      className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-600 transition-all disabled:opacity-50">
-                      <Download size={18} />
-                      <span className="text-[11px] font-bold text-center leading-tight">Export<br />Report</span>
-                    </button>
+                    {selectedTenantIds.length > 0 ? (
+                      <>
+                        <button
+                          onClick={() => markSelectedTenants("Present")}
+                          disabled={bulkMarking}
+                          className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 border border-emerald-600 text-white transition-all">
+                          {bulkMarking ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                          <span className="text-[11px] font-bold text-center leading-tight">Mark Selected<br />Present ({selectedTenantIds.length})</span>
+                        </button>
+                        <button
+                          onClick={() => markSelectedTenants("Absent")}
+                          disabled={bulkMarking}
+                          className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-rose-600 hover:bg-rose-700 border border-rose-600 text-white transition-all">
+                          {bulkMarking ? <Loader2 size={18} className="animate-spin" /> : <UserX size={18} />}
+                          <span className="text-[11px] font-bold text-center leading-tight">Mark Selected<br />Absent ({selectedTenantIds.length})</span>
+                        </button>
+                        <button
+                          onClick={() => setSelectedTenantIds([])}
+                          className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all">
+                          <X size={18} />
+                          <span className="text-[11px] font-bold text-center leading-tight">Clear<br />Selected</span>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => markAllTenants("Present")}
+                          disabled={bulkMarking || tenants.length === 0}
+                          className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 text-emerald-700 transition-all disabled:opacity-50">
+                          {bulkMarking ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                          <span className="text-[11px] font-bold text-center leading-tight">Mark All<br />Present</span>
+                        </button>
+                        <button
+                          onClick={() => markAllTenants("Absent")}
+                          disabled={bulkMarking || tenants.length === 0}
+                          className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 transition-all disabled:opacity-50">
+                          {bulkMarking ? <Loader2 size={18} className="animate-spin" /> : <UserX size={18} />}
+                          <span className="text-[11px] font-bold text-center leading-tight">Mark All<br />Absent</span>
+                        </button>
+                        <button
+                          onClick={exportTenantReport}
+                          disabled={tenants.length === 0}
+                          className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-600 transition-all disabled:opacity-50">
+                          <Download size={18} />
+                          <span className="text-[11px] font-bold text-center leading-tight">Export<br />Report</span>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

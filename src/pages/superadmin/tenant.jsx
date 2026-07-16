@@ -213,20 +213,20 @@ export default function Tenant() {
     <div className="space-y-6">
       <PageHeader 
         title="View All Tenants"
-        subtitle="Resident lifecycle governance & occupancy intelligence matrix."
+        subtitle="Manage and view all tenant records and occupancy."
         actions={
           <div className="flex items-center gap-4">
             <button 
               onClick={() => navigate("/superadmin/add-tenant")}
               className="bg-slate-900 text-white px-6 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest shadow-xl shadow-slate-900/20 hover:bg-black transition-all flex items-center gap-2 active:scale-95"
             >
-               <Plus size={14} /> Deploy Resident
+               <Plus size={14} /> Add Tenant
             </button>
             <button 
               onClick={exportToExcel}
               className="bg-white text-slate-600 border border-slate-100 px-6 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest shadow-xl shadow-slate-200 transition-all flex items-center gap-2 active:scale-95"
             >
-               <Sheet className="w-4 h-4" /> Export Registry
+               <Sheet className="w-4 h-4" /> Export Excel
             </button>
           </div>
         }
@@ -234,10 +234,10 @@ export default function Tenant() {
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCardHorizontal label="Active Residents" value={stats.total} trend="+12.5% Delta" up icon={Users} color="blue" />
-        <StatCardHorizontal label="KYC Verified" value={stats.verified} trend="Compliant" up icon={ShieldCheck} color="emerald" />
-        <StatCardHorizontal label="Monthly Yield" value={`₹${stats.revenue.toLocaleString()}`} trend="Contractual" up icon={Banknote} color="indigo" />
-        <StatCardHorizontal label="Awaiting Audit" value={stats.submitted} trend="Manual Review" up icon={Clock} color="amber" />
+        <StatCardHorizontal label="Active Tenants" value={stats.total} trend="Active" up icon={Users} color="blue" />
+        <StatCardHorizontal label="KYC Verified" value={stats.verified} trend="Verified" up icon={ShieldCheck} color="emerald" />
+        <StatCardHorizontal label="Total Rent" value={`₹${stats.revenue.toLocaleString()}`} trend="Monthly" up icon={Banknote} color="indigo" />
+        <StatCardHorizontal label="Pending KYC" value={stats.submitted} trend="Pending" up icon={Clock} color="amber" />
       </div>
 
       {/* Main Ledger Card */}
@@ -248,8 +248,8 @@ export default function Tenant() {
                   <LayoutGrid size={20} />
                </div>
                <div>
-                  <h3 className="text-xl font-bold text-slate-800">Resident Registry</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Real-time database of all active and pending residents</p>
+                  <h3 className="text-xl font-bold text-slate-800">Tenant Registry</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">View active and pending tenants</p>
                </div>
             </div>
             
@@ -258,7 +258,7 @@ export default function Tenant() {
                   <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
                   <input 
                     value={search} onChange={e => setSearch(e.target.value)}
-                    placeholder="Search residents, assets, IDs..." 
+                    placeholder="Search tenants..." 
                     className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-6 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all shadow-sm" 
                   />
                </div>
@@ -273,25 +273,25 @@ export default function Tenant() {
             <table className="w-full text-left">
                <thead>
                   <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] border-b border-slate-100">
-                     <th className="px-10 py-8">Resident Identity</th>
-                     <th className="px-6 py-8">Asset Allocation</th>
-                     <th className="px-6 py-8 text-center">Contact Pulse</th>
-                     <th className="px-6 py-8 text-center">Compliance Index</th>
-                     <th className="px-10 py-8 text-right">Operations</th>
+                     <th className="px-10 py-8">Tenant Name</th>
+                     <th className="px-6 py-8">Property Name</th>
+                     <th className="px-6 py-8 text-center">Contact Details</th>
+                     <th className="px-6 py-8 text-center">KYC Status</th>
+                     <th className="px-10 py-8 text-right">Actions</th>
                   </tr>
                </thead>
                <tbody className="divide-y divide-slate-50">
                   {loading ? (
                     <tr><td colSpan="5" className="py-40 text-center">
                        <div className="w-16 h-16 border-4 border-blue-600/10 border-t-blue-600 rounded-full animate-spin mx-auto mb-8" />
-                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">Accessing Resident Intelligence...</p>
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">Loading tenant data...</p>
                     </td></tr>
                   ) : filteredTenants.length === 0 ? (
                     <tr><td colSpan="5" className="py-40 text-center">
                        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-200">
                           <Users size={40} />
                        </div>
-                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No matching residents found</p>
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No tenants found</p>
                     </td></tr>
                   ) : paginatedTenants.map((t, i) => (
                     <tr key={i} className="group hover:bg-slate-50/50 transition-all duration-300 cursor-pointer" onClick={() => setSelectedTenant(t)}>
@@ -387,49 +387,49 @@ export default function Tenant() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-12 custom-scrollbar space-y-12">
-                 {/* Identity Pulse */}
+                 {/* Tenant Details */}
                  <section>
                     <div className="flex items-center gap-4 mb-10">
                        <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-lg shadow-blue-200">
                           <User size={20} />
                        </div>
-                       <h4 className="text-lg font-bold text-slate-800 uppercase tracking-widest">Resident Identity</h4>
+                       <h4 className="text-lg font-bold text-slate-800 uppercase tracking-widest">Tenant Details</h4>
                     </div>
                     <div className="grid grid-cols-2 gap-8">
-                       <DetailItem icon={Mail} label="Official Email" value={selectedTenant.profile.email} />
-                       <DetailItem icon={Phone} label="Pulse Contact" value={selectedTenant.profile.phone} />
-                       <DetailItem icon={Calendar} label="Birth Index" value={selectedTenant.profile.dob || "Not Defined"} />
+                       <DetailItem icon={Mail} label="Email Address" value={selectedTenant.profile.email} />
+                       <DetailItem icon={Phone} label="Phone Number" value={selectedTenant.profile.phone} />
+                       <DetailItem icon={Calendar} label="Date of Birth" value={selectedTenant.profile.dob || "Not Specified"} />
                        <DetailItem icon={Shield} label="Guardian Contact" value={selectedTenant.profile.guardianNumber} />
                     </div>
                  </section>
 
-                 {/* Asset Link */}
+                 {/* Property Details */}
                  <section className="bg-indigo-50/30 p-8 rounded-[2.5rem] border border-indigo-100">
                     <div className="flex items-center gap-4 mb-10">
                        <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-lg shadow-indigo-200">
                           <Home size={20} />
                        </div>
-                       <h4 className="text-lg font-bold text-slate-800 uppercase tracking-widest">Asset Allocation</h4>
+                       <h4 className="text-lg font-bold text-slate-800 uppercase tracking-widest">Property Details</h4>
                     </div>
                     <div className="grid grid-cols-2 gap-8">
-                       <DetailItem icon={Building2} label="Allocated Asset" value={selectedTenant.profile.propertyText} />
+                       <DetailItem icon={Building2} label="Property Name" value={selectedTenant.profile.propertyText} />
                        <DetailItem icon={Hash} label="Unit / Bed" value={`${selectedTenant.profile.roomNo} / ${selectedTenant.profile.bedNo}`} />
-                       <DetailItem icon={Clock} label="Move-In Index" value={formatDate(selectedTenant.profile.moveInDate)} />
-                       <DetailItem icon={Banknote} label="Contractual Rent" value={`₹${selectedTenant.profile.agreedRent}`} highlight />
+                       <DetailItem icon={Clock} label="Move-In Date" value={formatDate(selectedTenant.profile.moveInDate)} />
+                       <DetailItem icon={Banknote} label="Rent" value={`₹${selectedTenant.profile.agreedRent}`} highlight />
                     </div>
                  </section>
 
-                 {/* KYC Documents */}
+                 {/* KYC Details */}
                  <section>
                     <div className="flex items-center gap-4 mb-10">
                        <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-lg shadow-emerald-200">
                           <Fingerprint size={20} />
                        </div>
-                       <h4 className="text-lg font-bold text-slate-800 uppercase tracking-widest">Compliance Vault</h4>
+                       <h4 className="text-lg font-bold text-slate-800 uppercase tracking-widest">KYC Details</h4>
                     </div>
                     <div className="grid grid-cols-2 gap-8">
                        <DetailItem icon={FileText} label="Aadhaar ID" value={selectedTenant.kyc.aadhaarNumber} />
-                       <DetailItem icon={ShieldCheck} label="Audit Status" value={selectedTenant.kyc.status.toUpperCase()} highlight />
+                       <DetailItem icon={ShieldCheck} label="KYC Status" value={selectedTenant.kyc.status.toUpperCase()} highlight />
                     </div>
                     <div className="mt-10 grid grid-cols-2 gap-6">
                        <div className="space-y-3">

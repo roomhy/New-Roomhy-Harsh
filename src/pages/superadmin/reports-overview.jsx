@@ -50,6 +50,10 @@ const locationData = [
 export default function ReportsOverview() {
   const [stats, setStats] = useState({ totalProperties: 0, totalTenants: 0, occupancyRate: 0, monthlyRevenue: 0, netProfit: 0, growthRate: 0 });
   const [loading, setLoading] = useState(true);
+  const [revenueData, setRevenueData] = useState([]);
+  const [occupancyPieData, setOccupancyPieData] = useState([]);
+  const [topPropertiesList, setTopPropertiesList] = useState([]);
+  const [locationRevenueList, setLocationRevenueList] = useState([]);
 
   useEffect(() => {
     const loadStats = async () => {
@@ -58,6 +62,12 @@ export default function ReportsOverview() {
         const res = await fetchReportOverviewStats();
         if (res.success) {
           setStats(res.summary);
+          if (res.charts) {
+            setRevenueData(res.charts.revenueOverviewData || []);
+            setOccupancyPieData(res.charts.occupancyData || []);
+            setTopPropertiesList(res.charts.propertyPerformance || []);
+            setLocationRevenueList(res.charts.locationWiseData || []);
+          }
         }
       } catch (error) {
         console.error("Reports Stats Load Error:", error);
@@ -92,7 +102,7 @@ export default function ReportsOverview() {
          <ReportStatCard label="Occupancy Rate" value={`${stats.occupancyRate}%`} trend="+ 4.2%" icon={Target} color="emerald" loading={loading} />
          <ReportStatCard label="Monthly Revenue" value={`₹ ${stats.monthlyRevenue.toLocaleString()}`} trend="+ 16.7%" icon={DollarSign} color="amber" loading={loading} />
          <ReportStatCard label="Net Profit" value={`₹ ${stats.netProfit.toLocaleString()}`} trend="+ 12.1%" icon={Zap} color="rose" loading={loading} />
-         <ReportStatCard label="Growth Rate" value={`${stats.growthRate}%`} trend="+ 3.8%" icon={TrendingUp} color="blue" loading={loading} />
+         <ReportStatCard label="Conversion Rate" value={`${stats.growthRate}%`} trend="Steady" icon={TrendingUp} color="blue" loading={loading} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -107,7 +117,7 @@ export default function ReportsOverview() {
             </div>
             <div className="h-[350px]">
                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={revData}>
+                  <AreaChart data={revenueData.length > 0 ? revenueData : revData}>
                      <defs>
                         <linearGradient id="colorR" x1="0" y1="0" x2="0" y2="1">
                            <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.1}/>
@@ -131,20 +141,26 @@ export default function ReportsOverview() {
             <div className="relative w-56 h-56 mb-10">
                <ResponsiveContainer width="100%" height="100%">
                   <RePieChart>
-                     <RePie data={occPieData} innerRadius={70} outerRadius={95} paddingAngle={8} dataKey="value" stroke="none">
-                        {occPieData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                     <RePie data={occupancyPieData.length > 0 ? occupancyPieData : occPieData} innerRadius={70} outerRadius={95} paddingAngle={8} dataKey="value" stroke="none">
+                        {(occupancyPieData.length > 0 ? occupancyPieData : occPieData).map((entry, index) => <Cell key={index} fill={entry.color || (index === 0 ? '#3B82F6' : index === 1 ? '#10B981' : '#F59E0B')} />)}
                      </RePie>
                   </RePieChart>
                </ResponsiveContainer>
                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <p className="text-4xl font-black text-slate-800">82.4%</p>
+                  <p className="text-4xl font-black text-slate-800">{stats.occupancyRate}%</p>
                   <p className="text-[10px] text-slate-400 font-black uppercase mt-1">Occupancy Rate</p>
                </div>
             </div>
             <div className="w-full space-y-4">
-               <LegendRow label="Occupied" value="12,845" color="bg-blue-500" />
-               <LegendRow label="Vacant" value="4,560" color="bg-emerald-500" />
-               <LegendRow label="Maintenance" value="856" color="bg-amber-500" />
+               {occupancyPieData.length > 0 ? occupancyPieData.map(item => (
+                  <LegendRow key={item.name} label={item.name} value={item.value.toLocaleString()} color={item.name === "Occupied" ? "bg-blue-500" : item.name === "Vacant" ? "bg-emerald-500" : "bg-amber-500"} />
+               )) : (
+                  <>
+                     <LegendRow label="Occupied" value="12,845" color="bg-blue-500" />
+                     <LegendRow label="Vacant" value="4,560" color="bg-emerald-500" />
+                     <LegendRow label="Maintenance" value="856" color="bg-amber-500" />
+                  </>
+               )}
             </div>
          </div>
       </div>
@@ -154,7 +170,9 @@ export default function ReportsOverview() {
          <div className="lg:col-span-6 bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl">
             <h3 className="text-xl font-black text-slate-800 tracking-tight mb-10">Top Performing Properties</h3>
             <div className="space-y-6">
-               {topProperties.map((prop, i) => (
+               {topPropertiesList.length > 0 ? topPropertiesList.map((prop, i) => (
+                  <PropPerfRow key={i} name={prop.name} loc={prop.loc} occ={prop.occ} rev={prop.rev} />
+               )) : topProperties.map((prop, i) => (
                   <PropPerfRow key={i} name={prop.name} loc={prop.loc} occ={prop.occ} rev={prop.rev} />
                ))}
             </div>
@@ -164,7 +182,17 @@ export default function ReportsOverview() {
          <div className="lg:col-span-6 bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl">
             <h3 className="text-xl font-black text-slate-800 tracking-tight mb-10">Location Revenue Breakdown</h3>
             <div className="space-y-6">
-               {locationData.map((loc, i) => (
+               {locationRevenueList.length > 0 ? locationRevenueList.map((loc, i) => (
+                  <div key={i} className="space-y-2">
+                     <div className="flex items-center justify-between">
+                        <span className="text-sm font-black text-slate-800">{loc.name}</span>
+                        <span className="text-sm font-black text-blue-600">₹ {loc.revenue.toLocaleString()}</span>
+                     </div>
+                     <div className="w-full h-2 bg-slate-50 rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-500 rounded-full" style={{width: `${loc.percent}%`}} />
+                      </div>
+                  </div>
+               )) : locationData.map((loc, i) => (
                   <div key={i} className="space-y-2">
                      <div className="flex items-center justify-between">
                         <span className="text-sm font-black text-slate-800">{loc.name}</span>

@@ -50,13 +50,17 @@ export const getApiBase = () => {
   if (isLocal) return `http://${host}:5001`;
 
   // Production — use same server's backend (avoid Vercel rate limits)
-  return "https://roohmy-backend-xwa9.vercel.app";
+  return "https://api.roomhy.com";
 };
 
 // Read JWT from localStorage — sent as Authorization: Bearer header on every request.
 // Cookie is also set by the backend for httpOnly support; both mechanisms work simultaneously.
 export const getAuthHeader = () => {
-  const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+  if (typeof window === "undefined") return {};
+  const isAdminRoute = window.location.pathname.startsWith('/superadmin') || window.location.pathname.startsWith('/employee') || window.location.pathname.startsWith('/website-editor');
+  const token = isAdminRoute
+    ? (localStorage.getItem("staff_token") || sessionStorage.getItem("staff_token") || localStorage.getItem("token") || sessionStorage.getItem("token"))
+    : (localStorage.getItem("website_token") || sessionStorage.getItem("website_token") || localStorage.getItem("token") || sessionStorage.getItem("token"));
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
@@ -1351,9 +1355,12 @@ export const fetchSupportOverviewStats = async () => {
 };
 
 // Fetch home overview stats
-export const fetchHomeOverviewStats = async () => {
+export const fetchHomeOverviewStats = async (city) => {
   try {
-    const data = await fetchJson('/api/superadmin/home/overview');
+    const path = city && city !== 'All Cities' 
+      ? `/api/superadmin/home/overview?city=${encodeURIComponent(city)}` 
+      : '/api/superadmin/home/overview';
+    const data = await fetchJson(path);
     return data;
   } catch (error) {
     console.error('Error fetching home overview stats:', error);

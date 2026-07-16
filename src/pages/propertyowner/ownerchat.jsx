@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession, fetchOwnerTenants } from "../../utils/propertyowner";
 import { apiFetch } from "../../utils/api";
-import { Search, Send, User, MoreVertical, Phone, Video, Loader2, MessageSquare, Wallet } from "lucide-react";
+import { Search, Send, User, MoreVertical, Loader2, MessageSquare, Wallet, Paperclip, FileText } from "lucide-react";
 
 export default function OwnerChat() {
   const owner = getOwnerRuntimeSession();
@@ -17,9 +17,11 @@ export default function OwnerChat() {
   const [messages, setMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [associatedBooking, setAssociatedBooking] = useState(null);
   
   const messagesEndRef = React.useRef(null);
+  const fileInputRef = React.useRef(null);
   const [debouncedSearch, setDebouncedSearch] = React.useState("");
 
   // Debounce search — used for client-side filtering only, not for polling
@@ -71,7 +73,7 @@ export default function OwnerChat() {
     const propertyName = associatedBooking.property_name || "property";
     const tenantName = associatedBooking.name || activeChat.participant_name || "Tenant";
     const bookingId = associatedBooking._id;
-    const paymentUrl = `http://localhost:5173/website/pay?bookingId=${bookingId}&amount=${amount}`;
+    const paymentUrl = `${window.location.origin}/website/pay?bookingId=${bookingId}&amount=${amount}`;
     const paymentMessage = `Dear ${tenantName}, please complete the payment of ₹${amount} to secure your booking for "${propertyName}". 💳 You can pay securely via Razorpay here: ${paymentUrl}`;
 
     setIsSending(true);
@@ -100,6 +102,47 @@ export default function OwnerChat() {
       console.error("Failed to send payment link", err);
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !activeChat) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const { getApiBase } = await import("../../utils/api");
+      const res = await fetch(`${getApiBase()}/api/upload-file`, {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      
+      if (data.url) {
+        const isImg = file.type.startsWith('image/');
+        const fileMsg = {
+          from_login_id: owner.loginId,
+          to_login_id: activeChat.participant_login_id,
+          message: `Sent a ${isImg ? 'photo' : 'file'}: ${file.name}`,
+          message_type: isImg ? 'image' : 'file',
+          file_url: data.url
+        };
+        
+        await apiFetch("/api/chat/send", {
+          method: "POST",
+          body: JSON.stringify(fileMsg)
+        });
+
+        fetchMessages(activeChat.participant_login_id);
+      }
+    } catch (err) {
+      console.error("Upload failed:", err);
+      alert("File upload failed.");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -145,8 +188,12 @@ export default function OwnerChat() {
           id: msg._id,
           sender: msg.sender_login_id === owner.loginId ? "Me" : msg.sender_name,
           text: msg.message,
+          message_type: msg.message_type || 'text',
+          file_url: msg.file_url || null,
           time: new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-          isMe: msg.sender_login_id === owner.loginId
+          isMe: msg.sender_login_id === owner.loginId,
+          isBlocked: msg.is_blocked || false,
+          violationType: msg.violation_type || null
         })));
         scrollToBottom();
         // Mark these messages as read
@@ -303,8 +350,6 @@ export default function OwnerChat() {
                   </div>
                 </div>
                 <div className="flex gap-3 text-slate-400">
-                  <Phone className="cursor-pointer hover:text-blue-600 transition" size={20} />
-                  <Video className="cursor-pointer hover:text-blue-600 transition" size={20} />
                   <MoreVertical className="cursor-pointer hover:text-blue-600 transition" size={20} />
                 </div>
               </div>
@@ -316,7 +361,24 @@ export default function OwnerChat() {
                 ) : messages.map((msg, i) => (
                   <div key={msg.id || i} className={`flex ${msg.isMe ? "justify-end" : "justify-start"}`}>
                     <div className={`max-w-[70%] rounded-2xl p-4 shadow-sm ${msg.isMe ? "bg-blue-600 text-white rounded-br-sm" : "bg-white border border-slate-100 text-slate-800 rounded-bl-sm"}`}>
-                      <p className="text-[13px]">{msg.text}</p>
+                      {msg.isBlocked ? (
+                        <span className="text-[12px] italic font-semibold text-rose-500 block">
+                          ⚠️ Message blocked by Roomhy Safety Policy (contact/payment info detected)
+                        </span>
+                      ) : (
+                        <div>
+                          {msg.message_type === 'image' ? (
+                            <img src={msg.file_url} alt="uploaded" className="max-w-full rounded-xl cursor-pointer" onClick={() => window.open(msg.file_url, '_blank')} />
+                          ) : msg.message_type === 'file' ? (
+                            <div className="flex items-center gap-2">
+                              <FileText size={16} />
+                              <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className={`underline ${msg.isMe ? 'text-blue-100' : 'text-blue-600'}`}>{msg.text.replace('Sent a file: ', '')}</a>
+                            </div>
+                          ) : (
+                            <p className="text-[13px]">{msg.text}</p>
+                          )}
+                        </div>
+                      )}
                       <span className={`text-[10px] block mt-1.5 text-right ${msg.isMe ? "text-blue-200" : "text-slate-400"}`}>{msg.time}</span>
                     </div>
                   </div>
@@ -339,6 +401,16 @@ export default function OwnerChat() {
                     }`}
                   >
                     <Wallet size={20} />
+                  </button>
+                  <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    title="Upload file"
+                    className="size-12 rounded-xl flex items-center justify-center bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-all text-slate-500 shrink-0"
+                  >
+                    {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip size={20} />}
                   </button>
                   <input 
                     type="text" 

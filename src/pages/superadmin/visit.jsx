@@ -140,6 +140,7 @@ export default function Visit() {
   // Photos
   const [formPhotoUrl, setFormPhotoUrl] = useState("");
   const [formPhotos, setFormPhotos] = useState([]);
+  const [formRoomTypes, setFormRoomTypes] = useState([]);
 
   // Credentials
   const [formLoginId, setFormLoginId] = useState("");
@@ -149,7 +150,7 @@ export default function Visit() {
   const [saving, setSaving] = useState(false);
   const [openSections, setOpenSections] = useState({
     owner: true, property: true, location: true, occupancy: false,
-    features: false, policies: false, ratings: false, photos: false
+    features: false, roomTypes: false, policies: false, ratings: false, photos: false
   });
 
   const toggleSection = (key) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
@@ -191,8 +192,8 @@ export default function Visit() {
     setFormVentilation(""); setFormMinStay(""); setFormEntryExit("");
     setFormVisitorsAllowed(true); setFormCookingAllowed(false); setFormSmokingAllowed(false); setFormPetsAllowed(false);
     setFormCleanlinessRating(0); setFormOwnerBehaviour(""); setFormStudentReviews(""); setFormInternalRemarks("");
-    setFormPhotoUrl(""); setFormPhotos([]);
-    setOpenSections({ owner: true, property: true, location: true, occupancy: false, features: false, policies: false, ratings: false, photos: false });
+    setFormPhotoUrl(""); setFormPhotos([]); setFormRoomTypes([]);
+    setOpenSections({ owner: true, property: true, location: true, occupancy: false, features: false, roomTypes: false, policies: false, ratings: false, photos: false });
   };
 
   // ─── Onboarding Handler ─────────────────────────────────────────────────────
@@ -245,6 +246,7 @@ export default function Visit() {
           studentReviews: formStudentReviews,
           internalRemarks: formInternalRemarks,
           photos: formPhotos,
+          roomTypes: formRoomTypes,
           staffName: "Superadmin",
           staffId: "SUPERADMIN",
           _id: visitId,
@@ -529,6 +531,90 @@ export default function Visit() {
                       <FormField label="Minimum Stay" value={formMinStay} onChange={e => setFormMinStay(e.target.value)} placeholder="e.g. 3 Months" />
                       <FormField label="Entry / Exit" value={formEntryExit} onChange={e => setFormEntryExit(e.target.value)} placeholder="e.g. 24/7" />
                     </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ─── Section 5.5: Room Configurations ────────────────────────── */}
+              <div>
+                <SectionHeader icon={BedDouble} title="Room Configurations" subtitle="Configure room types and pricing" open={openSections.roomTypes} onToggle={() => toggleSection("roomTypes")} color="violet" />
+                {openSections.roomTypes && (
+                  <div className="px-8 pb-8 space-y-6">
+                    <div className="space-y-4">
+                      {formRoomTypes.map((rt, idx) => (
+                        <div key={idx} className="bg-slate-50 border border-slate-100 rounded-2xl p-5 relative space-y-4">
+                          <button type="button" onClick={() => setFormRoomTypes(prev => prev.filter((_, i) => i !== idx))}
+                            className="absolute top-4 right-4 bg-rose-50 text-rose-600 p-2 rounded-xl border border-rose-100 hover:bg-rose-100 hover:text-rose-700 transition-all">
+                            <Trash className="w-3.5 h-3.5" />
+                          </button>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pr-10">
+                            <div>
+                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Room Type / Sharing</label>
+                              <input type="text" value={rt.type} onChange={e => {
+                                const newTypes = [...formRoomTypes];
+                                newTypes[idx].type = e.target.value;
+                                setFormRoomTypes(newTypes);
+                              }} placeholder="e.g. Double Sharing AC" className="w-full bg-white border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-blue-200" />
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Description</label>
+                              <input type="text" value={rt.desc} onChange={e => {
+                                const newTypes = [...formRoomTypes];
+                                newTypes[idx].desc = e.target.value;
+                                setFormRoomTypes(newTypes);
+                              }} placeholder="e.g. Attached washroom, study desk" className="w-full bg-white border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-blue-200" />
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Occupancy (Beds per Room)</label>
+                              <input type="number" value={rt.occupancy} onChange={e => {
+                                const newTypes = [...formRoomTypes];
+                                newTypes[idx].occupancy = parseInt(e.target.value) || 1;
+                                setFormRoomTypes(newTypes);
+                              }} placeholder="e.g. 2" className="w-full bg-white border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-blue-200" />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div>
+                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Total Rooms</label>
+                              <input type="text" value={rt.totalRooms} onChange={e => {
+                                const newTypes = [...formRoomTypes];
+                                newTypes[idx].totalRooms = e.target.value;
+                                setFormRoomTypes(newTypes);
+                              }} placeholder="e.g. 5" className="w-full bg-white border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-blue-200" />
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Total Beds</label>
+                              <input type="text" value={rt.totalBeds} onChange={e => {
+                                const newTypes = [...formRoomTypes];
+                                newTypes[idx].totalBeds = e.target.value;
+                                setFormRoomTypes(newTypes);
+                              }} placeholder="e.g. 10" className="w-full bg-white border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-blue-200" />
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Price Per Bed (₹/mo)</label>
+                              <input type="text" value={rt.pricePerBed} onChange={e => {
+                                const newTypes = [...formRoomTypes];
+                                newTypes[idx].pricePerBed = e.target.value;
+                                setFormRoomTypes(newTypes);
+                              }} placeholder="e.g. 7500" className="w-full bg-white border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-blue-200" />
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Price Per Room (₹/mo)</label>
+                              <input type="text" value={rt.pricePerRoom} onChange={e => {
+                                const newTypes = [...formRoomTypes];
+                                newTypes[idx].pricePerRoom = e.target.value;
+                                setFormRoomTypes(newTypes);
+                              }} placeholder="e.g. 15000" className="w-full bg-white border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-blue-200" />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button type="button" onClick={() => setFormRoomTypes(prev => [...prev, { type: "", desc: "", totalRooms: "", totalBeds: "", occupancy: 1, pricePerBed: "", pricePerRoom: "" }])}
+                      className="w-full py-4 border-2 border-dashed border-slate-200 hover:border-blue-300 text-slate-500 hover:text-blue-600 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 bg-white">
+                      <Plus className="w-4 h-4" /> Add Room Configuration
+                    </button>
                   </div>
                 )}
               </div>

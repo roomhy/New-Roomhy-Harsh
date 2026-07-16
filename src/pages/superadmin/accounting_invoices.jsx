@@ -335,12 +335,25 @@ export default function Invoices() {
     setLoading(true);
     try {
       const res = await fetchJson("/api/superadmin/revenue/transactions");
-      if (res.success && res.payments) {
-        setPayments(res.payments);
-        const total = res.payments.length;
-        const paidVolume = res.payments.filter(p => p.payout_status === 'Paid').reduce((a, b) => a + (b.amount || 0), 0);
-        const pendingColl = res.payments.filter(p => p.payout_status !== 'Paid').reduce((a, b) => a + (b.amount || 0), 0);
-        setStats({ total, paidVolume, pendingColl, overdueAlerts: Math.floor(total * 0.05) });
+      if (res.success) {
+        // Prefer the invoiceList from RentInvoice (sequential numbers) if available
+        if (res.invoiceList && res.invoiceList.length > 0) {
+          setPayments(res.invoiceList.map(inv => ({
+            ...inv,
+            _source: 'rentinvoice'
+          })));
+          const total = res.invoiceList.length;
+          const paidVolume = res.invoiceList.filter(i => i.status === 'PAID').reduce((a, b) => a + (b.amount || 0), 0);
+          const pendingColl = res.invoiceList.filter(i => i.status !== 'PAID').reduce((a, b) => a + (b.amount || 0), 0);
+          const overdueAlerts = res.invoiceList.filter(i => i.status === 'PENDING').length;
+          setStats({ total, paidVolume, pendingColl, overdueAlerts });
+        } else if (res.payments) {
+          setPayments(res.payments);
+          const total = res.payments.length;
+          const paidVolume = res.payments.filter(p => p.payout_status === 'Paid').reduce((a, b) => a + (b.amount || 0), 0);
+          const pendingColl = res.payments.filter(p => p.payout_status !== 'Paid').reduce((a, b) => a + (b.amount || 0), 0);
+          setStats({ total, paidVolume, pendingColl, overdueAlerts: Math.floor(total * 0.05) });
+        }
       }
     } catch (err) {
       console.error("Failed to load invoices:", err);
@@ -354,23 +367,36 @@ export default function Invoices() {
   }, []);
 
   const invoices = useMemo(() => payments.map(p => {
+    const isRentInvoice = p._source === 'rentinvoice';
     const rawAmt = p.amount || 0;
+    const paidAmt = isRentInvoice ? (p.paid || 0) : rawAmt;
+    const invStatus = isRentInvoice
+      ? (p.status === 'PAID' ? 'Paid' : p.status === 'PARTIAL' ? 'Partial' : p.status === 'PENDING' ? 'Pending' : 'Overdue')
+      : (p.payout_status === 'Paid' ? 'Paid' : p.payout_status === 'Pending' ? 'Pending' : 'Overdue');
+    const invColor = invStatus === 'Paid' ? 'emerald' : invStatus === 'Pending' ? 'amber' : 'rose';
+    const invId = isRentInvoice
+      ? (p.invoice_number || String(p.id).slice(-8).toUpperCase())
+      : (p.invoice_number || String(p.id).slice(-8).toUpperCase());
+
     return {
-      id: String(p.id).slice(-8).toUpperCase(),
-      customer: p.tenant_name || "Unknown Tenant",
+      id: invId,
+      customer: (isRentInvoice ? p.tenant_name : p.tenant_name) || "Unknown Tenant",
       amount: rawAmt,
       amountStr: `₹${rawAmt.toLocaleString("en-IN")}`,
-      issued: new Date(p.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+      issued: p.date ? new Date(p.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
       due: "Due on Receipt",
-      status: p.payout_status === 'Paid' ? 'Paid' : p.payout_status === 'Pending' ? 'Pending' : 'Overdue',
-      initial: (p.tenant_name || "U")[0].toUpperCase(),
-      color: p.payout_status === 'Paid' ? 'emerald' : p.payout_status === 'Pending' ? 'amber' : 'rose',
-      // Fields needed for Receipt
-      tenant: p.tenant_name || "Unknown Tenant",
-      room: "N/A",
-      date: new Date(p.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-      period: billingLabel(p.date ? p.date.substring(0, 7) : ""), // approx
-      paid: rawAmt,
+      status: invStatus,
+      initial: ((isRentInvoice ? p.tenant_name : p.tenant_name) || "U")[0].toUpperCase(),
+      color: invColor,
+      // Fields for Receipt modal
+      tenant: (isRentInvoice ? p.tenant_name : p.tenant_name) || "Unknown Tenant",
+      room: p.room_number || p.room || "N/A",
+      phone: isRentInvoice ? (p.tenant_phone || p.phone || "") : (p.phone || ""),
+      email: isRentInvoice ? (p.tenant_email || p.email || "") : (p.email || ""),
+      address: p.address || "",
+      date: p.date ? new Date(p.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
+      period: isRentInvoice ? billingLabel(p.billing_month) : billingLabel(p.date ? String(p.date).substring(0, 7) : ""),
+      paid: paidAmt,
       type: "Rent & Utility",
       _raw: p
     };
@@ -405,8 +431,8 @@ export default function Invoices() {
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCardHorizontal label="Total Invoices" value={stats.total} trend="Active" up icon={FileText} color="blue" />
-        <StatCardHorizontal label="Paid Volume" value={`₹${(stats.paidVolume/100000).toFixed(1)}L`} trend="Yield" up icon={CheckCircle2} color="emerald" />
-        <StatCardHorizontal label="Pending Coll" value={`₹${(stats.pendingColl/100000).toFixed(1)}L`} trend="Active Flow" up icon={Receipt} color="amber" />
+        <StatCardHorizontal label="Paid Volume" value={`₹${(stats.paidVolume || 0).toLocaleString('en-IN')}`} trend="Yield" up icon={CheckCircle2} color="emerald" />
+        <StatCardHorizontal label="Pending Coll" value={`₹${(stats.pendingColl || 0).toLocaleString('en-IN')}`} trend="Active Flow" up icon={Receipt} color="amber" />
         <StatCardHorizontal label="Overdue Alerts" value={stats.overdueAlerts} trend="Risk" up={false} icon={AlertCircle} color="rose" />
       </div>
 

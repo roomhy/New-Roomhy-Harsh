@@ -62,10 +62,13 @@ export default function SuperadminIndexPage() {
 
             if (res.ok && data.token) {
                 localStorage.setItem("token", data.token);
+                localStorage.setItem("staff_token", data.token);
                 localStorage.setItem("user", JSON.stringify(data.user));
                 localStorage.setItem("staff_user", JSON.stringify(data.user));
                 sessionStorage.setItem("token", data.token);
+                sessionStorage.setItem("staff_token", data.token);
                 sessionStorage.setItem("user", JSON.stringify(data.user));
+                sessionStorage.setItem("staff_user", JSON.stringify(data.user));
                 sessionStorage.setItem("manager_user", JSON.stringify(data.user));
 
                 // Update AuthContext so RouteRoleGuard sees the user immediately

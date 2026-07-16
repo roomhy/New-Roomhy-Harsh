@@ -35,10 +35,12 @@ const allPoints = [
   },
 ];
 
-export default function WhyRoomhy() {
+export default function WhyRoomhy({ title = "Why Choose Roomhy?", subtitle = "Built by students, for students. Here's why thousands trust us.", list }) {
   const [zoomedCard, setZoomedCard] = useState(null);
   const [previewCard, setPreviewCard] = useState(null);
   const lastTapRef = useRef({ index: -1, time: 0 });
+
+  const activePoints = list && list.length > 0 ? list : allPoints;
 
   const handleMobileTap = (index, point) => {
     if (typeof window !== 'undefined' && window.innerWidth >= 768) return;
@@ -62,16 +64,16 @@ export default function WhyRoomhy() {
 
         <div className="text-center mb-2 md:mb-4">
           <h2 className="text-xl md:text-3xl font-bold text-gray-900 mb-1">
-            Why Choose Roomhy?
+            {title}
           </h2>
           <p className="text-xs md:text-base text-gray-600 max-w-2xl mx-auto">
-            Built by students, for students. Here's why thousands trust us.
+            {subtitle}
           </p>
         </div>
 
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
 
-          {allPoints.map((point, index) => (
+          {activePoints.map((point, index) => (
             <div
               key={index}
               onClick={() => handleMobileTap(index, point)}

@@ -46,7 +46,7 @@ export default function DirectBookings() {
     if (activeTab === "direct") {
       list = list.filter(b => (b.request_type?.toLowerCase() === "direct" || !b.request_type));
     } else {
-      list = list.filter(b => b.request_type?.toLowerCase() === "online" || b.request_type?.toLowerCase() === "website");
+      list = list.filter(b => ["online", "website", "bid", "request"].includes(b.request_type?.toLowerCase()));
     }
 
     if (statusFilter !== "all") {

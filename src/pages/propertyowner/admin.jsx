@@ -490,7 +490,10 @@ export default function Admin() {
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
 
           {/* 1. Monthly Rent Expected */}
-          <div className="bg-card border border-border rounded-2xl p-5 shadow-soft hover:shadow-md transition-all group cursor-default min-w-0">
+          <div 
+            onClick={() => window.location.href = '/propertyowner/payment'}
+            className="bg-card border border-border rounded-2xl p-5 shadow-soft hover:shadow-md hover:border-blue-300 transition-all group cursor-pointer min-w-0"
+          >
             <div className="flex items-start justify-between mb-2">
               <div className="size-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
                 <IndianRupee className="size-4" />
@@ -521,7 +524,10 @@ export default function Admin() {
           </div>
 
           {/* 2. Total Tenants */}
-          <div className="bg-card border border-border rounded-2xl p-5 shadow-soft hover:shadow-md transition-all group cursor-default min-w-0">
+          <div 
+            onClick={() => window.location.href = '/propertyowner/tenants'}
+            className="bg-card border border-border rounded-2xl p-5 shadow-soft hover:shadow-md hover:border-emerald-300 transition-all group cursor-pointer min-w-0"
+          >
             <div className="flex items-start justify-between mb-2">
               <div className="size-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
                 <Users className="size-4" />
@@ -546,7 +552,10 @@ export default function Admin() {
           </div>
 
           {/* 3. Total Leads */}
-          <div className="bg-card border border-border rounded-2xl p-5 shadow-soft hover:shadow-md transition-all group cursor-default min-w-0">
+          <div 
+            onClick={() => window.location.href = '/propertyowner/enquiry'}
+            className="bg-card border border-border rounded-2xl p-5 shadow-soft hover:shadow-md hover:border-violet-355 transition-all group cursor-pointer min-w-0"
+          >
             <div className="flex items-start justify-between mb-2">
               <div className="size-8 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center shrink-0 group-hover:bg-violet-100 transition-colors">
                 <TrendingUp className="size-4" />
@@ -571,7 +580,10 @@ export default function Admin() {
           </div>
 
           {/* 4. Occupancy Rate */}
-          <div className="bg-card border border-border rounded-2xl p-5 shadow-soft hover:shadow-md transition-all group cursor-default min-w-0">
+          <div 
+            onClick={() => window.location.href = '/propertyowner/rooms'}
+            className="bg-card border border-border rounded-2xl p-5 shadow-soft hover:shadow-md hover:border-amber-300 transition-all group cursor-pointer min-w-0"
+          >
             <div className="flex items-start justify-between mb-2">
               <div className="size-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:bg-amber-100 transition-colors">
                 <BedDouble className="size-4" />

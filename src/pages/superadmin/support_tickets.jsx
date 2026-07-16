@@ -57,6 +57,7 @@ function TicketDetailPanel({ ticket, onClose, onUpdate }) {
   const [note, setNote] = useState("");
   const [notes, setNotes] = useState([]);
   const [status, setStatus] = useState(ticket.status);
+  const [resNotes, setResNotes] = useState(ticket.resolution_notes || "");
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-start justify-end p-4" onClick={onClose}>
@@ -97,8 +98,8 @@ function TicketDetailPanel({ ticket, onClose, onUpdate }) {
                   ["Type", ticket.ticket_type],
                   ["Priority", ticket.priority],
                   ["Status", status],
-                  ["Created", ticket.created_at],
-                  ["Last Updated", ticket.updated_at],
+                  ["Created", ticket.created_at ? new Date(ticket.created_at).toLocaleDateString() : "—"],
+                  ["Last Updated", ticket.updated_at ? new Date(ticket.updated_at).toLocaleDateString() : "—"],
                 ].map(([l,v]) => (
                   <div key={l} className="flex justify-between text-xs">
                     <span className="text-slate-400 font-bold">{l}</span>
@@ -148,13 +149,16 @@ function TicketDetailPanel({ ticket, onClose, onUpdate }) {
                 </div>
               )}
 
-              {/* Resolution Notes */}
-              {ticket.resolution_notes && (
-                <div className="bg-emerald-50 rounded-2xl p-4">
-                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-2">Resolution Notes</p>
-                  <p className="text-xs text-emerald-800 leading-relaxed">{ticket.resolution_notes}</p>
-                </div>
-              )}
+              {/* Resolution Input */}
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Resolution Notes</p>
+                <textarea
+                  value={resNotes}
+                  onChange={e => setResNotes(e.target.value)}
+                  placeholder="Enter ticket resolution notes here..."
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-3 text-xs outline-none focus:ring-2 focus:ring-blue-100 min-h-[80px]"
+                />
+              </div>
             </div>
 
             {/* RIGHT: Timeline + Notes */}
@@ -206,13 +210,13 @@ function TicketDetailPanel({ ticket, onClose, onUpdate }) {
 
         {/* Footer Actions */}
         <div className="p-4 border-t border-slate-100 flex gap-3 shrink-0">
-          <button onClick={() => onUpdate(ticket._id, status)} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all">
+          <button onClick={() => onUpdate(ticket._id, status, resNotes)} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all">
             Save Changes
           </button>
-          <button className="flex-1 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-600 hover:text-white transition-all">
+          <button onClick={() => onUpdate(ticket._id, 'Resolved', resNotes)} className="flex-1 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-600 hover:text-white transition-all">
             Mark Resolved
           </button>
-          <button className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition-all">
+          <button onClick={() => onUpdate(ticket._id, 'Closed', resNotes)} className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition-all">
             Close Ticket
           </button>
         </div>
@@ -275,11 +279,11 @@ export default function TicketsSystem() {
     };
   }, [tickets]);
 
-  const handleUpdate = async (id, newStatus) => {
+  const handleUpdate = async (id, newStatus, resolutionNotes = "") => {
     try {
       const res = await fetchJson(`/api/superadmin/support/tickets/${id}`, {
         method: "PUT",
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ status: newStatus, resolution_notes: resolutionNotes })
       });
       if (res && res.success) {
         setTickets(prev => prev.map(t => t._id === id ? res.ticket : t));

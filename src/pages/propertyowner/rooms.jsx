@@ -6,7 +6,7 @@ import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLay
 import { getApiBase, getAuthHeader } from "../../utils/api";
 import {
   assignTenant, clearOwnerFetchCache, clearOwnerRuntimeSession, createRoom, updateRoom, deleteRoom, bulkCreateRooms,
-  fetchOwnerProperties, fetchOwnerRooms, fetchOwnerTenants, getOwnerRuntimeSession
+  fetchOwnerProperties, fetchOwnerRooms, fetchOwnerTenants, getOwnerRuntimeSession, fetchRoomsByPropertyId
 } from "../../utils/propertyowner";
 import BulkRoomModal from "../../components/propertyowner/BulkRoomModal";
 
@@ -153,7 +153,6 @@ export default function Rooms() {
     
     if (currentPropRoomsCount < expectedRoomsCount && currentPropRoomsCount < totalPropRooms) {
       try {
-        const { fetchRoomsByPropertyId } = require("../../utils/propertyowner");
         const res = await fetchRoomsByPropertyId(propId, newPage, ROOMS_PER_PAGE);
         if (res.rooms && res.rooms.length > 0) {
           const normalizedNewRooms = res.rooms.map(r => normalizeRoom(r, owner?.loginId));

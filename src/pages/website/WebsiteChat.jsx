@@ -487,9 +487,7 @@ export default function WebsiteChat() {
                     ) : (
                       <div className="chat-input-actions">
                         <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-                        <button className="chat-input-btn" onClick={() => fileInputRef.current?.click()}><ImageIcon className="w-6 h-6" /></button>
-                        <button className="chat-input-btn"><Mic className="w-6 h-6" /></button>
-                        <button className="chat-input-btn"><Heart className="w-6 h-6" /></button>
+                        <button className="chat-input-btn" onClick={() => fileInputRef.current?.click()} title="Upload file"><Paperclip className="w-6 h-6" /></button>
                       </div>
                     )}
                   </div>

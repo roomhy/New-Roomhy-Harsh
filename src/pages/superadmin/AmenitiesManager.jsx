@@ -98,8 +98,15 @@ export default function AmenitiesManager() {
             return (
               <div key={i} className="bg-white rounded-[2rem] p-6 border border-slate-100 shadow-xl group hover:-translate-y-2 transition-all">
                  <div className="flex items-center justify-between mb-6">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-sm transition-transform group-hover:scale-110">
-                       <Icon className="w-6 h-6" />
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-sm transition-transform group-hover:scale-110 p-2">
+                       {a.iconSvg ? (
+                         <div 
+                           className="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[1.5]"
+                           dangerouslySetInnerHTML={{ __html: a.iconSvg }}
+                         />
+                       ) : (
+                         <Icon className="w-6 h-6" />
+                       )}
                     </div>
                     <div className="flex gap-1">
                        <button className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all">

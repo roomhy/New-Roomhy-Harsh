@@ -17,6 +17,7 @@ export default function StaffPerformancePage() {
 
   const [performance, setPerformance] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeSubTab, setActiveSubTab] = useState("performance");
 
   React.useEffect(() => {
     fetchPerformance();
@@ -24,32 +25,53 @@ export default function StaffPerformancePage() {
 
   const fetchPerformance = async () => {
     const CACHE_KEY = `perf:${owner.loginId}`;
-    const cached = cacheGet(CACHE_KEY);
-    if (cached) { setPerformance(cached); setLoading(false); return; }
     try {
-      const empData = await apiFetch(`/api/employees?parentLoginId=${owner.loginId}`);
+      setLoading(true);
+      const [empData, compData, maintData, attData] = await Promise.all([
+        apiFetch(`/api/employees?parentLoginId=${owner.loginId}`),
+        apiFetch(`/api/complaints/owner/${owner.loginId}`).catch(() => ({ complaints: [] })),
+        apiFetch(`/api/maintenance/owner/${owner.loginId}`).catch(() => ({ tasks: [] })),
+        apiFetch(`/api/hr/attendance/${owner.loginId}`).catch(() => ({ data: [] }))
+      ]);
+
       const myStaff = empData.data || [];
+      const allAtt = attData.data || [];
 
-      const compData = await apiFetch(`/api/complaints/owner/${owner.loginId}`);
-
-      const maintData = await apiFetch(`/api/maintenance/owner/${owner.loginId}`);
+      // Calculate attendance rate per staff member
+      const attCount = {};
+      const presentCount = {};
+      allAtt.forEach(a => {
+        const empId = String(a.employeeId?._id || a.employeeId || '');
+        if (empId) {
+          attCount[empId] = (attCount[empId] || 0) + 1;
+          if (a.status === 'Present' || a.status === 'Late' || a.status === 'Half Day') {
+            presentCount[empId] = (presentCount[empId] || 0) + (a.status === 'Half Day' ? 0.5 : 1);
+          }
+        }
+      });
 
       const perfMap = {};
       myStaff.forEach(s => {
-        perfMap[s._id] = {
+        const sId = String(s._id);
+        const totalDays = attCount[sId] || 0;
+        const attendedDays = presentCount[sId] || 0;
+        const attRate = totalDays > 0 ? Math.round((attendedDays / totalDays) * 100) : 100;
+
+        perfMap[sId] = {
            id: s._id,
            name: s.name,
            role: s.role,
-           rating: 4.5, // Mock rating as we don't have real ratings yet
+           rating: 4.0,
            resolved: 0,
-           feedback: "Doing good work on time."
+           attendanceRate: attRate,
+           feedback: "No tasks completed yet."
         };
       });
 
       // Count resolved complaints
       (compData.complaints || []).forEach(c => {
          if (c.status === 'Resolved' && c.assignedStaffId) {
-            const sid = c.assignedStaffId._id || c.assignedStaffId;
+            const sid = String(c.assignedStaffId._id || c.assignedStaffId);
             if (perfMap[sid]) perfMap[sid].resolved++;
          }
       });
@@ -57,24 +79,36 @@ export default function StaffPerformancePage() {
       // Count completed maintenance
       (maintData.tasks || []).forEach(t => {
          if (t.status === 'Completed' && t.assignedStaffId) {
-            const sid = t.assignedStaffId._id || t.assignedStaffId;
+            const sid = String(t.assignedStaffId._id || t.assignedStaffId);
             if (perfMap[sid]) perfMap[sid].resolved++;
          }
       });
 
-      // Simple mock rating adjustment based on resolved
+      // Compute rating and feedback dynamically
       const results = Object.values(perfMap).map(p => {
-         if (p.resolved > 10) { p.rating = 4.9; p.feedback = "Extremely fast resolution times."; }
-         else if (p.resolved > 5) { p.rating = 4.7; p.feedback = "Polite attitude and tidy work."; }
-         else if (p.resolved > 0) { p.rating = 4.5; p.feedback = "Good start."; }
-         else { p.rating = 0.0; p.feedback = "No tasks completed yet."; }
+         const score = p.resolved;
+         const att = p.attendanceRate;
+
+         if (score > 10 && att >= 90) {
+            p.rating = 4.9;
+            p.feedback = "Outstanding performance with high attendance and rapid task completion.";
+         } else if (score > 5 && att >= 80) {
+            p.rating = 4.6;
+            p.feedback = "Very reliable worker. Resolves issues promptly with high quality.";
+         } else if (score > 0) {
+            p.rating = 4.2;
+            p.feedback = "Good work. Resolving assigned maintenance and tenant complaints regularly.";
+         } else {
+            p.rating = 3.5;
+            p.feedback = "Satisfactory progress. Direct supervisor recommends more task assignments.";
+         }
          return p;
       });
 
       setPerformance(results);
       cacheSet(CACHE_KEY, results, 2 * 60 * 1000);
     } catch (err) {
-      console.error(err);
+      console.error("Error fetching staff performance:", err);
     } finally {
       setLoading(false);
     }
@@ -91,6 +125,28 @@ export default function StaffPerformancePage() {
           <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Staff Performance</h1>
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">Monitor performance review averages, tenant feedback scores, and resolved complaints counts.</p>
         </div>
+      </div>
+
+      {/* Sub-navigation tabs */}
+      <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 mb-6 w-fit">
+        <button
+          onClick={() => setActiveSubTab("performance")}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeSubTab === "performance" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+        >
+          Performance Metrics
+        </button>
+        <button
+          onClick={() => window.location.href = "/propertyowner/staff-attendance"}
+          className="px-4 py-2 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-slate-600"
+        >
+          Daily Attendance
+        </button>
+        <button
+          onClick={() => window.location.href = "/propertyowner/staff-tasks"}
+          className="px-4 py-2 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-slate-600"
+        >
+          Staff Tasks
+        </button>
       </div>
 
       {/* Grid of Performance profiles */}
@@ -125,6 +181,10 @@ export default function StaffPerformancePage() {
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Complaints Solved:</span>
                     <span className="font-bold text-emerald-600">{p.resolved} Tickets</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Attendance Rate:</span>
+                    <span className={`font-bold ${p.attendanceRate >= 90 ? 'text-emerald-600' : p.attendanceRate >= 75 ? 'text-amber-500' : 'text-rose-500'}`}>{p.attendanceRate}%</span>
                   </div>
                 </div>
               </div>

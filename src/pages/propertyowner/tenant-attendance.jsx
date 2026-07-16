@@ -14,9 +14,7 @@ export default function TenantAttendancePage() {
     return null; 
   }
 
-  const [search, setSearch] = useState("");
-  const [tenants, setTenants] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   React.useEffect(() => {
     syncAndFetchAttendance();
@@ -31,7 +29,7 @@ export default function TenantAttendancePage() {
       
       if (Array.isArray(tenantsData)) {
           const activeTenants = tenantsData.map(t => ({
-             id: t._id,
+             id: t._id || t.id || t.loginId,
              name: t.name,
              room: t.roomNo || "N/A"
           }));
@@ -91,10 +89,57 @@ export default function TenantAttendancePage() {
     }
   };
 
+  const handleBulkStatusChange = async (nextStatus, targetIds = null) => {
+    try {
+      const idsToUpdate = targetIds || selectedIds;
+      if (!idsToUpdate || idsToUpdate.length === 0) return;
+
+      const data = await apiFetch('/api/tenant-attendance/bulk', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({
+            ownerLoginId: owner.loginId,
+            date: new Date().toISOString().split('T')[0],
+            status: nextStatus,
+            tenantIds: idsToUpdate
+         })
+      });
+
+      if (data.success) {
+         setTenants(prev => prev.map(t => idsToUpdate.includes(t.id) ? { 
+           ...t, 
+           status: nextStatus,
+           lastScan: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
+         } : t));
+         setSelectedIds([]);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    const visibleIds = filteredTenants.map(t => t.id);
+    const allSelected = visibleIds.every(id => selectedIds.includes(id));
+    if (allSelected) {
+      setSelectedIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    } else {
+      setSelectedIds(prev => [...new Set([...prev, ...visibleIds])]);
+    }
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
   const filteredTenants = tenants.filter(t => 
     t.name.toLowerCase().includes(search.toLowerCase()) ||
     t.room.includes(search)
   );
+
+  const allVisibleSelected = filteredTenants.length > 0 && filteredTenants.every(t => selectedIds.includes(t.id));
 
   return (
     <PropertyOwnerLayout 
@@ -104,13 +149,13 @@ export default function TenantAttendancePage() {
     >
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
         <div>
-          <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Tenant Attendance</h1>
+          <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-slate-900 font-black">Tenant Attendance</h1>
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">Monitor who is inside the hostel, track late check-outs, and review leave applications.</p>
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+      {/* Toolbar & Global Bulk Action Buttons */}
+      <div className="flex flex-col lg:flex-row gap-4 mb-6 items-stretch lg:items-center">
         <div className="relative flex-1">
           <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -120,6 +165,47 @@ export default function TenantAttendancePage() {
             className="w-full h-10 pl-9 pr-3 rounded-xl bg-card border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground"
           />
         </div>
+        
+        <div className="flex gap-2 items-center flex-wrap shrink-0">
+          {selectedIds.length > 0 ? (
+            <>
+              <button
+                onClick={() => handleBulkStatusChange("Inside")}
+                className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-emerald-600/20 flex items-center gap-1.5"
+              >
+                <CheckCircle2 size={13} /> Mark Selected Present ({selectedIds.length})
+              </button>
+              <button
+                onClick={() => handleBulkStatusChange("Outside")}
+                className="h-10 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-amber-600/20 flex items-center gap-1.5"
+              >
+                Mark Selected Absent ({selectedIds.length})
+              </button>
+              <button
+                onClick={() => setSelectedIds([])}
+                className="h-10 px-3 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-100 text-xs font-bold transition-all"
+              >
+                Clear Selection
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => handleBulkStatusChange("Inside", filteredTenants.map(t => t.id))}
+                className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-blue-600/10"
+              >
+                Mark All Present
+              </button>
+              
+              <button
+                onClick={() => handleBulkStatusChange("Outside", filteredTenants.map(t => t.id))}
+                className="h-10 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-black uppercase tracking-wider transition-all"
+              >
+                Mark All Absent
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Desktop Table */}
@@ -128,6 +214,14 @@ export default function TenantAttendancePage() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="text-left text-[11.5px] uppercase tracking-wider text-muted-foreground bg-muted/50">
+                <th className="px-6 py-3.5 font-semibold w-12 text-center">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={toggleSelectAll}
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                  />
+                </th>
                 <th className="px-6 py-3.5 font-semibold">Tenant Name</th>
                 <th className="px-6 py-3.5 font-semibold">Room</th>
                 <th className="px-6 py-3.5 font-semibold">Last Gate Activity</th>
@@ -137,11 +231,19 @@ export default function TenantAttendancePage() {
             </thead>
             <tbody className="divide-y divide-border">
               {loading ? (
-                <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-500">Loading attendance data...</td></tr>
+                <tr><td colSpan="6" className="px-6 py-8 text-center text-slate-500">Loading attendance data...</td></tr>
               ) : filteredTenants.length === 0 ? (
-                <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-500">No tenants found.</td></tr>
+                <tr><td colSpan="6" className="px-6 py-8 text-center text-slate-500">No tenants found.</td></tr>
               ) : filteredTenants.map((t) => (
                 <tr key={t.id} className="hover:bg-muted/40 transition-colors">
+                  <td className="px-6 py-4 text-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(t.id)}
+                      onChange={() => toggleSelect(t.id)}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                    />
+                  </td>
                   <td className="px-6 py-4 font-semibold text-foreground">{t.name}</td>
                   <td className="px-6 py-4 font-bold text-foreground">Room {t.room}</td>
                   <td className="px-6 py-4 text-muted-foreground">{t.lastScan}</td>
@@ -201,6 +303,12 @@ export default function TenantAttendancePage() {
             {/* Header: Avatar + Name + Room + Status Badge */}
             <div className="flex justify-between items-start mb-2.5">
               <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(t.id)}
+                  onChange={() => toggleSelect(t.id)}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
                 <div className="w-11 h-11 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-[16px] font-bold shrink-0 border border-slate-200/50 shadow-inner">
                   {(t.name || "T")[0].toUpperCase()}
                 </div>

@@ -4,8 +4,10 @@ import WebsiteFooter from "../../components/website/WebsiteFooter";
 import MobileBottomNav from "../../components/website/MobileBottomNav";
 import { useWebsiteLogin } from "../../hooks/useWebsiteLogin";
 import { Mail, Lock, ArrowRight, ShieldCheck, UserCheck, Star, Eye, EyeOff } from "lucide-react";
+import useSEO from "../../hooks/useSEO";
 
 export default function WebsiteLogin() {
+  useSEO({ pageKey: 'login', fallbackTitle: 'Sign In to Roomhy' });
   const {
     email,
     password,

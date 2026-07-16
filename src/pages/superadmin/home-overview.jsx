@@ -13,7 +13,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line
 } from "recharts";
-import { fetchHomeOverviewStats } from "../../utils/api";
+import { fetchHomeOverviewStats, fetchCities } from "../../utils/api";
 import { PageHeader } from "../../components/superadmin/PageHeader";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
@@ -32,12 +32,27 @@ export default function HomeOverview() {
   const [tenantTypeData, setTenantTypeData] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cities, setCities] = useState([]);
+  const [selectedCity, setSelectedCity] = useState("All Cities");
+
+  useEffect(() => {
+    const loadCities = async () => {
+      try {
+        const data = await fetchCities();
+        const cityNames = data.map(c => typeof c === 'object' ? (c.name || c.cityName || '') : c).filter(Boolean);
+        setCities(["All Cities", ...new Set(cityNames)]);
+      } catch (err) {
+        console.error("Failed to load cities for overview:", err);
+      }
+    };
+    loadCities();
+  }, []);
 
   useEffect(() => {
     const loadStats = async () => {
       setLoading(true);
       try {
-        const res = await fetchHomeOverviewStats();
+        const res = await fetchHomeOverviewStats(selectedCity);
         if (res.success && res.summary) {
           console.log("Home Stats Fetched:", res);
           setStats({
@@ -46,13 +61,11 @@ export default function HomeOverview() {
             revenue: res.summary.monthlyRevenue || 0,
             alerts: res.summary.alerts || 0
           });
-          if (res.revenueTrend) setRevenueTrend(res.revenueTrend);
-          if (res.pendingAlerts) setPendingAlerts(res.pendingAlerts);
-          if (res.propertiesByStatus) setPropStatusData(res.propertiesByStatus);
-          if (res.tenantsByType) setTenantTypeData(res.tenantsByType);
-          if (res.activities && res.activities.length > 0) {
-            setRecentActivities(res.activities);
-          }
+          setRevenueTrend(res.revenueTrend || []);
+          setPendingAlerts(res.pendingAlerts || []);
+          setPropStatusData(res.propertiesByStatus || []);
+          setTenantTypeData(res.tenantsByType || []);
+          setRecentActivities(res.activities || []);
         } else {
            console.warn("Home Stats API returned failure or empty summary");
         }
@@ -63,7 +76,7 @@ export default function HomeOverview() {
       }
     };
     loadStats();
-  }, []);
+  }, [selectedCity]);
 
   return (
     <div className="space-y-6">
@@ -75,9 +88,22 @@ export default function HomeOverview() {
           { label: "Overview", active: true }
         ]}
         actions={
-          <div className="flex items-center gap-3 bg-white border border-slate-100 px-4 py-2 rounded-xl shadow-sm text-xs font-bold text-slate-600">
-            <Calendar className="w-4 h-4 text-slate-400" />
-            <span>May 22 - May 28, 2024</span>
+          <div className="flex items-center gap-3">
+            {cities.length > 0 && (
+              <select
+                value={selectedCity}
+                onChange={(e) => setSelectedCity(e.target.value)}
+                className="bg-white border border-slate-100 px-4 py-2 rounded-xl shadow-sm text-xs font-bold text-slate-600 outline-none cursor-pointer focus:ring-2 focus:ring-blue-500/20"
+              >
+                {cities.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            )}
+            <div className="flex items-center gap-3 bg-white border border-slate-100 px-4 py-2 rounded-xl shadow-sm text-xs font-bold text-slate-600">
+              <Calendar className="w-4 h-4 text-slate-400" />
+              <span>May 22 - May 28, 2024</span>
+            </div>
           </div>
         }
       />

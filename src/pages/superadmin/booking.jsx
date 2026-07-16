@@ -193,13 +193,13 @@ export default function BookingOverview() {
                       className="flex items-center justify-between px-4 rounded-lg transition-all"
                       style={{
                         backgroundColor: f.color,
-                        width: `${f.w}%`,
+                        width: `${Math.max(45, Math.min(100, f.w || 0))}%`,
                         height: 36,
                         opacity: 0.85 + i * 0.03,
                       }}
                     >
-                      <span className="text-white text-[11px] font-bold">{f.label}</span>
-                      <span className="text-white text-[11px] font-black">{f.val.toLocaleString()}{f.pct ? ` (${f.pct})` : ''}</span>
+                      <span className="text-white text-[11px] font-bold whitespace-nowrap mr-2">{f.label}</span>
+                      <span className="text-white text-[11px] font-black whitespace-nowrap">{f.val.toLocaleString()}{f.pct ? ` (${f.pct})` : ''}</span>
                     </div>
                   </div>
                 </div>

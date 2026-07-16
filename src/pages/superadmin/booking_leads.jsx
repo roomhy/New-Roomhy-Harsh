@@ -9,7 +9,6 @@ const STATUS_CONFIG = {
   New:        { cls: "bg-blue-50 text-blue-600",     dot: "bg-blue-500" },
   Contacted:  { cls: "bg-amber-50 text-amber-600",   dot: "bg-amber-500" },
   Interested: { cls: "bg-purple-50 text-purple-600", dot: "bg-purple-500" },
-  "Follow-up":{ cls: "bg-cyan-50 text-cyan-600",     dot: "bg-cyan-500" },
   Converted:  { cls: "bg-emerald-50 text-emerald-600",dot: "bg-emerald-500" },
   Lost:       { cls: "bg-red-50 text-red-500",        dot: "bg-red-500" },
 };

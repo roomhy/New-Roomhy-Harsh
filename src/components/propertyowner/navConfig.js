@@ -52,14 +52,9 @@ export const PROPERTY_OWNER_NAV = [
     submenus: [
       { label: "All Leads", href: "/propertyowner/enquiry", goldOnly: false },
       { label: "New Enquiries", href: "/propertyowner/new-enquiries", goldOnly: false },
-      { label: "Follow Ups", href: "/propertyowner/follow-ups", goldOnly: false },
-      { label: "Site Visits", href: "/propertyowner/schedulevisit", goldOnly: false },
       { label: "Booking Requests", href: "/propertyowner/booking_request", goldOnly: false },
       { label: "Confirmed Bookings", href: "/propertyowner/booking", goldOnly: false },
       { label: "Cancelled Bookings", href: "/propertyowner/cancelled-bookings", goldOnly: false },
-      { label: "Lead Sources", href: "/propertyowner/lead-sources", goldOnly: false },
-      { label: "WhatsApp Leads", href: "/propertyowner/whatsapp-leads", goldOnly: false },
-      { label: "New Booking Form", href: "/propertyowner/booking-form", goldOnly: false },
     ]
   },
   {

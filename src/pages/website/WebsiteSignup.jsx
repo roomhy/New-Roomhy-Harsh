@@ -4,8 +4,10 @@ import WebsiteFooter from "../../components/website/WebsiteFooter";
 import MobileBottomNav from "../../components/website/MobileBottomNav";
 import { setWebsiteSession, getWebsiteApiUrl } from "../../utils/websiteSession";
 import { User, Mail, Phone, Lock, ArrowRight, CheckCircle2, Sparkles, Building2, Wallet, Eye, EyeOff } from "lucide-react";
+import useSEO from "../../hooks/useSEO";
 
 export default function WebsiteSignup() {
+  useSEO({ pageKey: 'register', fallbackTitle: 'Create Roomhy Account - Sign Up Free' });
   const apiUrl = getWebsiteApiUrl();
   const [signupMode, setSignupMode] = useState(true);
   

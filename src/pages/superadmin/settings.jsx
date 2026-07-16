@@ -17,20 +17,42 @@ export default function SuperadminSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Profile state
+  const [profile, setProfile] = useState({ firstName: "", lastName: "", phone: "", email: "" });
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  // Password state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
+
   useEffect(() => {
-    async function loadSettings() {
+    async function loadSettingsAndProfile() {
       try {
-        const res = await fetchJson("/api/superadmin/settings");
-        if (res.success && res.settings) {
-          setCommissionPercentage(res.settings.commission_percentage ?? 10);
+        const [settingsRes, profileRes] = await Promise.all([
+          fetchJson("/api/superadmin/settings").catch(() => null),
+          fetchJson("/api/users/profile").catch(() => null)
+        ]);
+
+        if (settingsRes && settingsRes.success && settingsRes.settings) {
+          setCommissionPercentage(settingsRes.settings.commission_percentage ?? 10);
+        }
+        if (profileRes && profileRes.success && profileRes.user) {
+          setProfile({
+            firstName: profileRes.user.firstName || profileRes.user.name?.split(' ')[0] || "",
+            lastName: profileRes.user.lastName || profileRes.user.name?.split(' ').slice(1).join(' ') || "",
+            phone: profileRes.user.phone || "",
+            email: profileRes.user.email || ""
+          });
         }
       } catch (err) {
-        console.error("Failed to load settings:", err);
+        console.error("Failed to load settings or profile:", err);
       } finally {
         setLoading(false);
       }
     }
-    loadSettings();
+    loadSettingsAndProfile();
   }, []);
 
   const handleSave = async () => {
@@ -50,6 +72,63 @@ export default function SuperadminSettings() {
       alert("Error saving settings: " + err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    setProfileSaving(true);
+    try {
+      const res = await fetchJson("/api/users/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          phone: profile.phone
+        })
+      });
+      if (res.success) {
+        alert("Profile updated successfully!");
+      } else {
+        alert(res.message || "Failed to update profile");
+      }
+    } catch (err) {
+      alert("Error updating profile: " + err.message);
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      alert("Please fill all password fields.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      alert("New password and confirm password do not match.");
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      const res = await fetchJson("/api/users/change-password", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      if (res.success) {
+        alert("Password changed successfully!");
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        alert(res.message || "Failed to change password");
+      }
+    } catch (err) {
+      alert("Error changing password: " + err.message);
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -93,26 +172,60 @@ export default function SuperadminSettings() {
                   <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Administrative Identity</h3>
                </div>
                
-               <div className="space-y-6">
-                  <SettingRow 
-                    icon={Mail} 
-                    label="Master Email Access" 
-                    sub="Primary communication hub for platform alerts" 
-                    action={<button className="text-blue-600 text-[10px] font-bold uppercase hover:underline">Update Hub</button>}
-                  />
-                  <SettingRow 
-                    icon={Bell} 
-                    label="Global Notifications" 
-                    sub="Receive real-time system and security alerts" 
-                    action={<Toggle active />}
-                  />
-                  <SettingRow 
-                    icon={Smartphone} 
-                    label="Mobile Synchronization" 
-                    sub="Link mobile devices for administrative pulse" 
-                    action={<button className="px-5 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-bold uppercase text-slate-500 hover:bg-white hover:shadow-md transition-all">Provision Device</button>}
-                  />
-               </div>
+               <form onSubmit={handleSaveProfile} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">First Name</label>
+                        <input
+                           type="text"
+                           value={profile.firstName}
+                           onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
+                           className="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                           required
+                        />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Last Name</label>
+                        <input
+                           type="text"
+                           value={profile.lastName}
+                           onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
+                           className="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                        />
+                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Master Email Access</label>
+                        <input
+                           type="email"
+                           value={profile.email}
+                           disabled
+                           className="w-full bg-slate-100 border-none rounded-2xl py-4 px-6 text-sm font-bold text-slate-400 outline-none cursor-not-allowed"
+                        />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Phone Number</label>
+                        <input
+                           type="text"
+                           value={profile.phone}
+                           onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                           className="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                        />
+                     </div>
+                  </div>
+
+                  <div className="flex justify-end pt-4">
+                     <button
+                        type="submit"
+                        disabled={profileSaving}
+                        className="bg-blue-600 text-white px-8 py-3.5 rounded-2xl text-[10px] font-bold uppercase shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all disabled:opacity-50"
+                     >
+                        {profileSaving ? "Saving Identity..." : "Save Identity"}
+                     </button>
+                  </div>
+               </form>
             </div>
 
             {/* System Preferences */}
@@ -210,6 +323,59 @@ export default function SuperadminSettings() {
                      </button>
                   </div>
                </div>
+            </div>
+
+            {/* Change Password Card */}
+            <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50">
+               <div className="flex items-center gap-4 mb-8">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shadow-sm">
+                     <Key className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Credentials Update</h3>
+               </div>
+
+               <form onSubmit={handleChangePassword} className="space-y-4">
+                  <div className="space-y-1">
+                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Current Password</label>
+                     <input
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full bg-slate-50 border-none rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-100 transition-all"
+                        required
+                     />
+                  </div>
+                  <div className="space-y-1">
+                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">New Password</label>
+                     <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full bg-slate-50 border-none rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-100 transition-all"
+                        required
+                     />
+                  </div>
+                  <div className="space-y-1">
+                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Confirm New Password</label>
+                     <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full bg-slate-50 border-none rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-100 transition-all"
+                        required
+                     />
+                  </div>
+                  <button
+                     type="submit"
+                     disabled={passwordSaving}
+                     className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[10px] font-bold uppercase transition-all disabled:opacity-50"
+                  >
+                     {passwordSaving ? "Updating Password..." : "Update Password"}
+                  </button>
+               </form>
             </div>
 
             {/* Danger Zone */}

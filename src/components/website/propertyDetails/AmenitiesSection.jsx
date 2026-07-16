@@ -29,15 +29,17 @@ const AmenitiesSection = ({ amenities = [], facilities = {} }) => {
         return {
           name: parsed?.name || '',
           icon: parsed?.icon || 'check',
+          iconSvg: parsed?.iconSvg || '',
           category: normalizeCategory(parsed?.category),
         };
       } catch (_) {
-        return { name: amenity, icon: 'check', category: 'basic' };
+        return { name: amenity, icon: 'check', iconSvg: '', category: 'basic' };
       }
     }
     return {
       name: amenity?.name || '',
       icon: amenity?.icon || 'check',
+      iconSvg: amenity?.iconSvg || '',
       category: normalizeCategory(amenity?.category),
     };
   };
@@ -109,7 +111,14 @@ const AmenitiesSection = ({ amenities = [], facilities = {} }) => {
               key={index}
               className="flex items-center gap-3"
             >
-              <Icon className="w-5 h-5 text-[#6d787d] flex-shrink-0" strokeWidth={1.5} />
+              {amenity.iconSvg ? (
+                <div 
+                  className="w-5 h-5 text-[#6d787d] flex-shrink-0 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full" 
+                  dangerouslySetInnerHTML={{ __html: amenity.iconSvg }} 
+                />
+              ) : (
+                <Icon className="w-5 h-5 text-[#6d787d] flex-shrink-0" strokeWidth={1.5} />
+              )}
               <span className="text-[15px] text-[#222]">{amenity.name}</span>
             </div>
           );

@@ -63,10 +63,9 @@ export default function Enquiry() {
         apiFetch(`/api/owners/${owner.loginId}/enquiries`),
         fetchOwnerProperties(owner.loginId).catch(() => [])
       ]);
-      if (enqRes) {
-        setEnquiries(enqRes);
-        cacheSet(ENQ_KEY, enqRes, 3 * 60 * 1000);
-      }
+      const normalizedEnquiries = Array.isArray(enqRes) ? enqRes : (enqRes?.data || enqRes?.enquiries || []);
+      setEnquiries(normalizedEnquiries);
+      cacheSet(ENQ_KEY, normalizedEnquiries, 3 * 60 * 1000);
       if (propRes) {
         setProperties(propRes);
       }
@@ -148,8 +147,7 @@ export default function Enquiry() {
   // Status checks for mapping tabs
   const getEnquiryStatusGroup = (status = "") => {
     const s = status.toLowerCase();
-    if (s === "new" || s === "pending" || s === "request to connect") return "new";
-    if (s === "follow-up") return "follow-up";
+    if (s === "new" || s === "pending" || s === "request to connect" || s === "follow-up") return "new";
     if (s === "site-visit" || s === "visit" || s === "scheduled") return "site-visit";
     if (s === "booking" || s === "confirmed" || s === "closed") return "bookings";
     return s;
@@ -167,7 +165,6 @@ export default function Enquiry() {
   // Calculate counts dynamically
   const totalCount = enquiries.length;
   const newCount = enquiries.filter(x => getEnquiryStatusGroup(x.status) === "new").length;
-  const followupCount = enquiries.filter(x => getEnquiryStatusGroup(x.status) === "follow-up").length;
   const visitCount = enquiries.filter(x => getEnquiryStatusGroup(x.status) === "site-visit").length;
   const bookingsCount = enquiries.filter(x => getEnquiryStatusGroup(x.status) === "bookings").length;
 
@@ -192,12 +189,11 @@ export default function Enquiry() {
 
 
 
-      {/* Stats Cards — Desktop: 5-col horizontal strip, Mobile: 2x2 grid */}
-      <div className="hidden md:grid md:grid-cols-5 gap-3 mb-6">
+      {/* Stats Cards — Desktop: 4-col horizontal strip, Mobile: 2x2 grid */}
+      <div className="hidden md:grid md:grid-cols-4 gap-3 mb-6">
         {[
           { l: "Total", v: totalCount, bg: "bg-blue-50/50 border border-blue-150/60 text-blue-600 dark:bg-blue-950/10", text: "text-blue-900 dark:text-blue-300" },
           { l: "New", v: newCount, bg: "bg-indigo-50/50 border border-indigo-150/60 text-indigo-600 dark:bg-indigo-950/10", text: "text-indigo-900 dark:text-indigo-300" },
-          { l: "Follow-up", v: followupCount, bg: "bg-amber-50/50 border border-amber-150/60 text-amber-600 dark:bg-amber-950/10", text: "text-amber-900 dark:text-amber-300" },
           { l: "Site Visit", v: visitCount, bg: "bg-emerald-50/50 border border-emerald-150/60 text-emerald-600 dark:bg-emerald-950/10", text: "text-emerald-900 dark:text-emerald-300" },
           { l: "Bookings", v: bookingsCount, bg: "bg-purple-50/50 border border-purple-150/60 text-purple-600 dark:bg-purple-950/10", text: "text-purple-900 dark:text-purple-300" }
         ].map(({ l, v, bg, text }) => (
@@ -213,7 +209,6 @@ export default function Enquiry() {
         {[
           { title: "Total",     value: totalCount,    subtext: "All leads",    icon: Users,         bg: "bg-blue-50",   ic: "text-blue-600" },
           { title: "New",       value: newCount,      subtext: "Needs action", icon: TrendingUp,    bg: "bg-indigo-50", ic: "text-indigo-600" },
-          { title: "Follow-up", value: followupCount, subtext: "In progress",  icon: UserCheck,     bg: "bg-amber-50",  ic: "text-amber-600" },
           { title: "Site Visit",value: visitCount,    subtext: "Scheduled",    icon: CalendarCheck, bg: "bg-emerald-50",ic: "text-emerald-600" },
           { title: "Bookings",  value: bookingsCount, subtext: "Confirmed",    icon: BookOpen,      bg: "bg-purple-50", ic: "text-purple-600" },
         ].map(({ title, value, subtext, icon: Icon, bg, ic }) => (
@@ -237,7 +232,6 @@ export default function Enquiry() {
         {[
           { k: "all", l: "All" },
           { k: "new", l: "New" },
-          { k: "follow-up", l: "Follow-up" },
           { k: "site-visit", l: "Site Visit" },
           { k: "bookings", l: "Bookings" }
         ].map(({ k, l }) => (

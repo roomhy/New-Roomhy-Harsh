@@ -212,7 +212,21 @@ const DomainGuard = () => {
     // Show only coming-soon page on root URL or paths not matching allowed website routes
     const allowedWebsiteRoutes = [
       "/website",
-      "/coming-soon"
+      "/website-editor",
+      "/coming-soon",
+      "/about-us",
+      "/contact-us",
+      "/list-property",
+      "/login",
+      "/register",
+      "/faq",
+      "/privacy-policy",
+      "/terms-and-conditions",
+      "/pg",
+      "/hostels",
+      "/co-living",
+      "/apartments",
+      "/property"
     ];
 
     if (!allowedWebsiteRoutes.some(route => path.startsWith(route))) {

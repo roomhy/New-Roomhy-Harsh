@@ -7,6 +7,8 @@ import {
   FileText, ShieldCheck, Download, Ban
 } from "lucide-react";
 
+const cn = (...classes) => classes.filter(Boolean).join(" ");
+
 export default function ConfirmedBookingsPage() {
   const owner = getOwnerRuntimeSession();
   if (!owner?.loginId && typeof window !== "undefined") { 
@@ -17,6 +19,7 @@ export default function ConfirmedBookingsPage() {
   const [search, setSearch] = useState("");
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("direct");
 
   React.useEffect(() => {
     let active = true;
@@ -64,10 +67,12 @@ export default function ConfirmedBookingsPage() {
     }
   };
 
-  const filteredBookings = bookings.filter(b => 
-    (b.name || "").toLowerCase().includes(search.toLowerCase()) ||
-    (b.property_name || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredBookings = bookings.filter(b => {
+    const matchesTab = activeTab === "bid" ? b.request_type === "bid" : b.request_type !== "bid";
+    const matchesSearch = (b.name || "").toLowerCase().includes(search.toLowerCase()) ||
+                          (b.property_name || "").toLowerCase().includes(search.toLowerCase());
+    return matchesTab && matchesSearch;
+  });
 
   return (
     <PropertyOwnerLayout 
@@ -80,6 +85,28 @@ export default function ConfirmedBookingsPage() {
           <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Confirmed Bookings</h1>
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">List of confirmed tenant bookings, agreement signing states, and schedules.</p>
         </div>
+      </div>
+
+      {/* Tabs Switcher */}
+      <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 mb-6 w-fit">
+        <button
+          onClick={() => setActiveTab("direct")}
+          className={cn(
+            "px-4 py-2 rounded-lg text-xs font-bold transition-all",
+            activeTab === "direct" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+          )}
+        >
+          Direct Bookings
+        </button>
+        <button
+          onClick={() => setActiveTab("bid")}
+          className={cn(
+            "px-4 py-2 rounded-lg text-xs font-bold transition-all",
+            activeTab === "bid" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+          )}
+        >
+          Bid Bookings
+        </button>
       </div>
 
       {/* Toolbar */}

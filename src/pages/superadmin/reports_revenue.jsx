@@ -180,62 +180,7 @@ export default function ReportsRevenue() {
 
       <p className="text-sm font-bold text-slate-400">View all payments, commissions and owner payouts on this platform.</p>
 
-      {/* Global Commission Settings Panel */}
-      <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col md:flex-row items-center justify-between gap-8 animate-in fade-in slide-in-from-top-6 duration-500">
-        <div className="flex items-center gap-6">
-          <div className="w-16 h-16 rounded-[1.25rem] bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-inner shrink-0">
-             <Sliders className="w-8 h-8" />
-          </div>
-          <div>
-              <h3 className="text-xl font-bold text-slate-800 tracking-tight">Platform Commission Rate</h3>
-             <p className="text-xs text-slate-400 font-bold uppercase mt-1">Set how much % the platform takes per booking</p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-4">
-          <div className="flex items-center bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-4">Current Rate:</span>
-             {showSettingsEdit ? (
-               <div className="flex items-center gap-2">
-                 <input 
-                   type="number" 
-                   value={newCommPct} 
-                   onChange={e => setNewCommPct(Math.max(0, Math.min(100, Number(e.target.value))))}
-                   className="w-16 bg-white border border-slate-200 rounded-xl px-2 py-1 text-sm font-black text-slate-800 outline-none text-center"
-                 />
-                 <span className="text-sm font-bold text-slate-700">%</span>
-               </div>
-             ) : (
-               <span className="text-lg font-black text-blue-600 bg-blue-50 px-4 py-1 rounded-xl border border-blue-100">{settings.commission_percentage}%</span>
-             )}
-          </div>
-          
-          {showSettingsEdit ? (
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={handleSaveSettings}
-                disabled={updatingSettings}
-                className="px-6 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-[10px] font-bold uppercase transition-all shadow-md active:scale-95"
-              >
-                {updatingSettings ? "Saving..." : "Save"}
-              </button>
-              <button 
-                onClick={() => { setShowSettingsEdit(false); setNewCommPct(settings.commission_percentage); }}
-                className="px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-2xl text-[10px] font-bold uppercase transition-all"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button 
-              onClick={() => setShowSettingsEdit(true)}
-              className="px-8 py-4 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl text-[10px] font-bold uppercase shadow-lg transition-all active:scale-95"
-            >
-              Change Commission %
-            </button>
-          )}
-        </div>
-      </div>
+
 
       {/* Hero Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">

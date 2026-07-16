@@ -169,12 +169,29 @@ export default function SuperChat() {
     const user2 = params.get("user2");
 
     if (inbox.length > 0) {
+      if (user1 && user2) {
+        const pairKey = [user1, user2].sort().join(':').toUpperCase();
+        const found = inbox.find(c => {
+          const cPairKey = String(c.pair_key || '').toUpperCase();
+          const cUser1 = String(c.user1 || '').toUpperCase();
+          const cUser2 = String(c.user2 || '').toUpperCase();
+          const u1 = user1.toUpperCase();
+          const u2 = user2.toUpperCase();
+          return cPairKey === pairKey || (cUser1 === u1 && cUser2 === u2) || (cUser1 === u2 && cUser2 === u1);
+        });
+        if (found) {
+          setActiveChat(found);
+          return;
+        }
+      }
+
       if (roomId) {
-        const found = inbox.find(c => c.participant_login_id === roomId || c.pair_key === roomId);
-        if (found) setActiveChat(found);
-      } else if (user1 && user2) {
-        const pairKey = [user1, user2].sort().join(':');
-        const found = inbox.find(c => c.pair_key === pairKey || (c.user1 === user1 && c.user2 === user2) || (c.user1 === user2 && c.user2 === user1));
+        const rId = roomId.toUpperCase();
+        const found = inbox.find(c => {
+          const pId = String(c.participant_login_id || '').toUpperCase();
+          const cPairKey = String(c.pair_key || '').toUpperCase();
+          return pId === rId || cPairKey === rId;
+        });
         if (found) setActiveChat(found);
       }
     }

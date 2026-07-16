@@ -847,7 +847,15 @@ export const useHtmlPage = ({
       stylesheetLinks.push(element);
     });
 
-    links.forEach((link) => {
+    const hasCanonical = links.some((link) => link.rel === "canonical");
+    const linksToProcess = [...links];
+    if (!hasCanonical) {
+      const cleanPath = pathName.replace(/\/+$/, "");
+      const canonicalUrl = `https://roomhy.com${cleanPath || "/"}`;
+      linksToProcess.push({ rel: "canonical", href: canonicalUrl });
+    }
+
+    linksToProcess.forEach((link) => {
       if (link.rel === "canonical") {
         document.querySelectorAll('link[rel="canonical"]').forEach((el) => el.remove());
       }

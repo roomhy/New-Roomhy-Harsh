@@ -227,9 +227,10 @@ export const useOwnerProfile = () => {
     const email = getParamValue(["email", "ownerEmail", "mail"]);
     const area = getParamValue(["area", "assignedArea", "location"]);
     const password = getParamValue(["password", "tempPassword", "pass"]);
+    const phone = getParamValue(["phone", "ownerPhone", "mobile", "contact"]);
 
     if (loginId) updateForm({ loginId });
-    if (email || area) updateForm({ email, area });
+    if (email || area || phone) updateForm({ email, area, ...(phone ? { phone } : {}) });
     if (email || area || password) setAutoInfo({ email, area, password });
   }, [updateForm]);
 

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
+import { fetchJson } from "../../utils/api";
 import { 
   User, CheckCircle2, AlertCircle, Save 
 } from "lucide-react";
@@ -23,16 +24,14 @@ export default function OwnerProfile() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch("/api/owner-change-requests/submit", {
+      const data = await fetchJson("/api/owner-change-requests/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ownerLoginId: owner.loginId,
           requestType: "profile",
           requestedChanges: { name, phone, address }
         })
       });
-      const data = await res.json();
       if (data.success) {
         setSuccess("Changes submitted for Superadmin approval.");
         setTimeout(() => setSuccess(""), 5000);
@@ -41,7 +40,7 @@ export default function OwnerProfile() {
         setTimeout(() => setSuccess(""), 3000);
       }
     } catch (err) {
-      setSuccess("Failed to submit request.");
+      setSuccess(err.message || "Failed to submit request.");
       setTimeout(() => setSuccess(""), 3000);
     } finally {
       setLoading(false);

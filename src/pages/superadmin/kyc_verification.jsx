@@ -129,21 +129,21 @@ export default function KycVerification() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
          <div className="flex flex-col gap-2">
             <h1 className="text-4xl font-bold text-slate-800 tracking-tight leading-none">KYC / Documents</h1>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-2">Identity Trust Hub & Global Compliance Monitoring Command</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-2">Manage KYC approvals for owners and tenants.</p>
          </div>
          <div className="flex items-center gap-4">
             <button className="bg-white text-slate-600 border border-slate-100 px-8 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest shadow-xl shadow-slate-200 transition-all flex items-center gap-3 active:scale-95">
-               <Download className="w-4 h-4" /> Export Audit
+               <Download className="w-4 h-4" /> Export Data
             </button>
          </div>
       </div>
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCardHorizontal label="Trust Index" value={`${stats.rate}%`} trend="Elite Status" up icon={ShieldCheck} color="blue" />
-        <StatCardHorizontal label="Awaiting Audit" value={stats.pending} trend="Queue Stream" up={false} icon={Fingerprint} color="amber" />
-        <StatCardHorizontal label="Total Stakeholders" value={stats.total} trend="Global Sync" up icon={Users} color="indigo" />
-        <StatCardHorizontal label="Compliance Pass" value={stats.total - stats.pending} trend="+4.2% Delta" up icon={Activity} color="emerald" />
+        <StatCardHorizontal label="Verification Rate" value={`${stats.rate}%`} trend="Active Verified" up icon={ShieldCheck} color="blue" />
+        <StatCardHorizontal label="Pending KYC" value={stats.pending} trend="Pending List" up={false} icon={Fingerprint} color="amber" />
+        <StatCardHorizontal label="Total Users" value={stats.total} trend="Synced" up icon={Users} color="indigo" />
+        <StatCardHorizontal label="Verified Users" value={stats.total - stats.pending} trend="Verified" up icon={Activity} color="emerald" />
       </div>
 
       {/* Main Ledger Card */}
@@ -206,25 +206,25 @@ export default function KycVerification() {
                            }}
                          />
                       </th>
-                      <th className="px-6 py-8">Stakeholder Identity</th>
-                      <th className="px-6 py-8">Contact Pulse</th>
-                      <th className="px-6 py-8 text-center">Protocol Segment</th>
-                      <th className="px-6 py-8 text-center">Audit Status</th>
-                      <th className="px-10 py-8 text-right">Audit Actions</th>
+                      <th className="px-6 py-8">User Identity</th>
+                      <th className="px-6 py-8">Contact Details</th>
+                      <th className="px-6 py-8 text-center">User Type</th>
+                      <th className="px-6 py-8 text-center">KYC Status</th>
+                      <th className="px-10 py-8 text-right">Actions</th>
                    </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                    {loading ? (
                      <tr><td colSpan="6" className="py-40 text-center">
                         <div className="w-16 h-16 border-4 border-blue-600/10 border-t-blue-600 rounded-full animate-spin mx-auto mb-8" />
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">Accessing Distributed Identity Vault...</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">Loading KYC data...</p>
                      </td></tr>
                    ) : filteredList.length === 0 ? (
                      <tr><td colSpan="6" className="py-40 text-center">
                         <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-200">
                            <ShieldCheck size={40} />
                         </div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Compliance Queue Clear</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No Pending KYC</p>
                      </td></tr>
                    ) : filteredList.map((item, i) => (
                      <tr key={i} className="group hover:bg-slate-50/50 transition-all duration-300 cursor-pointer" onClick={() => {
@@ -255,20 +255,20 @@ export default function KycVerification() {
                                  {(item.name || "U").charAt(0).toUpperCase()}
                               </div>
                               <div>
-                                 <p className="text-base font-bold text-slate-800 tracking-tight">{item.name || "Unknown Identity"}</p>
+                                 <p className="text-base font-bold text-slate-800 tracking-tight">{item.name || "Unknown User"}</p>
                                  <p className="text-[9px] font-black bg-blue-600 text-white px-2 py-0.5 rounded-lg uppercase tracking-widest mt-2 inline-block">ID: {item.loginId || "N/A"}</p>
                               </div>
                            </div>
                         </td>
                         <td className="px-6 py-8">
                            <div className="space-y-1.5">
-                              <p className="text-xs font-bold text-slate-700 leading-none">{item.phone || "No Pulse"}</p>
-                              <p className="text-[9px] font-bold text-slate-400 truncate max-w-[150px] uppercase tracking-wider">{item.email || "No Digital Record"}</p>
+                              <p className="text-xs font-bold text-slate-700 leading-none">{item.phone || "No Phone"}</p>
+                              <p className="text-[9px] font-bold text-slate-400 truncate max-w-[150px] uppercase tracking-wider">{item.email || "No Email"}</p>
                            </div>
                         </td>
                         <td className="px-6 py-8 text-center">
                            <span className="text-[9px] font-bold text-slate-500 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 shadow-sm uppercase tracking-widest">
-                              {tab === "tenants" ? "Resident Profile" : "Asset Stakeholder"}
+                              {tab === "tenants" ? "Tenant" : "Owner"}
                            </span>
                         </td>
                         <td className="px-6 py-8 text-center">
@@ -276,7 +276,7 @@ export default function KycVerification() {
                               "text-[8px] font-bold px-4 py-1.5 rounded-xl border uppercase tracking-[0.2em] shadow-sm",
                               "bg-amber-50 text-amber-600 border-amber-100"
                            )}>
-                              {item.kycStatus || item.kyc?.status || "Pending Audit"}
+                              {item.kycStatus || item.kyc?.status || "Pending"}
                            </span>
                         </td>
                         <td className="px-10 py-8 text-right" onClick={(e) => e.stopPropagation()}>

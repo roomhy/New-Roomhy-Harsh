@@ -1,7 +1,10 @@
+import { useState, useEffect } from "react";
 import WebsiteNavbar from "../../components/website/WebsiteNavbar";
 import WebsiteFooter from "../../components/website/WebsiteFooter";
 import MobileBottomNav from "../../components/website/MobileBottomNav";
 import { ChevronDown, HelpCircle } from 'lucide-react';
+import { fetchJson } from "../../utils/api";
+import useSEO from "../../hooks/useSEO";
 
 const faqData = [
   {
@@ -55,93 +58,154 @@ const faqData = [
 ];
 
 export default function FAQPage() {
+  useSEO({ pageKey: 'faq', fallbackTitle: 'How Roomhy Works - FAQ & Guide' });
+  const [layoutSections, setLayoutSections] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch page layout settings from DB
+  useEffect(() => {
+    const fetchLayout = async () => {
+      let resolved = false;
+      const timeoutPromise = new Promise((resolve) => {
+        setTimeout(() => {
+          if (!resolved) {
+            console.warn('FAQ layout API call timed out, falling back to defaults');
+            resolve({ success: false, timeout: true });
+          }
+        }, 3000);
+      });
+
+      try {
+        const apiPromise = fetchJson('/api/page-layouts/faq');
+        const res = await Promise.race([apiPromise, timeoutPromise]);
+        
+        resolved = true;
+        if (res && res.success && res.data && res.data.sections) {
+          const sorted = res.data.sections.sort((a, b) => a.order - b.order);
+          setLayoutSections(sorted);
+        }
+      } catch (err) {
+        console.warn('Failed to load FAQ page layout:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLayout();
+  }, []);
+
+  const isSectionVisible = (id) => {
+    if (layoutSections.length === 0) return true;
+    const sec = layoutSections.find(s => s.id === id);
+    return sec ? sec.visible : true;
+  };
+
+  const getSectionContent = (id, fallback) => {
+    if (layoutSections.length === 0) return fallback;
+    const sec = layoutSections.find(s => s.id === id);
+    return sec && sec.content ? { ...fallback, ...sec.content } : fallback;
+  };
+
+  const renderHero = () => {
+    const content = getSectionContent('faq-hero', {
+      title: 'Frequently Asked Questions',
+      subtitle: 'Everything you need to know about finding your perfect home'
+    });
+    return (
+      <div key="faq-hero" className="relative w-full py-5 md:py-10 px-4 md:px-6 overflow-hidden border-b border-stone-200/50" 
+           style={{ background: 'linear-gradient(135deg, #FFFAF5 0%, #FDFCFB 50%, #F5F7FA 100%)' }}>
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
+             style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/pinstripe.png")` }}>
+        </div>
+        <div className="relative max-w-7xl mx-auto flex flex-col items-center text-center">
+          <div className="w-8 h-8 md:w-12 md:h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-2 md:mb-4">
+            <HelpCircle size={18} className="text-purple-600 md:w-6 md:h-6" />
+          </div>
+          <div className="flex items-center gap-2 md:gap-4 mb-1 md:mb-2">
+            <div className="h-[1px] w-6 md:w-8 bg-[#C5A059]/40 hidden md:block"></div>
+            <h1 className="text-lg md:text-4xl font-bold text-[#1A1A1A] tracking-tight">
+              {content.title}
+            </h1>
+            <div className="h-[1px] w-6 md:w-8 bg-[#C5A059]/40 hidden md:block"></div>
+          </div>
+          <p className="text-xs md:text-lg text-stone-500 font-normal opacity-90 max-w-xl mx-auto">
+            {content.subtitle}
+          </p>
+          <div className="mt-2 md:mt-4 w-1.5 h-1.5 rounded-full bg-[#C5A059]/30"></div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderFAQList = () => {
+    return (
+      <section key="faq-list" className="py-6 md:py-12 bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="space-y-2.5 md:space-y-4">
+            {faqData.map((faq, index) => (
+              <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <details className="group">
+                  <summary className="flex justify-between items-center p-4 md:p-6 cursor-pointer hover:bg-gray-50/50 transition-colors">
+                    <span className="font-semibold text-sm md:text-lg text-gray-900 pr-4">
+                      {faq.question}
+                    </span>
+                    <span className="text-teal-500 flex-shrink-0 group-open:rotate-180 transition-transform">
+                      <ChevronDown className="w-4 h-4 md:w-5 md:h-5" />
+                    </span>
+                  </summary>
+                  <div className="px-4 pb-4 md:px-6 md:pb-6">
+                    <p className="text-gray-600 text-xs md:text-base leading-relaxed whitespace-pre-line">
+                      {faq.answer}
+                    </p>
+                  </div>
+                </details>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-12 text-center">
+            <div className="bg-gradient-to-r from-teal-500 to-cyan-500 rounded-xl p-8 text-white">
+              <h3 className="text-2xl font-bold mb-3">Still have questions?</h3>
+              <p className="text-lg mb-6">Our support team is here to help you 24/7</p>
+              <a 
+                href="/website/contact" 
+                className="inline-block bg-white text-teal-600 px-8 py-3 rounded-lg font-semibold hover:shadow-lg transition-all"
+              >
+                Contact Us
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  };
+
+  const defaultOrder = ['faq-hero', 'faq-list'];
+  const activeOrder = layoutSections.length > 0
+    ? layoutSections.map(s => s.id)
+    : defaultOrder;
+
   return (
     <div className="min-h-screen bg-white">
       <WebsiteNavbar />
       
-      <main className="min-h-screen">
-        {/* --- COMPACT & STYLISH HEADER --- */}
-        <div className="relative w-full py-5 md:py-10 px-4 md:px-6 overflow-hidden border-b border-stone-200/50" 
-             style={{ background: 'linear-gradient(135deg, #FFFAF5 0%, #FDFCFB 50%, #F5F7FA 100%)' }}>
-          
-          {/* Background Pattern */}
-          <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
-               style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/pinstripe.png")` }}>
-          </div>
-
-          <div className="relative max-w-7xl mx-auto flex flex-col items-center text-center">
-            
-            {/* Icon */}
-            <div className="w-8 h-8 md:w-12 md:h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-2 md:mb-4">
-              <HelpCircle size={18} className="text-purple-600 md:w-6 md:h-6" />
-            </div>
-            
-            {/* MAIN HEADING */}
-            <div className="flex items-center gap-2 md:gap-4 mb-1 md:mb-2">
-              <div className="h-[1px] w-6 md:w-8 bg-[#C5A059]/40 hidden md:block"></div>
-              <h1 className="text-lg md:text-4xl font-bold text-[#1A1A1A] tracking-tight">
-                Frequently Asked <span className="text-[#C5A059] font-serif italic font-medium">Questions</span>
-              </h1>
-              <div className="h-[1px] w-6 md:w-8 bg-[#C5A059]/40 hidden md:block"></div>
-            </div>
-
-            {/* SUB-HEADING */}
-            <p className="text-xs md:text-lg text-stone-500 font-normal opacity-90 max-w-xl mx-auto">
-              Everything you need to know about finding your perfect home
-            </p>
-
-            {/* Bottom Accent Dot */}
-            <div className="mt-2 md:mt-4 w-1.5 h-1.5 rounded-full bg-[#C5A059]/30"></div>
-          </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-40">
+          <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
         </div>
-
-        {/* FAQ Section */}
-        <section className="py-6 md:py-12 bg-gray-50">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="space-y-2.5 md:space-y-4">
-              {faqData.map((faq, index) => (
-                <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                  <details className="group">
-                    <summary className="flex justify-between items-center p-4 md:p-6 cursor-pointer hover:bg-gray-50/50 transition-colors">
-                      <span className="font-semibold text-sm md:text-lg text-gray-900 pr-4">
-                        {faq.question}
-                      </span>
-                      <ChevronDown className="w-4 h-4 md:w-5 md:h-5 text-teal-500 flex-shrink-0 group-open:rotate-180 transition-transform" />
-                    </summary>
-                    <div className="px-4 pb-4 md:px-6 md:pb-6">
-                      <p className="text-gray-600 text-xs md:text-base leading-relaxed whitespace-pre-line">
-                        {faq.answer}
-                      </p>
-                    </div>
-                  </details>
-                </div>
-              ))}
-            </div>
-
-            {/* Contact CTA */}
-            <div className="mt-12 text-center">
-              <div className="bg-gradient-to-r from-teal-500 to-cyan-500 rounded-xl p-8 text-white">
-                <h3 className="text-2xl font-bold mb-3">
-                  Still have questions?
-                </h3>
-                <p className="text-lg mb-6">
-                  Our support team is here to help you 24/7
-                </p>
-                <a 
-                  href="/website/contact" 
-                  className="inline-block bg-white text-teal-600 px-8 py-3 rounded-lg font-semibold hover:shadow-lg transition-all"
-                >
-                  Contact Us
-                </a>
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
+      ) : (
+        <main className="min-h-screen">
+          {activeOrder.map(sectionId => {
+            if (!isSectionVisible(sectionId)) return null;
+            switch (sectionId) {
+              case 'faq-hero': return renderHero();
+              case 'faq-list': return renderFAQList();
+              default: return null;
+            }
+          })}
+        </main>
+      )}
 
       <WebsiteFooter />
-
-      {/* Mobile Bottom Navigation */}
       <MobileBottomNav />
     </div>
   );

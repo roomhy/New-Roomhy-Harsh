@@ -4,16 +4,25 @@ import MobileBottomNav from "../../components/website/MobileBottomNav";
 import * as LucideIcons from "lucide-react";
 const { Filter, MapPin, Wallet, Home, Users, TrendingUp, Send, RefreshCw, ChevronLeft, ChevronRight, Building2, BookOpen, Star, Check, Phone, Wifi, Utensils, Car, Dumbbell, Tv, Wind, Droplets, Zap, X, Menu, Heart, ChevronDown, Clock, Shirt, Cctv, Video, Waves, Fan } = LucideIcons;
 import { useState, useEffect } from "react";
-import { useSearchParams, Link, useNavigate } from "react-router-dom";
-import { fetchProperties, searchPropertiesByLocation, getNearbyAreas, getInstitutions, getPriceRangeByType, trackPropertyClick } from "../../utils/api";
+import { useSearchParams, Link, useNavigate, useParams, useLocation } from "react-router-dom";
+import { fetchProperties, searchPropertiesByLocation, getNearbyAreas, getInstitutions, getPriceRangeByType, trackPropertyClick, getApiBase, fetchJson } from "../../utils/api";
 import FastBiddingModal from "../../components/website/FastBiddingModal";
 import { useAuth } from "../../contexts/AuthContext";
+import { useHtmlPage } from "../../utils/htmlPage";
 import axios from "axios";
+import useSEO from "../../hooks/useSEO";
+
+// Client-side memory cache to optimize performance and prevent duplicate SEO API lookups
+const seoCache = new Map();
 
 export default function OurPropertyPage() {
+  useSEO({ pageKey: 'our-property', fallbackTitle: 'Browse PGs, Hostels & Co-living Spaces - Roomhy' });
   const [showFilters, setShowFilters] = useState(true);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const { city: citySlug, area: areaSlug } = useParams();
+  const navigate = useNavigate();
+
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [institutions, setInstitutions] = useState([]);
@@ -29,7 +38,79 @@ export default function OurPropertyPage() {
   const [propertiesPerPage] = useState(10);
   const [totalProperties, setTotalProperties] = useState([]);
   const [totalCount, setTotalCount] = useState(0); // Total from API
+
+  // Layout sections from CMS editor
+  const [layoutSections, setLayoutSections] = useState([]);
+
+  useEffect(() => {
+    const fetchLayout = async () => {
+      try {
+        const timeoutPromise = new Promise(r => setTimeout(() => r({ success: false }), 3000));
+        const apiPromise = fetchJson('/api/page-layouts/our-property');
+        const res = await Promise.race([apiPromise, timeoutPromise]);
+        if (res?.success && res?.data?.sections) {
+          setLayoutSections(res.data.sections.sort((a, b) => a.order - b.order));
+        }
+      } catch (err) {
+        console.warn('Failed to load property listing layout:', err);
+      }
+    };
+    fetchLayout();
+  }, []);
+
+  // Helper to get section content from CMS layout
+  const getSectionContent = (sectionId, defaults = {}) => {
+    const section = layoutSections.find(s => s.id === sectionId);
+    if (section?.content) return { ...defaults, ...section.content };
+    return defaults;
+  };
+
+  const isSectionVisible = (sectionId) => {
+    if (layoutSections.length === 0) return true;
+    const sec = layoutSections.find(s => s.id === sectionId);
+    return sec ? sec.visible !== false : true;
+  };
   
+  // Helper to slugify text on the client side
+  const slugify = (text) => {
+    if (!text) return "";
+    return text
+      .toString()
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/[^\w\-]+/g, "")
+      .replace(/\-\-+/g, "-");
+  };
+
+  // Helper to humanize a slug
+  const humanizeSlug = (s) => {
+    if (!s) return "";
+    return s
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
+  const { pathname } = useLocation();
+
+  const getTypeFromPathname = (path) => {
+    if (path.startsWith('/pg')) return 'PG';
+    if (path.startsWith('/hostels')) return 'Hostel';
+    if (path.startsWith('/co-living')) return 'Co-living';
+    if (path.startsWith('/apartments')) return 'Apartment';
+    return '';
+  };
+
+  const getPrefix = (path) => {
+    if (path.startsWith('/pg')) return '/pg';
+    if (path.startsWith('/hostels')) return '/hostels';
+    if (path.startsWith('/co-living')) return '/co-living';
+    if (path.startsWith('/apartments')) return '/apartments';
+    if (path.startsWith('/property')) return '/property';
+    return '/website/ourproperty';
+  };
+
   // Get parameters from URL first (before using them in state)
   const typeFromUrl = searchParams.get('type');
   const cityFromUrl = searchParams.get('city');
@@ -38,10 +119,14 @@ export default function OurPropertyPage() {
   const latitudeFromUrl = searchParams.get('latitude');
   const longitudeFromUrl = searchParams.get('longitude');
   
+  const initialCity = cityFromUrl || (citySlug ? humanizeSlug(citySlug) : "");
+  const initialArea = areaFromUrl || (areaSlug ? humanizeSlug(areaSlug) : "");
+  const initialType = typeFromUrl || getTypeFromPathname(pathname) || '';
+
   // Filter states (after URL params are declared)
-  const [selectedCity, setSelectedCity] = useState(cityFromUrl || '');
-  const [selectedArea, setSelectedArea] = useState(areaFromUrl || '');
-  const [selectedType, setSelectedType] = useState(typeFromUrl || '');
+  const [selectedCity, setSelectedCity] = useState(initialCity);
+  const [selectedArea, setSelectedArea] = useState(initialArea);
+  const [selectedType, setSelectedType] = useState(initialType);
   const [searchQuery, setSearchQuery] = useState(searchFromUrl || '');
   const [selectedGender, setSelectedGender] = useState('');
   const [minPrice, setMinPrice] = useState('');
@@ -52,6 +137,145 @@ export default function OurPropertyPage() {
   const [showBidModal, setShowBidModal] = useState(false);
   const [selectedPropertyForBid, setSelectedPropertyForBid] = useState(null);
   const { user, isAuthenticated } = useAuth();
+
+  const [seoData, setSeoData] = useState({
+    title: "Our Properties | Roomhy",
+    description: "Find verified, broker-free PGs and hostels on Roomhy.",
+    keywords: "pg, hostel, co-living, student housing",
+    canonicalUrl: ""
+  });
+
+  // Synchronize type from path/URL changes
+  useEffect(() => {
+    const type = getTypeFromPathname(pathname) || typeFromUrl || '';
+    setSelectedType(type);
+  }, [pathname, typeFromUrl]);
+
+  // 1. Redirect old query parameter URLs to clean path parameters (301-equivalent client-side redirect)
+  useEffect(() => {
+    const qCity = searchParams.get("city");
+    const qArea = searchParams.get("area");
+    if (qCity) {
+      const citySlugified = slugify(qCity);
+      const areaSlugified = qArea ? slugify(qArea) : "";
+      const prefix = getPrefix(pathname);
+      const cleanPath = `${prefix}/${citySlugified}${
+        areaSlugified ? "/" + areaSlugified : ""
+      }`;
+      
+      const remainingParams = new URLSearchParams(searchParams);
+      remainingParams.delete("city");
+      remainingParams.delete("area");
+      const queryString = remainingParams.toString();
+      
+      navigate(`${cleanPath}${queryString ? "?" + queryString : ""}`, {
+        replace: true
+      });
+    }
+  }, [searchParams, navigate, pathname]);
+
+  // 2. Synchronize path parameters with active selection states
+  useEffect(() => {
+    if (citySlug) {
+      const hCity = humanizeSlug(citySlug);
+      if (selectedCity.toLowerCase() !== hCity.toLowerCase()) {
+        setSelectedCity(hCity);
+      }
+    } else if (!cityFromUrl) {
+      setSelectedCity("");
+    }
+  }, [citySlug, cityFromUrl]);
+
+  useEffect(() => {
+    if (areaSlug) {
+      const hArea = humanizeSlug(areaSlug);
+      if (selectedArea.toLowerCase() !== hArea.toLowerCase()) {
+        setSelectedArea(hArea);
+      }
+    } else if (!areaFromUrl) {
+      setSelectedArea("");
+    }
+  }, [areaSlug, areaFromUrl]);
+
+  // 3. Improve casing correctness based on database records
+  useEffect(() => {
+    if (citySlug && availableCities.length > 0) {
+      const exactMatch = availableCities.find((c) => slugify(c) === citySlug);
+      if (exactMatch && exactMatch !== selectedCity) {
+        setSelectedCity(exactMatch);
+      }
+    }
+  }, [citySlug, availableCities]);
+
+  useEffect(() => {
+    if (areaSlug && nearbyAreas.length > 0) {
+      const exactMatch = nearbyAreas.find((a) => slugify(a) === areaSlug);
+      if (exactMatch && exactMatch !== selectedArea) {
+        setSelectedArea(exactMatch);
+      }
+    }
+  }, [areaSlug, nearbyAreas]);
+
+  // 4. Fetch dynamic SEO metadata with memory caching
+  useEffect(() => {
+    let isMounted = true;
+    const fetchSEOMetadata = async () => {
+      const cacheKey = `${selectedCity || ""}_${selectedArea || ""}`;
+      if (seoCache.has(cacheKey)) {
+        if (isMounted) setSeoData(seoCache.get(cacheKey));
+        return;
+      }
+
+      try {
+        const queryParams = new URLSearchParams();
+        queryParams.append("pageKey", "our-property");
+        if (selectedCity) queryParams.append("city", selectedCity);
+        if (selectedArea) queryParams.append("area", selectedArea);
+
+        const slugPath = `website/ourproperty${
+          selectedCity ? "/" + slugify(selectedCity) : ""
+        }${selectedArea ? "/" + slugify(selectedArea) : ""}`;
+        queryParams.append("slug", slugPath);
+
+        const response = await axios.get(
+          `${getApiBase()}/api/seo/metadata?${queryParams.toString()}`
+        );
+        if (response.data && response.data.success && response.data.data) {
+          const { metaTitle, metaDescription, metaKeywords, canonicalUrl } =
+            response.data.data;
+          
+          const result = {
+            title: metaTitle || "Our Properties | Roomhy",
+            description: metaDescription || "Find verified, broker-free PGs and hostels on Roomhy.",
+            keywords: metaKeywords || "pg, hostel, co-living, student housing",
+            canonicalUrl: canonicalUrl || ""
+          };
+
+          seoCache.set(cacheKey, result);
+          if (isMounted) setSeoData(result);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch SEO metadata:", err.message);
+      }
+    };
+
+    fetchSEOMetadata();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedCity, selectedArea]);
+
+  // 5. Mount meta tags dynamically to document head
+  useHtmlPage({
+    title: seoData.title,
+    metas: [
+      { name: "description", content: seoData.description },
+      { name: "keywords", content: seoData.keywords }
+    ],
+    links: seoData.canonicalUrl
+      ? [{ rel: "canonical", href: seoData.canonicalUrl }]
+      : []
+  });
 
   // Fetch properties and related data dynamically
   useEffect(() => {
@@ -272,6 +496,13 @@ export default function OurPropertyPage() {
 
       <main className="min-h-screen">
 {/* --- COMPACT & STYLISH PROPERTIES HEADER --- */}
+{isSectionVisible('our-property-hero') && (() => {
+  const heroContent = getSectionContent('our-property-hero', {
+    title: 'Our Properties',
+    titleAccent: 'Properties',
+    subtitle: 'Find PGs, Hostels, and Co-living spaces directly without brokers.'
+  });
+  return (
 <div className="relative w-full py-1 md:py-4 px-4 md:px-6 overflow-hidden border-b border-stone-200/50" 
      style={{
        background: 'linear-gradient(135deg, #FFFAF5 0%, #FDFCFB 50%, #F5F7FA 100%)'
@@ -284,11 +515,12 @@ export default function OurPropertyPage() {
 
   <div className="relative max-w-7xl mx-auto flex flex-col items-center text-center">
     
-    {/* MAIN HEADING - "Our Properties" */}
+    {/* MAIN HEADING */}
     <div className="flex items-center gap-4 mb-1">
       <div className="h-[1px] w-6 bg-[#C5A059]/40 hidden md:block"></div>
       <h1 className="text-xl md:text-4xl font-bold text-[#1A1A1A] tracking-tight">
-        Our <span className="text-[#C5A059] font-serif italic font-medium">Properties</span>
+        {heroContent.title.replace(heroContent.titleAccent || '', '').trim()}{' '}
+        <span className="text-[#C5A059] font-serif italic font-medium">{heroContent.titleAccent || ''}</span>
       </h1>
       <div className="h-[1px] w-6 bg-[#C5A059]/40 hidden md:block"></div>
     </div>
@@ -304,6 +536,8 @@ export default function OurPropertyPage() {
     <div className="mt-2 w-1 h-1 rounded-full bg-[#C5A059]/30 md:block hidden"></div>
   </div>
 </div>
+  );
+})()}
 
         <section className="pt-1 pb-4 md:pt-0 md:pb-8 bg-white md:bg-[#F3F5F9] px-3 md:px-0">
           <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-0">

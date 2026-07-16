@@ -5,6 +5,7 @@ import {
   ArrowUpRight, ArrowDownRight, Search, Download, 
   Filter, FileText, Calendar
 } from "lucide-react";
+import { apiFetch } from "../../utils/api";
 
 export default function TransactionsPage() {
   const owner = getOwnerRuntimeSession();
@@ -13,18 +14,52 @@ export default function TransactionsPage() {
     return null; 
   }
 
+  const [txns, setTxns] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
 
-  const txns = [
-    { id: "TXN-1002", desc: "Room 101 rent collection", category: "Rent", type: "income", amount: 17300, date: "18 May 2026", method: "UPI" },
-    { id: "TXN-1003", desc: "Housekeeping plumber plumbing fix", category: "Maintenance", type: "expense", amount: 2500, date: "15 May 2026", method: "Cash" },
-    { id: "TXN-1004", desc: "Mess kitchen groceries purchase", category: "Food & Kitchen", type: "expense", amount: 4500, date: "15 May 2026", method: "UPI" },
-    { id: "TXN-1005", desc: "Utility electricity surcharge Room 102", category: "Utilities", type: "income", amount: 1200, date: "14 May 2026", method: "Razorpay" }
-  ];
+  React.useEffect(() => {
+    const loadTransactions = async () => {
+      setLoading(true);
+      try {
+        const res = await apiFetch(`/api/owners/${owner.loginId}/revenue-dashboard`);
+        if (res && res.success) {
+          const paymentsList = (res.recentPayments || []).map(p => ({
+            id: p.id,
+            desc: `${p.tenant} · ${p.category} (Room ${p.room || 'TBD'})`,
+            category: p.category || 'Rent',
+            type: 'income',
+            amount: p.amount,
+            date: p.date,
+            method: 'Razorpay'
+          }));
+
+          const payoutsList = (res.recentPayouts || []).map(p => ({
+            id: p.id,
+            desc: p.title || 'Owner Payout Escalation',
+            category: 'Payout',
+            type: 'expense',
+            amount: p.amount,
+            date: p.date,
+            method: p.method || 'Bank Transfer'
+          }));
+
+          // Combine and sort by date descending
+          const combined = [...paymentsList, ...payoutsList].sort((a, b) => new Date(b.date) - new Date(a.date));
+          setTxns(combined);
+        }
+      } catch (err) {
+        console.error("Failed to load transactions:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadTransactions();
+  }, [owner.loginId]);
 
   const filteredTxns = txns.filter(t => {
-    const matchesSearch = t.desc.toLowerCase().includes(search.toLowerCase()) || t.id.includes(search);
+    const matchesSearch = String(t.desc || '').toLowerCase().includes(search.toLowerCase()) || String(t.id || '').includes(search);
     const matchesType = filterType === "all" || t.type === filterType;
     return matchesSearch && matchesType;
   });
@@ -85,24 +120,37 @@ export default function TransactionsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredTxns.map((t) => (
-                <tr key={t.id} className="hover:bg-muted/40 transition-colors">
-                  <td className="px-6 py-4 font-mono font-bold text-foreground">{t.id}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      {t.type === "income" ? (
-                        <span className="size-5 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                          <ArrowUpRight size={12} />
-                        </span>
-                      ) : (
-                        <span className="size-5 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">
-                          <ArrowDownRight size={12} />
-                        </span>
-                      )}
-                      <span className="font-semibold text-foreground">{t.desc}</span>
-                    </div>
+              {loading ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-10 text-center text-muted-foreground font-semibold">
+                    Loading transactions ledger...
                   </td>
-                  <td className="px-6 py-4 text-muted-foreground">{t.category}</td>
+                </tr>
+              ) : filteredTxns.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-10 text-center text-muted-foreground font-semibold">
+                    No transactions recorded on this account.
+                  </td>
+                </tr>
+              ) : (
+                filteredTxns.map((t) => (
+                  <tr key={t.id} className="hover:bg-muted/40 transition-colors">
+                    <td className="px-6 py-4 font-mono font-bold text-foreground">{t.id}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        {t.type === "income" ? (
+                          <span className="size-5 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                            <ArrowUpRight size={12} />
+                          </span>
+                        ) : (
+                          <span className="size-5 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">
+                            <ArrowDownRight size={12} />
+                          </span>
+                        )}
+                        <span className="font-semibold text-foreground">{t.desc}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-muted-foreground">{t.category}</td>
                   <td className="px-6 py-4 text-muted-foreground">{t.method}</td>
                   <td className="px-6 py-4 text-muted-foreground">{t.date}</td>
                   <td className={`px-6 py-4 font-bold ${
@@ -110,8 +158,9 @@ export default function TransactionsPage() {
                   }`}>
                     {t.type === "income" ? "+" : "-"}₹{t.amount.toLocaleString("en-IN")}
                   </td>
-                </tr>
-              ))}
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
