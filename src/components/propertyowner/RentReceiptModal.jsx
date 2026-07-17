@@ -25,7 +25,8 @@ export function buildReceiptHtml(r) {
   const totalDue = originalRent + penalty + electricity;
   const paidAmt = (r.paid && r.paid > 0) ? r.paid : totalDue;
   const balance = Math.max(0, totalDue - paidAmt);
-  const isPaid = balance === 0;
+  // Use actual DB invoice status when available; fall back to balance-based check
+  const isPaid = ['PAID', 'WAIVED'].includes(String(r.invoiceStatus || '').toUpperCase()) || balance === 0;
 
   return `<!DOCTYPE html>
 <html>
@@ -184,10 +185,12 @@ export function RentReceiptModal({ receipt, onClose }) {
   const originalRent = receipt.amount || 0;
   const penalty = receipt.penalty || 0;
   const electricity = receipt.electricity || 0;
-  const totalDue = receipt.totalDue || (originalRent + penalty + electricity);
+  // Always compute fresh from components — receipt.totalDue may be stale (saved before electricity was added)
+  const totalDue = (originalRent + penalty + electricity) || receipt.totalDue || 0;
   const paidAmt = receipt.paid ?? originalRent;
   const balance = Math.max(0, totalDue - paidAmt);
-  const isPaid = balance === 0;
+  // Use actual DB invoice status when available; fall back to balance-based check
+  const isPaid = ['PAID', 'WAIVED'].includes(String(receipt.invoiceStatus || '').toUpperCase()) || balance === 0;
 
   const handlePrint = () => {
     const win = window.open("", "_blank", "width=860,height=960");

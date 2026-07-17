@@ -398,7 +398,9 @@ export default function Tenantdashboard() {
   const roomRent = Number(rent?.rentAmount || tenant?.agreedRent || 0);
   const totalPenalty = Number(rent?.totalPenalty || 0);
   const electricityCost = Number(rent?.electricityBill || 0);
-  const totalPayable = Number(rent?.totalDue || (roomRent + totalPenalty + electricityCost) || roomRent || 0);
+  // Always compute fresh from components — never trust stale rent.totalDue stored in DB,
+  // because electricity gets added to the invoice after the initial totalDue is saved.
+  const totalPayable = roomRent + totalPenalty + electricityCost || Number(rent?.totalDue || 0);
   const rentAmount = totalPayable;
   const paymentStatus = String(rent?.paymentStatus || "pending").toLowerCase();
   const isPaid = paymentStatus === "paid" || paymentStatus === "completed";
@@ -1549,7 +1551,7 @@ export default function Tenantdashboard() {
       items,
       total: totalPayable,
     };
-  }, [roomRent, totalPenalty, totalPayable]);
+  }, [roomRent, totalPenalty, electricityCost, totalPayable]);
 
   const quickActions = [
     { title: "Pay Rent", subtitle: "Settle your monthly rent", color: "purple", icon: QuickActionIcons.CreditCard, onClick: () => setPayOpen(true) },

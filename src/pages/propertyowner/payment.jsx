@@ -336,6 +336,33 @@ export default function Payment() {
     return () => clearTimeout(t);
   }, [search]);
 
+  // Real-time SSE listener for instant dashboard updates
+  useEffect(() => {
+    if (!owner?.loginId) return;
+
+    // Connect to the generic owner event stream
+    const sse = new EventSource(`${import.meta.env.VITE_API_BASE_URL || ''}/api/owners/${owner.loginId}/stream`);
+
+    sse.addEventListener('CASH_REQUEST_NEW', (e) => {
+      try {
+        const data = JSON.parse(e.data || '{}');
+        setCashRequestsLoading(true);
+        // Silently re-fetch cash requests in background
+        fetchCashRequests(owner._id || owner.loginId)
+          .then(res => setCashRequests(res?.requests || res?.cashRequests || res?.items || []))
+          .catch(err => console.error("SSE fetch cash error:", err))
+          .finally(() => setCashRequestsLoading(false));
+
+        setToast({ msg: `New cash payment request from ${data.tenantName || 'a tenant'}!`, type: "success" });
+        setTimeout(() => setToast(null), 4000);
+      } catch (err) {
+        console.error("SSE parsing error:", err);
+      }
+    });
+
+    return () => sse.close();
+  }, [owner?.loginId, owner?._id]);
+
   // Pre-index current-month invoices by tenantId to eliminate O(n²) find on every render
   const invoiceMap = useMemo(() => {
     const m = new Map();
@@ -1221,10 +1248,12 @@ export default function Payment() {
                       : new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
                     period: hm.billingMonth,
                     amount: hm.rentAmount || 0,
-                    totalDue: hm.totalDue || hm.rentAmount || 0,
+                    // NOTE: do NOT pass totalDue here — RentReceiptModal computes it fresh
+                    // from (amount + penalty + electricity). Passing stale DB totalDue causes wrong totals.
                     paid: hm.totalPaid || 0,
                     penalty: hm.penalty || 0,
                     electricity: hm.electricity || 0,
+                    invoiceStatus: hm.status || '',
                     type: "Rent Only",
                   });
                 }}

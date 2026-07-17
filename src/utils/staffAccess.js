@@ -16,7 +16,7 @@
 import {
   LayoutDashboard, Users, Home, AlertCircle, ClipboardList,
   UserPlus, CalendarCheck, Zap, ShieldCheck, Building2,
-  Target, Calendar, IndianRupee, Wallet, BarChart3, FileText, UserCheck,
+  Target, Calendar, CalendarDays, IndianRupee, Wallet, BarChart3, FileText, UserCheck, Wrench,
 } from "lucide-react";
 import { PROPERTY_OWNER_NAV } from "../components/propertyowner/navConfig";
 
@@ -30,31 +30,32 @@ import { PROPERTY_OWNER_NAV } from "../components/propertyowner/navConfig";
 // ----------------------------------------------------------------------------
 export const STAFF_ACCESS_MODULES = [
   // ── Staff Panel operational modules (have working staff screens) ──
-  { key: "Dashboard",            label: "Dashboard",             path: "/staff",                icon: LayoutDashboard, group: "Staff Panel", always: true },
-  { key: "Tenants",              label: "Tenants",               path: "/staff/tenants",        icon: Users,           group: "Staff Panel" },
-  { key: "Rooms",                label: "Room Inventory",        path: "/staff/rooms",          icon: Home,            group: "Staff Panel" },
-  { key: "Complaints",           label: "Complaints",            path: "/staff/complaints",     icon: AlertCircle,     group: "Staff Panel" },
-  { key: "Tasks",                label: "Daily Tasks",           path: "/staff/tasks",          icon: ClipboardList,   group: "Staff Panel" },
-  { key: "Visitors",             label: "Visitors Log",          path: "/staff/visitors",       icon: UserPlus,        group: "Staff Panel" },
-  { key: "Visitor Passes",       label: "Visitor Pass Requests", path: "/staff/visitor-passes", icon: ShieldCheck,     group: "Staff Panel" },
-  { key: "Attendance",           label: "Attendance",            path: "/staff/attendance",     icon: CalendarCheck,   group: "Staff Panel" },
+  { key: "Dashboard", label: "Dashboard", path: "/staff", icon: LayoutDashboard, group: "Staff Panel", always: true },
+  { key: "Tenants", label: "Tenants", path: "/staff/tenants", icon: Users, group: "Staff Panel" },
+  { key: "Rooms", label: "Room Inventory", path: "/staff/rooms", icon: Home, group: "Staff Panel" },
+  { key: "Complaints", label: "Complaints", path: "/staff/complaints", icon: AlertCircle, group: "Staff Panel" },
+  { key: "Tasks", label: "Daily Tasks", path: "/staff/tasks", icon: ClipboardList, group: "Staff Panel" },
+  { key: "Visitors", label: "Visitors Log", path: "/staff/visitors", icon: UserPlus, group: "Staff Panel" },
+  { key: "Visitor Passes", label: "Visitor Pass Requests", path: "/staff/visitor-passes", icon: ShieldCheck, group: "Staff Panel" },
+  { key: "Attendance", label: "Attendance", path: "/staff/attendance", icon: CalendarCheck, group: "Staff Panel" },
   // Sub-capability of the Attendance screen: marking *tenant* attendance. Without
   // it a staff member can only mark their own attendance. No nav entry (path: null)
   // — it toggles the "Tenant Attendance" tab inside the Attendance screen.
-  { key: "Tenant Attendance",    label: "Tenant Attendance",     path: null,                    icon: UserCheck,       group: "Staff Panel" },
-  { key: "Electricity Readings", label: "Electricity",           path: "/staff/electricity",    icon: Zap,             group: "Staff Panel" },
+  { key: "Tenant Attendance", label: "Tenant Attendance", path: null, icon: UserCheck, group: "Staff Panel" },
+  { key: "Electricity Readings", label: "Electricity", path: "/staff/electricity", icon: Zap, group: "Staff Panel" },
 
   // ── Owner Panel modules (granted by the owner). When a staff member holds one
   // of these, it appears in their sidebar and opens the corresponding owner page,
   // scoped to their parent owner via the "staff proxy" session (see
   // getOwnerRuntimeSession). Access is enforced by canAccessOwnerPathAsStaff. ──
-  { key: "Properties",      label: "Properties",        path: "/propertyowner/properties",      icon: Building2,   group: "Owner Panel" },
-  { key: "Leads",           label: "Leads & Enquiries", path: "/propertyowner/enquiry",         icon: Target,      group: "Owner Panel" },
-  { key: "Bookings",        label: "Bookings",          path: "/propertyowner/booking",         icon: Calendar,    group: "Owner Panel" },
-  { key: "Rent Collection", label: "Rent Collection",   path: "/propertyowner/payment",         icon: IndianRupee, group: "Owner Panel" },
-  { key: "Payments",        label: "Payments",          path: "/propertyowner/payment-received", icon: Wallet,     group: "Owner Panel" },
-  { key: "Reports",         label: "Reports",           path: "/propertyowner/reports",         icon: BarChart3,   group: "Owner Panel" },
-  { key: "Documents",       label: "Documents",         path: "/propertyowner/documents",       icon: FileText,    group: "Owner Panel" },
+  { key: "Properties", label: "Properties", path: "/propertyowner/properties", icon: Building2, group: "Owner Panel" },
+  { key: "Leads", label: "Leads & Enquiries", path: "/propertyowner/enquiry", icon: Target, group: "Owner Panel" },
+  { key: "Bookings", label: "Bookings", path: "/propertyowner/booking", icon: Calendar, group: "Owner Panel" },
+  { key: "Rent Collection", label: "Rent Collection", path: "/propertyowner/payment", icon: IndianRupee, group: "Owner Panel" },
+  { key: "Payments", label: "Payments", path: "/propertyowner/payment-received", icon: Wallet, group: "Owner Panel" },
+  { key: "Reports", label: "Reports", path: "/propertyowner/reports", icon: BarChart3, group: "Owner Panel" },
+  { key: "Documents", label: "Documents", path: "/propertyowner/documents", icon: FileText, group: "Owner Panel" },
+  { key: "Maintenance", label: "Maintenance Requests", path: "/propertyowner/maintenance-requests", icon: Wrench, group: "Owner Panel" },
 ];
 
 // Sensible default granted to a new staff member. Per product requirement a new
@@ -101,8 +102,11 @@ export function canManageTenantAttendance(session) {
 // Default permissions for a newly created staff member of a given role.
 export function getDefaultPermissionsForRole(role) {
   const base = [...DEFAULT_STAFF_PERMISSIONS];
-  if (String(role || "").trim().toLowerCase() === "warden" && !base.includes("Tenant Attendance")) {
-    base.push("Tenant Attendance");
+  const r = String(role || "").trim().toLowerCase();
+
+  if (r === "warden") {
+    if (!base.includes("Tenant Attendance")) base.push("Tenant Attendance");
+    if (!base.includes("Maintenance")) base.push("Maintenance");
   }
   return base;
 }
@@ -171,11 +175,11 @@ export function normalizeStaffRecord(emp = {}) {
 
 export function setStaffSession(emp, token) {
   const s = JSON.stringify(normalizeStaffRecord(emp));
-  try { sessionStorage.setItem("staff_session", s); } catch (_) {}
-  try { localStorage.setItem("staff_session", s); } catch (_) {}
+  try { sessionStorage.setItem("staff_session", s); } catch (_) { }
+  try { localStorage.setItem("staff_session", s); } catch (_) { }
   if (token) {
-    try { sessionStorage.setItem("token", token); } catch (_) {}
-    try { localStorage.setItem("token", token); } catch (_) {}
+    try { sessionStorage.setItem("token", token); } catch (_) { }
+    try { localStorage.setItem("token", token); } catch (_) { }
   }
 }
 
@@ -183,14 +187,14 @@ export function getStaffSession() {
   try {
     const raw = sessionStorage.getItem("staff_session") || localStorage.getItem("staff_session");
     if (raw) return JSON.parse(raw);
-  } catch (_) {}
+  } catch (_) { }
   return null;
 }
 
 export function clearStaffSession() {
   ["staff_session", "employee_session", "token"].forEach((k) => {
-    try { sessionStorage.removeItem(k); } catch (_) {}
-    try { localStorage.removeItem(k); } catch (_) {}
+    try { sessionStorage.removeItem(k); } catch (_) { }
+    try { localStorage.removeItem(k); } catch (_) { }
   });
 }
 
@@ -214,14 +218,16 @@ export const STAFF_HOME_PATH = "/propertyowner/staff-home";
 // gets the simpler staff page — e.g. "Complaints" opens the staff complaints
 // screen, not the owner's full Complaints & Maintenance management section.
 export const STAFF_SELF_SERVICE_NAV = [
-  { key: "Dashboard",            label: "Dashboard",       href: "/propertyowner/staff-home",           icon: LayoutDashboard, always: true },
-  { key: "Attendance",           label: "Attendance",      href: "/propertyowner/my-attendance",        icon: CalendarCheck },
-  { key: "Tasks",                label: "Daily Tasks",     href: "/propertyowner/my-tasks",             icon: ClipboardList },
-  { key: "Rooms",                label: "Room Inventory",  href: "/propertyowner/staff-rooms",          icon: Home },
-  { key: "Complaints",           label: "Complaints",      href: "/propertyowner/staff-complaints",     icon: AlertCircle },
-  { key: "Visitors",             label: "Visitors Log",    href: "/propertyowner/staff-visitors",       icon: UserPlus },
-  { key: "Visitor Passes",       label: "Visitor Passes",  href: "/propertyowner/staff-visitor-passes", icon: ShieldCheck },
-  { key: "Electricity Readings", label: "Electricity",     href: "/propertyowner/staff-electricity",    icon: Zap },
+  { key: "Dashboard", label: "Dashboard", href: "/propertyowner/staff-home", icon: LayoutDashboard, always: true },
+  { key: "Attendance", label: "Attendance", href: "/propertyowner/my-attendance", icon: CalendarCheck },
+  { key: "Tasks", label: "Daily Tasks", href: "/propertyowner/my-tasks", icon: ClipboardList },
+  { key: "Rooms", label: "Room Inventory", href: "/propertyowner/staff-rooms", icon: Home },
+  { key: "Complaints", label: "Complaints", href: "/propertyowner/staff-complaints", icon: AlertCircle },
+  { key: "Visitors", label: "Visitors Log", href: "/propertyowner/staff-visitors", icon: UserPlus },
+  { key: "Visitor Passes", label: "Visitor Passes", href: "/propertyowner/staff-visitor-passes", icon: ShieldCheck },
+  { key: "Electricity Readings", label: "Electricity", href: "/propertyowner/staff-electricity", icon: Zap },
+  { key: "Maintenance", label: "Maintenance", href: "/propertyowner/maintenance-requests", icon: Wrench },
+  { key: "Maintenance Calendar", label: "Maintenance Calendar", href: "/propertyowner/maintenance-calendar", icon: CalendarDays, always: true },
 ];
 
 // Which OWNER-PANEL permission(s) unlock each owner-panel section (keyed by its
@@ -273,15 +279,15 @@ const OWNER_ONLY_NOTIFICATION_RE =
 // Keyword → staff permission(s) that make a notification relevant to that staff.
 const NOTIFICATION_PERMISSION_HINTS = [
   { re: /complaint|maintenance|ticket|repair|issue/i, perms: ["Complaints"] },
-  { re: /task|duty|assignment|chore/i,                perms: ["Tasks"] },
+  { re: /task|duty|assignment|chore/i, perms: ["Tasks"] },
   { re: /attendance|check.?in|check.?out|leave|shift/i, perms: ["Attendance"] },
-  { re: /visitor|guest|gate/i,                        perms: ["Visitors", "Visitor Passes"] },
-  { re: /\bpass\b/i,                                   perms: ["Visitor Passes"] },
-  { re: /electric|meter|reading|units/i,              perms: ["Electricity Readings"] },
-  { re: /tenant|move.?in|move.?out|resident|kyc/i,    perms: ["Tenants"] },
-  { re: /lead|enquiry|inquiry/i,                       perms: ["Leads"] },
-  { re: /booking/i,                                    perms: ["Bookings", "Leads"] },
-  { re: /room|bed|occupanc/i,                          perms: ["Rooms", "Properties"] },
+  { re: /visitor|guest|gate/i, perms: ["Visitors", "Visitor Passes"] },
+  { re: /\bpass\b/i, perms: ["Visitor Passes"] },
+  { re: /electric|meter|reading|units/i, perms: ["Electricity Readings"] },
+  { re: /tenant|move.?in|move.?out|resident|kyc/i, perms: ["Tenants"] },
+  { re: /lead|enquiry|inquiry/i, perms: ["Leads"] },
+  { re: /booking/i, perms: ["Bookings", "Leads"] },
+  { re: /room|bed|occupanc/i, perms: ["Rooms", "Properties"] },
 ];
 
 export function filterNotificationsForStaff(session, notifications) {

@@ -20,10 +20,10 @@ export default function ReceiptsPage() {
   }
 
   const [payments, setPayments] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [search, setSearch]     = useState("");
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [viewing, setViewing]   = useState(null);
+  const [viewing, setViewing] = useState(null);
 
   useEffect(() => {
     fetchPayments(owner.loginId, 300)
@@ -38,17 +38,21 @@ export default function ReceiptsPage() {
   }, [search]);
 
   const receipts = useMemo(() => payments.map(p => ({
-    id:     p.invoiceNumber || p.transactionId || String(p._id).slice(-8).toUpperCase(),
+    id: p.invoiceNumber || p.transactionId || String(p._id).slice(-8).toUpperCase(),
     tenant: p.tenantName,
-    room:   p.roomNo,
-    phone:  p.tenantPhone,
-    email:  p.tenantEmail,
-    date:   new Date(p.paymentDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+    room: p.roomNo,
+    phone: p.tenantPhone,
+    email: p.tenantEmail,
+    date: new Date(p.paymentDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
     period: billingLabel(p.billingMonth),
     amount: p.rentAmount || p.amount,
-    paid:   p.amount,
-    type:   p.electricityBill > 0 ? "Rent & Utility" : p.totalPenalty > 0 ? "Rent + Penalty" : "Rent Only",
-    _raw:   p,
+    penalty: p.totalPenalty || 0,
+    electricity: p.electricityBill || 0,
+    totalDue: (p.rentAmount || 0) + (p.totalPenalty || 0) + (p.electricityBill || 0),
+    paid: p.amount,
+    invoiceStatus: p.invoiceStatus || '',   // PAID / PARTIAL / PENDING — from DB
+    type: p.electricityBill > 0 ? "Rent & Utility" : p.totalPenalty > 0 ? "Rent + Penalty" : "Rent Only",
+    _raw: p,
   })), [payments]);
 
   const filtered = useMemo(() => {

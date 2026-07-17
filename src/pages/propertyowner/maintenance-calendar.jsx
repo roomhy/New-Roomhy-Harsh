@@ -11,10 +11,10 @@ import {
 const FREQUENCIES = ["One-time", "Daily", "Weekly", "Monthly", "Quarterly", "Bi-Annually", "Yearly"];
 
 const STATUS_COLORS = {
-  Scheduled:   "bg-blue-50 text-blue-600 border-blue-100",
+  Scheduled: "bg-blue-50 text-blue-600 border-blue-100",
   "In Progress": "bg-amber-50 text-amber-600 border-amber-100",
-  Completed:   "bg-emerald-50 text-emerald-600 border-emerald-100",
-  Cancelled:   "bg-slate-100 text-slate-500 border-slate-200",
+  Completed: "bg-emerald-50 text-emerald-600 border-emerald-100",
+  Cancelled: "bg-slate-100 text-slate-500 border-slate-200",
 };
 
 export default function MaintenanceCalendarPage() {
@@ -34,6 +34,19 @@ export default function MaintenanceCalendarPage() {
   const [form, setForm] = useState({ title: "", scheduledDate: "", frequency: "One-time", staff: "" });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(null);
+
+  const isStaffProxy = !!owner?.isStaffProxy;
+  const staffRole = String(owner?.role || "").toLowerCase();
+  const isWarden = isStaffProxy && staffRole === "warden";
+  const isOwner = !isStaffProxy;
+
+  const canCreate = isOwner || isWarden;
+
+  const canModify = (item) => {
+    if (isOwner) return true;
+    if (isWarden && item.createdByRole?.toLowerCase() === 'warden' && item.createdById === owner.staffLoginId) return true;
+    return false;
+  };
 
   const fetchTasks = async () => {
     const CACHE_KEY = `maintenance:${owner.loginId}`;
@@ -115,6 +128,8 @@ export default function MaintenanceCalendarPage() {
           scheduledDate: form.scheduledDate,
           frequency: form.frequency,
           staff: form.staff.trim() || "TBD",
+          createdByRole: isStaffProxy ? staffRole : "owner",
+          createdById: isStaffProxy ? owner.staffLoginId : owner.loginId
         }),
       });
       toast.success("Task added!");
@@ -152,9 +167,11 @@ export default function MaintenanceCalendarPage() {
           <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Maintenance Calendar</h1>
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">Plan and track repairs, safety tests, and housekeeping routines.</p>
         </div>
-        <button onClick={openAdd} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-foreground text-background text-[13px] font-medium hover:opacity-90 transition-opacity self-start md:mt-2">
-          <Plus className="size-4" /> Add Task
-        </button>
+        {canCreate && (
+          <button onClick={openAdd} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-foreground text-background text-[13px] font-medium hover:opacity-90 transition-opacity self-start md:mt-2">
+            <Plus className="size-4" /> Add Task
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -170,7 +187,7 @@ export default function MaintenanceCalendarPage() {
           </div>
 
           <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-bold text-muted-foreground uppercase border-b border-border/60 pb-3 mb-3">
-            {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => <span key={d}>{d}</span>)}
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => <span key={d}>{d}</span>)}
           </div>
 
           <div className="grid grid-cols-7 gap-1.5">
@@ -190,9 +207,9 @@ export default function MaintenanceCalendarPage() {
                   onClick={() => setSelectedDay(isSelected ? null : day)}
                   className={`h-14 rounded-xl border flex flex-col items-center justify-start pt-1.5 gap-1 transition-all text-left
                     ${isSelected ? "border-blue-400 bg-blue-50 ring-1 ring-blue-300"
-                    : isToday ? "border-blue-200 bg-blue-50/30"
-                    : dayTasks.length > 0 ? "border-amber-200 bg-amber-50/20 hover:bg-amber-50/40"
-                    : "border-border/40 hover:bg-muted/20"}`}
+                      : isToday ? "border-blue-200 bg-blue-50/30"
+                        : dayTasks.length > 0 ? "border-amber-200 bg-amber-50/20 hover:bg-amber-50/40"
+                          : "border-border/40 hover:bg-muted/20"}`}
                 >
                   <span className={`text-[11px] font-bold ${isSelected || isToday ? "text-blue-600" : dayTasks.length > 0 ? "text-amber-700" : "text-slate-500"}`}>
                     {day}
@@ -232,7 +249,9 @@ export default function MaintenanceCalendarPage() {
                 <p className="text-sm text-muted-foreground">
                   {selectedDay ? "No tasks on this day." : "No upcoming tasks."}
                 </p>
-                <button onClick={openAdd} className="mt-3 text-xs font-bold text-blue-600 hover:text-blue-800">+ Add one</button>
+                {canCreate && (
+                  <button onClick={openAdd} className="mt-3 text-xs font-bold text-blue-600 hover:text-blue-800">+ Add one</button>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -244,13 +263,15 @@ export default function MaintenanceCalendarPage() {
                         <span className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${STATUS_COLORS[item.status] || STATUS_COLORS.Scheduled}`}>
                           {item.status}
                         </span>
-                        <button
-                          onClick={() => handleDelete(item._id)}
-                          disabled={deleting === item._id}
-                          className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
-                        >
-                          {deleting === item._id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                        </button>
+                        {canModify(item) && (
+                          <button
+                            onClick={() => handleDelete(item._id)}
+                            disabled={deleting === item._id}
+                            className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
+                          >
+                            {deleting === item._id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div className="space-y-1 text-[11px] text-muted-foreground">
@@ -260,6 +281,9 @@ export default function MaintenanceCalendarPage() {
                         {item.frequency && item.frequency !== "One-time" && <span className="ml-1 text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{item.frequency}</span>}
                       </p>
                       <p className="flex items-center gap-1.5"><User size={11} /> {item.assignedStaffName || item.staff || "Unassigned"}</p>
+                      <div className="mt-1.5 inline-flex items-center px-1.5 py-0.5 rounded bg-slate-200/50 text-slate-600 text-[9px] font-bold capitalize">
+                        Created by {(!item.createdByRole || item.createdByRole.toLowerCase() === 'owner') ? "Owner" : item.createdByRole}
+                      </div>
                     </div>
                   </div>
                 ))}

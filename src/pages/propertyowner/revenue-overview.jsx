@@ -15,7 +15,30 @@ export default function RevenueOverviewPage() {
     return null;
   }
 
-  const [dateRange, setDateRange] = useState("This Month");
+  // Helper: compute YYYY-MM for offset from current month (0 = this month, -1 = last month…)
+  const computeMonth = (offset = 0) => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + offset);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+
+  const buildOptions = () => {
+    const opts = [];
+    for (let i = 0; i >= -5; i--) {
+      const d = new Date();
+      d.setDate(1);
+      d.setMonth(d.getMonth() + i);
+      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+      opts.push({ value, label });
+    }
+    return opts;
+  };
+
+  const monthOptions = buildOptions();
+
+  const [selectedMonth, setSelectedMonth] = useState(computeMonth(0));
   const [activeTab, setActiveTab] = useState("tenants");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -38,7 +61,7 @@ export default function RevenueOverviewPage() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const res = await fetchJson(`/api/owners/${owner.loginId}/revenue-dashboard`);
+        const res = await fetchJson(`/api/owners/${owner.loginId}/revenue-dashboard?month=${selectedMonth}`);
         if (res.success || res.summaryMetrics) {
           setDashboardData({
             summaryMetrics: res.summaryMetrics || { tenantCollected: 0, ownerPayouts: 0, pendingPayouts: 0, tenantDues: 0 },
@@ -58,7 +81,7 @@ export default function RevenueOverviewPage() {
     };
 
     loadData();
-  }, [owner?.loginId]);
+  }, [owner?.loginId, selectedMonth]);
 
   const { summaryMetrics, recentPayments, recentPayouts, revenueChartData, collectionBreakdown } = dashboardData;
 
@@ -120,13 +143,13 @@ export default function RevenueOverviewPage() {
         </div>
         <div className="flex items-center gap-2 md:mt-2">
           <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
             className="h-10 px-3 border border-border bg-card rounded-xl text-xs font-semibold focus:outline-none"
           >
-            <option value="This Month">This Month</option>
-            <option value="Last Month">Last Month</option>
-            <option value="Last 3 Months">Last 3 Months</option>
+            {monthOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
           <button onClick={() => alert(`Downloading Statement for ${dateRange}...`)} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-foreground text-background text-[13px] font-medium hover:opacity-90 transition-opacity">
             <Download className="size-4" /> Download Statement

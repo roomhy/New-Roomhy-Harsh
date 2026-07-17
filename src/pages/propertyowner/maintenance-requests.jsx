@@ -4,16 +4,16 @@ import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLay
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
 import { apiFetch } from "../../utils/api";
 import { cacheGet, cacheSet, cacheInvalidate } from "../../utils/cache";
-import { 
-  Wrench, Search, Plus, Trash2, Edit3, 
+import {
+  Wrench, Search, Plus, Trash2, Edit3,
   CheckCircle2, AlertCircle, Calendar, Loader2
 } from "lucide-react";
 
 export default function MaintenanceRequestsPage() {
   const owner = getOwnerRuntimeSession();
-  if (!owner?.loginId && typeof window !== "undefined") { 
-    window.location.href = "/propertyowner/ownerlogin"; 
-    return null; 
+  if (!owner?.loginId && typeof window !== "undefined") {
+    window.location.href = "/propertyowner/ownerlogin";
+    return null;
   }
 
   const [search, setSearch] = useState("");
@@ -21,7 +21,7 @@ export default function MaintenanceRequestsPage() {
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
+
   // Form State
   const [title, setTitle] = useState("");
   const [frequency, setFrequency] = useState("Bi-Annually");
@@ -116,9 +116,9 @@ export default function MaintenanceRequestsPage() {
         body: JSON.stringify({ assignedStaffId: staffId, assignedStaffName: staffObj ? staffObj.name : null })
       });
       if (data && data.success) {
-        setTasks(prev => prev.map(t => t._id === id ? { 
-          ...t, 
-          assignedStaffId: staffId, 
+        setTasks(prev => prev.map(t => t._id === id ? {
+          ...t,
+          assignedStaffId: staffId,
           assignedStaffName: staffObj ? staffObj.name : null,
           staff: staffObj ? staffObj.name : t.staff
         } : t));
@@ -142,7 +142,9 @@ export default function MaintenanceRequestsPage() {
   };
 
   const staffOptions = useMemo(
-    () => staffList.map(s => <option key={s._id} value={s._id}>{s.name} ({s.role})</option>),
+    () => staffList
+      .filter(s => (s.role || "").toLowerCase() !== "warden")
+      .map(s => <option key={s._id} value={s._id}>{s.name} ({s.role})</option>),
     [staffList]
   );
 
@@ -153,9 +155,9 @@ export default function MaintenanceRequestsPage() {
   ), [tasks, search]);
 
   return (
-    <PropertyOwnerLayout 
-      owner={owner} 
-      title="Asset Maintenance" 
+    <PropertyOwnerLayout
+      owner={owner}
+      title="Asset Maintenance"
       onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
     >
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
@@ -163,11 +165,11 @@ export default function MaintenanceRequestsPage() {
           <h1 className="font-serif text-[38px] md:text-[44px] leading-[1.05] text-foreground">Maintenance Tasks</h1>
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">Manage periodic property operations, water tank cleaning schedules, and elevator lift services.</p>
         </div>
-        <button 
+        <button
           onClick={() => setIsModalOpen(true)}
           className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg bg-foreground text-background text-[13px] font-medium hover:opacity-90 md:mt-2"
         >
-          <Plus className="size-4"/> Schedule Maintenance
+          <Plus className="size-4" /> Schedule Maintenance
         </button>
       </div>
 
@@ -201,32 +203,50 @@ export default function MaintenanceRequestsPage() {
               <button onClick={() => deleteTask(t._id)} className="absolute top-4 right-4 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Trash2 size={16} />
               </button>
-              
+
               <div className="space-y-4">
                 <div className="flex justify-between items-start pr-6">
                   <div className="size-10 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
                     <Wrench size={20} />
                   </div>
-                  <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full border ${t.status === "Completed" ? "bg-green-100 text-green-700 border-green-200" : "bg-blue-50 text-blue-600 border-blue-100"}`}>
-                    {t.status === "Completed" ? "Completed" : t.frequency}
-                  </span>
+                  <div className="flex gap-2">
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full border bg-slate-50 text-slate-600 border-slate-200">
+                      {t.frequency}
+                    </span>
+                    <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full border ${t.status === "Completed" ? "bg-green-100 text-green-700 border-green-200" :
+                        t.status === "In Progress" ? "bg-blue-100 text-blue-700 border-blue-200" :
+                          "bg-amber-50 text-amber-600 border-amber-200"
+                      }`}>
+                      {t.status === "Completed" ? "Completed" : t.status === "In Progress" ? "In Progress" : "Pending"}
+                    </span>
+                  </div>
                 </div>
 
                 <div>
                   <h3 className={`font-serif text-[21px] font-bold ${t.status === "Completed" ? "text-slate-500 line-through" : "text-foreground"}`}>{t.title}</h3>
                   <div className="text-[12.5px] text-muted-foreground mt-2">
                     <span className="block mb-1">Assigned To:</span>
-                    {t.status !== "Completed" ? (
-                      <select 
-                        value={t.assignedStaffId || ""} 
+                    {t.status === "Completed" ? (
+                      <strong className="text-foreground">{t.assignedStaffName || t.staff || "Unassigned"}</strong>
+                    ) : t.assignedStaffId ? (
+                      <div className="flex items-center justify-between bg-muted/30 border border-border/50 rounded px-2 py-1">
+                        <strong className="text-foreground">{t.assignedStaffName || t.staff}</strong>
+                        <button
+                          onClick={() => assignStaff(t._id, "")}
+                          className="text-[10px] text-blue-600 hover:text-blue-800 font-bold transition-colors"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    ) : (
+                      <select
+                        value={t.assignedStaffId || ""}
                         onChange={(e) => assignStaff(t._id, e.target.value)}
                         className="bg-muted border border-border text-[11px] rounded px-2 py-1 outline-none w-full"
                       >
                         <option value="">-- Assign Staff --</option>
                         {staffOptions}
                       </select>
-                    ) : (
-                      <strong className="text-foreground">{t.assignedStaffName || t.staff || "Unassigned"}</strong>
                     )}
                   </div>
                 </div>
@@ -239,7 +259,7 @@ export default function MaintenanceRequestsPage() {
 
               {t.status !== "Completed" && (
                 <div className="border-t border-border/60 mt-6 pt-4 flex gap-2">
-                  <button 
+                  <button
                     onClick={() => markCompleted(t._id)}
                     className="flex-1 h-10 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
                   >
