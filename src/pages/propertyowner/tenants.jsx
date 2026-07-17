@@ -123,12 +123,12 @@ export default function Tenants() {
       paymentFrequency: t.paymentFrequency || "Monthly",
       floor: t.floor || "",
       building: t.building || "",
-      emergencyName: t.additional?.emergencyName || t.emergencyName || "",
-      emergencyPhone: t.additional?.emergencyPhone || t.emergencyPhone || "",
-      relationship: t.additional?.relationship || t.relationship || "",
-      occupation: t.additional?.occupation || t.occupation || "",
-      permanentAddress: t.additional?.permanentAddress || t.permanentAddress || "",
-      remarks: t.additional?.remarks || t.remarks || "",
+      emergencyName: t.emergencyContact?.name || t.additional?.emergencyName || t.emergencyName || "",
+      emergencyPhone: t.emergencyContact?.phone || t.additional?.emergencyPhone || t.emergencyPhone || "",
+      relationship: t.emergencyContact?.relationship || t.additional?.relationship || t.relationship || "",
+      occupation: t.occupation || t.additional?.occupation || "",
+      permanentAddress: t.permanentAddress || t.additional?.permanentAddress || "",
+      remarks: t.remarks || t.additional?.remarks || "",
     });
     setEditModalOpen(true);
   };
@@ -163,7 +163,8 @@ export default function Tenants() {
           remarks: editForm.remarks,
         }
       });
-      setTenants(prev => prev.map(t => (t._id === editingTenant._id || t.id === editingTenant.id) ? { ...t, ...updated } : t));
+      const returnedTenant = updated?.tenant || updated;
+      setTenants(prev => prev.map(t => (t._id === editingTenant._id || t.id === editingTenant.id) ? { ...t, ...returnedTenant } : t));
       setEditModalOpen(false);
       setEditingTenant(null);
       if (owner?.loginId) clearOwnerFetchCache(owner.loginId);
