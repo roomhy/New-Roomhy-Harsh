@@ -478,6 +478,11 @@ export default function TenantRec() {
           const res = await fetchJson(`/api/tenants/${editId}`);
           const t = res?.tenant || res?.data || res;
           if (t) {
+            // ── KYC / ID Proof ──
+            const kycIdProofType = t.kyc?.idProof || t.idProof?.type || t.idProofType || "Aadhaar Card";
+            const kycIdProofNumber = t.kyc?.aadhaarNumber || t.idProof?.number || t.idProofNumber || "";
+            const kycIdProofFile = t.kyc?.idProofFile || t.kyc?.aadhaarFront || t.idProof?.file || t.idProofFile || null;
+
             setBasicDetails(prev => ({
               ...prev,
               fullName: t.name || t.fullName || "",
@@ -485,9 +490,9 @@ export default function TenantRec() {
               phone: t.phone || t.mobile || "",
               dob: t.dob ? new Date(t.dob).toISOString().split('T')[0] : "",
               gender: t.gender || "",
-              idProofType: t.idProof?.type || t.idProofType || "Aadhaar Card",
-              idProofNumber: t.idProof?.number || t.idProofNumber || "",
-              idProofFile: t.idProof?.file || t.idProofFile || null,
+              idProofType: kycIdProofType,
+              idProofNumber: kycIdProofNumber,
+              idProofFile: kycIdProofFile,
             }));
             setRoomAssignment(prev => ({
               ...prev,
@@ -495,37 +500,42 @@ export default function TenantRec() {
               building: t.building || "",
               floor: t.floor || "",
               roomUnit: t.roomNo || t.room?.title || "",
-              roomType: t.accommodationType || t.roomType || "",
-              bed: t.bedNo || "",
+              roomType: t.accommodationType || t.room?.type || t.roomType || "",
+              bed: t.bedNo ? String(t.bedNo) : "",
               rentAgreementType: t.rentAgreementType || "Standard",
               propertyAddress: t.propertyAddress || "",
             }));
+
+            // ── Billing fields: try direct fields first, then digitalCheckin.agreementDetails ──
+            const agd = t.digitalCheckin?.agreementDetails || {};
             setTenancyDetails(prev => ({
               ...prev,
-              baseRoomRent: String(t.baseRoomRent || t.agreedRent || t.rent || ""),
-              rentAmount: String(t.agreedRent || t.rent || ""),
-              depositAmount: String(t.securityDepositTotal || t.depositAmount || ""),
+              baseRoomRent: String(t.baseRoomRent || ""),
+              rentAmount: String(t.agreedRent || t.digitalCheckin?.profile?.agreedRent || ""),
+              depositAmount: String(t.securityDepositTotal ?? agd.securityDeposit ?? ""),
               moveInDate: t.moveInDate ? new Date(t.moveInDate).toISOString().split('T')[0] : "",
-              minStay: String(t.minStay || "11"),
-              noticePeriod: String(t.noticePeriod || "30"),
-              rentDueDate: String(t.rentDueDate || "5"),
+              minStay: String(t.minStay || agd.minimumStayDuration || "11"),
+              noticePeriod: String(t.noticePeriod || agd.noticePeriodDays || "30"),
+              rentDueDate: String(t.rentDueDate || agd.licenseFeeDueDate || "5"),
               paymentFrequency: t.paymentFrequency || "Monthly",
               lateFee: String(t.lateFee || ""),
-              licenseDuration: String(t.licenseDuration || ""),
-              moveOutCharges: String(t.moveOutCharges || "0"),
-              noticePeriodCharges: String(t.noticePeriodCharges || "0"),
-              inclusions: t.inclusions || "",
-              gstCharges: String(t.gstCharges || "0"),
+              licenseDuration: String(t.licenseDuration || agd.licenseDuration || ""),
+              moveOutCharges: String(t.moveOutCharges ?? agd.moveOutCharges ?? "0"),
+              noticePeriodCharges: String(t.noticePeriodCharges ?? agd.noticePeriodCharges ?? "0"),
+              inclusions: t.inclusions || agd.inclusions || "",
+              gstCharges: String(t.gstCharges ?? agd.gstCharges ?? "0"),
             }));
+
+            // ── Emergency Contact: DB stores as emergencyContact.{name,phone,relationship} ──
             setAdditionalDetails(prev => ({
               ...prev,
-              occupation: t.additional?.occupation || t.occupation || "",
-              company: t.additional?.company || t.company || "",
-              emergencyName: t.additional?.emergencyName || t.emergencyName || "",
-              emergencyPhone: t.additional?.emergencyPhone || t.emergencyPhone || "",
-              relationship: t.additional?.relationship || t.relationship || "",
-              permanentAddress: t.additional?.permanentAddress || t.permanentAddress || "",
-              remarks: t.additional?.remarks || t.remarks || "",
+              occupation: t.occupation || t.additional?.occupation || "",
+              company: t.company || t.additional?.company || "",
+              emergencyName:  t.emergencyContact?.name  || t.additional?.emergencyName  || t.emergencyName  || "",
+              emergencyPhone: t.emergencyContact?.phone || t.additional?.emergencyPhone || t.emergencyPhone || "",
+              relationship:   t.emergencyContact?.relationship || t.additional?.relationship || t.relationship || "",
+              permanentAddress: t.permanentAddress || t.additional?.permanentAddress || "",
+              remarks: t.remarks || t.additional?.remarks || "",
             }));
           }
         } catch (err) {
