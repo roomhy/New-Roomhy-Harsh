@@ -804,12 +804,19 @@ export default function Rooms() {
                     <option value="Triple Sharing">Triple Sharing</option>
                     <option value="Four Sharing">Four Sharing</option>
                     <option value="Private Room (No Sharing)">Private Room (No Sharing)</option>
+                    <option value="Custom">Custom Sharing</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-[13px] text-muted-foreground mb-1.5">Amount Per Bed</label>
                   <input type="number" className="w-full bg-card border border-border rounded-lg px-3 py-2 text-[14px] text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" placeholder="0" value={roomForm.roomRent} onChange={e => setRoomForm(p => ({ ...p, roomRent: e.target.value }))} />
                 </div>
+                {roomForm.sharingType === 'Custom' && (
+                  <div className="col-span-2">
+                    <label className="block text-[13px] text-muted-foreground mb-1.5">Custom Number of Beds</label>
+                    <input type="number" min="1" max="100" className="w-full bg-card border border-border rounded-lg px-3 py-2 text-[14px] text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" placeholder="Enter number of beds (e.g. 6)" value={roomForm.roomBeds} onChange={e => setRoomForm(p => ({ ...p, roomBeds: Math.max(1, Number(e.target.value) || 1) }))} />
+                  </div>
+                )}
               </div>
 
               <div>
