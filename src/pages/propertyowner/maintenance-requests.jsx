@@ -120,7 +120,7 @@ export default function MaintenanceRequestsPage() {
           ...t,
           assignedStaffId: staffId,
           assignedStaffName: staffObj ? staffObj.name : null,
-          staff: staffObj ? staffObj.name : t.staff
+          staff: staffObj ? staffObj.name : null
         } : t));
       }
     } catch (err) {
@@ -214,8 +214,8 @@ export default function MaintenanceRequestsPage() {
                       {t.frequency}
                     </span>
                     <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full border ${t.status === "Completed" ? "bg-green-100 text-green-700 border-green-200" :
-                        t.status === "In Progress" ? "bg-blue-100 text-blue-700 border-blue-200" :
-                          "bg-amber-50 text-amber-600 border-amber-200"
+                      t.status === "In Progress" ? "bg-blue-100 text-blue-700 border-blue-200" :
+                        "bg-amber-50 text-amber-600 border-amber-200"
                       }`}>
                       {t.status === "Completed" ? "Completed" : t.status === "In Progress" ? "In Progress" : "Pending"}
                     </span>
