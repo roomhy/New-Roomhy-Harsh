@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { toast } from "react-hot-toast";
+import AddPropertyWizard from "./AddPropertyWizard";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 const getApiUrl = () =>
@@ -33,6 +34,9 @@ export default function SuperadminPropertyApprovals() {
   const [fCity, setFCity] = useState("all");
   const [fGender, setFGender] = useState("all");
   const [filterType, setFilterType] = useState("all");
+  const [approvedPopup, setApprovedPopup] = useState(null); // { title, id }
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editPropertyId, setEditPropertyId] = useState(null);
 
   const fetchProperties = async () => {
     try {
@@ -66,12 +70,25 @@ export default function SuperadminPropertyApprovals() {
 
   const handleApprove = async (id) => {
     try {
+      // Try publish endpoint first, then fallback to PUT
       const res = await fetch(`${getApiUrl()}/api/properties/${id}/publish`, { method: "POST", headers: { "Content-Type": "application/json" } });
       const data = await res.json();
       if (data.success || res.ok) {
+        // Also try to update status to approved
+        try {
+          await fetch(`${getApiUrl()}/api/properties/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "approved", isPublished: true })
+          });
+        } catch (_) {}
         setProperties(prev => prev.map(p => p.id === id ? { ...p, status: "Approved" } : p));
         if (selected?.id === id) setSelected(prev => ({ ...prev, status: "Approved" }));
+        const approvedProp = properties.find(p => p.id === id);
+        setApprovedPopup({ title: approvedProp?.title || "Property", id });
         toast.success("Property approved successfully");
+      } else {
+        toast.error(data.message || "Approval failed");
       }
     } catch (e) {
       console.error(e);
@@ -686,6 +703,68 @@ export default function SuperadminPropertyApprovals() {
                   <button onClick={() => { handleApprove(selected.id); setSelected(null); }} className="px-4 py-2 rounded-xl text-[10px] font-black text-white bg-emerald-600 hover:bg-emerald-700 transition-all flex items-center gap-1.5"><Check className="w-3.5 h-3.5" /> Approve</button>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Property Approved Success Popup */}
+      {approvedPopup && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-emerald-100 overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-8 flex flex-col items-center text-center">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mb-4 shadow-lg shadow-emerald-100">
+                <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+              </div>
+              <h3 className="text-lg font-black text-slate-800 mb-1">Property Approved!</h3>
+              <p className="text-xs font-bold text-slate-500 mb-1">
+                <span className="text-emerald-700 font-black">{approvedPopup.title}</span>
+              </p>
+              <p className="text-[10px] text-slate-400 font-semibold">
+                Property is now live. You can now edit rooms & add photos.
+              </p>
+            </div>
+            <div className="p-5 space-y-3">
+              <button
+                onClick={() => {
+                  setEditPropertyId(approvedPopup.id);
+                  setEditModalOpen(true);
+                  setApprovedPopup(null);
+                }}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-600/20"
+              >
+                <ClipboardList className="w-4 h-4" /> Edit Property & Add Photos
+              </button>
+              <button
+                onClick={() => setApprovedPopup(null)}
+                className="w-full py-3 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ✅ Direct Property Editing Modal */}
+      {editModalOpen && editPropertyId && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] overflow-y-auto p-4 flex items-center justify-center animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-[1300px] h-[90vh] shadow-2xl overflow-hidden flex flex-col relative animate-in zoom-in-95 duration-200">
+            <button 
+              onClick={() => { setEditModalOpen(false); setEditPropertyId(null); }} 
+              className="absolute top-6 right-8 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-2.5 rounded-2xl transition-colors z-[180]"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex-1 overflow-y-auto">
+              <AddPropertyWizard 
+                propEditId={editPropertyId} 
+                isModal={true} 
+                onClose={() => {
+                  setEditModalOpen(false);
+                  setEditPropertyId(null);
+                  fetchProperties();
+                }} 
+              />
             </div>
           </div>
         </div>

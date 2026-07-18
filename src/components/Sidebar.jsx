@@ -26,7 +26,7 @@ const NAV = [
       { label: "Overview", path: "/superadmin/home-overview" },
       { label: "Total Properties", path: "/superadmin/total-properties" },
       { label: "Total Tenants", path: "/superadmin/tenant" },
-      { label: "Revenue Overview", path: "/superadmin/accounting" },
+      { label: "Revenue Overview", path: "/superadmin/home/revenue-overview" },
       { label: "Alerts (Pending Rent)", path: "/superadmin/rentcollection" },
     ]
   },
@@ -92,7 +92,6 @@ const NAV = [
         { label: "Pending Properties", path: "/superadmin/property/pending" },
         { label: "Rooms Management", path: "/superadmin/rooms" },
         { label: "Online Leads", path: "/superadmin/enquiry" },
-        { label: "Web Enquiries", path: "/superadmin/websiteenq" },
         { label: "Property Categories", path: "/superadmin/property/categories" },
     ]
   },
@@ -102,55 +101,32 @@ const NAV = [
     path: "/superadmin/accounting", 
     children: [
         { label: "Overview", path: "/superadmin/accounting" },
+        { label: "Revenue Overview", path: "/superadmin/home/revenue-overview" },
         { 
-          label: "Transaction Management (Tenants)", 
+          label: "Tenant Accounts", 
           children: [
-            { label: "Monthly Payment Receipt", path: "/superadmin/accounting/invoices" },
             { label: "Payment History", path: "/superadmin/accounting/transactions" },
             { label: "Other Charges", path: "/superadmin/accounting/other-charges" },
             { label: "Payment Tracking", path: "/superadmin/accounting/tracking" },
           ]
         },
         { 
-          label: "Transaction Management (Owners)", 
+          label: "Owner Accounts", 
           children: [
-            { label: "Monthly Payment Receipt", path: "/superadmin/accounting/invoices" },
             { label: "Payment History", path: "/superadmin/accounting/transactions" },
-            { label: "Service Fees Details", path: "/superadmin/accounting/commission" },
           ]
         },
         { 
           label: "Owner Payout", 
           children: [
-            { label: "Payout Cycle", path: "/superadmin/accounting/payouts" },
-            { label: "Manual + Auto Payout Option", path: "/superadmin/accounting/payouts" },
-            { label: "Pending Payouts", path: "/superadmin/accounting/payouts" },
-            { label: "Bank Transfer Tracking", path: "/superadmin/accounting/payouts" },
-            { label: "Cash Received Details", path: "/superadmin/accounting/payouts" },
-            { label: "Failed Payout Alerts", path: "/superadmin/accounting/payouts" },
+            { label: "Owner Payouts", path: "/superadmin/accounting/payouts" },
+            { label: "Pending Payouts", path: "/superadmin/accounting/payouts/pending" },
+            { label: "Cash Received Details", path: "/superadmin/accounting/payouts/cash-received" },
+            { label: "Failed Payout Alerts", path: "/superadmin/accounting/payouts/failed" },
           ]
         },
         { 
-          label: "Roomhy Overview", 
-          children: [
-            { label: "Fixed Fees", path: "/superadmin/accounting/commission" },
-            { label: "Per Bed Fees", path: "/superadmin/accounting/commission" },
-            { label: "Commission Management", path: "/superadmin/accounting/commission" },
-            { label: "Discount Management", path: "/superadmin/accounting/commission" },
-            { label: "Revenue Tracking", path: "/superadmin/accounting/transactions" },
-          ]
-        },
-        { 
-          label: "Invoice System", 
-          children: [
-            { label: "Auto Invoice Generation", path: "/superadmin/accounting/invoices" },
-            { label: "GST", path: "/superadmin/accounting/taxes" },
-            { label: "Download PDF", path: "/superadmin/accounting/invoices" },
-            { label: "Invoice Numbering System", path: "/superadmin/accounting/invoices" },
-          ]
-        },
-        { 
-          label: "Refund Management", 
+          label: "Refunds", 
           children: [
             { label: "Booking Amount Refund", path: "/superadmin/refund" },
             { label: "Partial Refund", path: "/superadmin/refund" },
@@ -159,22 +135,22 @@ const NAV = [
           ]
         },
         { 
-          label: "Alert & Automation", 
+          label: "Alerts", 
           children: [
-            { label: "Rent Due Reminder", path: "/superadmin/accounting/settings" },
-            { label: "Payment Success/Failure Alerts", path: "/superadmin/accounting/settings" },
-            { label: "Payout Processed Notification", path: "/superadmin/accounting/settings" },
+            { label: "Rent Due Reminder", path: "/superadmin/accounting/alerts/rent-due-reminders" },
+            { label: "Payment Success/Failure Alerts", path: "/superadmin/accounting/alerts/payments" },
+            { label: "Payout Processed Notification", path: "/superadmin/accounting/alerts/payouts" },
           ]
         },
         { 
           label: "Analytics", 
           children: [
-            { label: "Roomhy Monthly Revenue", path: "/superadmin/accounting/reports" },
-            { label: "Owners Monthly Revenue", path: "/superadmin/accounting/reports" },
-            { label: "Due Rents", path: "/superadmin/accounting/reports" },
-            { label: "Profit / Loss Report", path: "/superadmin/accounting/reports" },
-            { label: "Cashflow Dashboard", path: "/superadmin/accounting-overview" },
-            { label: "Transaction Reports", path: "/superadmin/accounting/reports" },
+            { label: "Roomhy Monthly Revenue", path: "/superadmin/accounting/reports/roomhy-revenue" },
+            { label: "Owners Monthly Revenue", path: "/superadmin/accounting/reports/owner-revenue" },
+            { label: "Due Rents", path: "/superadmin/accounting/reports/due-rents" },
+            { label: "Profit / Loss Report", path: "/superadmin/accounting/reports/profit-loss" },
+            { label: "Cashflow Dashboard", path: "/superadmin/accounting/reports/cashflow" },
+            { label: "Transaction Reports", path: "/superadmin/accounting/reports/transactions" },
           ]
         },
     ]
@@ -185,11 +161,7 @@ const NAV = [
     path: "/superadmin/superchat",
     children: [
         { label: "Live Conversations", path: "/superadmin/superchat" },
-        { label: "Moderation & Filters", path: "/superadmin/chat/moderation" },
         { label: "Alerts & Violations", path: "/superadmin/chat/alerts" },
-        { label: "Templates / Auto Messages", path: "/superadmin/chat/templates" },
-        { label: "Lead -> Chat Mapping", path: "/superadmin/chat/leads" },
-        { label: "Settings", path: "/superadmin/chat/settings" },
     ]
   },
   { 
@@ -199,7 +171,7 @@ const NAV = [
     path: "/superadmin/visit",
   },
   { 
-    label: "Report & Analytics", 
+    label: "Reports", 
     icon: BarChart3, 
     path: "/superadmin/reports",
     children: [
@@ -213,7 +185,7 @@ const NAV = [
     ]
   },
   { 
-    label: "Booking & Leads", 
+    label: "Bookings", 
     icon: Calendar, 
     path: "/superadmin/booking",
     children: [
@@ -225,7 +197,7 @@ const NAV = [
     ]
   },
   { 
-    label: "Review", 
+    label: "Reviews", 
     icon: Star, 
     path: "/superadmin/reviews",
     children: [
@@ -249,8 +221,7 @@ const NAV = [
         { label: "Issues Resolution Tracking", path: "/superadmin/support/resolution" },
     ]
   },
-  { label: "CRM", id: "crm", icon: Target, path: "/superadmin/enquiry" },
-  { label: "Subscription Control", id: "subscription_control", icon: ShieldCheck, path: "/superadmin/pricing" },
+  { label: "Pricing & Plans", id: "subscription_control", icon: ShieldCheck, path: "/superadmin/pricing" },
   { label: "Settings", id: "settings", icon: Settings, path: "/superadmin/settings" },
 ];
 
@@ -309,7 +280,7 @@ const getFilteredNav = () => {
   } catch (e) {
     console.error("Failed to parse user for sidebar filtering", e);
   }
-  return NAV;
+  return NAV.filter(item => item.label !== "Visit Reports");
 };
 
 export function Sidebar({ open, isMobile, onClose, onLogout }) {

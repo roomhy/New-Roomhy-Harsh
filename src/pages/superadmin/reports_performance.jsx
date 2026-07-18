@@ -1,233 +1,266 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { 
-  Building2, Users, Shield, Clock, Search, 
-  ArrowUpRight, ArrowDownRight, MoreVertical, 
-  Filter, Globe, MapPin, Zap, Sheet, Trash2, 
-  ChevronRight, Phone, Mail, User, Image as ImageIcon,
-  Activity, Home, CheckCircle2, XCircle, Wallet,
-  ArrowUpCircle, ArrowDownCircle, RotateCcw, Plus,
-  Download, Eye, Send, FileText, Receipt, LayoutGrid,
-  TrendingUp, Calendar, Timer, Award, BarChart3
+  Users, Search, ChevronRight, Zap, Award, Activity, RotateCcw,
+  Download, Eye, Landmark, HelpCircle, CheckCircle2, ShieldAlert
 } from "lucide-react";
-import { PageHeader } from "../../components/dashboard/PageHeader";
-import { DateRangePill } from "../../components/dashboard/DateRangePill";
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Cell, PieChart, Pie
-} from "recharts";
+import { fetchJson } from "../../utils/api";
+import useSEO from "../../hooks/useSEO";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
-const taskData = Array.from({ length: 7 }, (_, i) => ({
-  name: `${20 + i} May`,
-  resolved: 45 + i * 5,
-  pending: 12 - i,
-}));
-
-const staffPerf = [
-  { name: "Rahul Sharma", role: "Ops Lead", score: "98%", tasks: 145, resolved: 142, status: "Elite", color: "blue" },
-  { name: "Priya Verma", role: "Support", score: "95%", tasks: 120, resolved: 114, status: "Excellent", color: "indigo" },
-  { name: "Amit Kumar", role: "Verification", score: "92%", tasks: 98, resolved: 90, status: "On Track", color: "emerald" },
-  { name: "Neha Singh", role: "Ops Agent", score: "88%", tasks: 110, resolved: 97, status: "Improving", color: "amber" },
-];
-
 export default function ReportsPerformance() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useSEO({
+    title: "Staff Performance Reports - Roomhy Superadmin",
+    description: "Track and audit employee visits, tasks, and submission logs.",
+  });
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const res = await fetchJson("/api/superadmin/reports/overview");
+      if (res && res.success) {
+        setData(res);
+      }
+    } catch (err) {
+      console.error("Failed to load staff performance data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="p-8 space-y-10 bg-[#F8FAFC] min-h-full flex flex-col items-center justify-center py-40">
+        <div className="w-16 h-16 border-4 border-blue-600/10 border-t-blue-600 rounded-full animate-spin mb-4" />
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Loading Staff Performance Reports...</p>
+      </div>
+    );
+  }
+
+  const staffPerformance = data?.charts?.staffPerformance || [];
+  const visitsCreated = data?.summary?.visitsCreated || 0;
+
+  const filteredStaff = staffPerformance.filter(s => 
+    (s.name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (s.role || "").toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Calculate metrics
+  const totalVisits = staffPerformance.reduce((acc, curr) => acc + (curr.tasks || 0), 0);
+  const totalApproved = staffPerformance.reduce((acc, curr) => acc + (curr.resolved || 0), 0);
+  const topPerformer = staffPerformance[0]?.name || "N/A";
+  const activeStaffCount = staffPerformance.length;
+
+  const exportCSV = () => {
+    if (!filteredStaff.length) return;
+    const headers = "Staff Name,Role,Total Visits,Approved Visits,Performance Score,Status\n";
+    const rows = filteredStaff.map(s => 
+      `"${s.name}","${s.role}",${s.tasks || 0},${s.resolved || 0},"${s.score}","${s.status}"`
+    ).join("\n");
+    const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", "Staff_Performance_Report.csv");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
   return (
-    <div className="p-8 space-y-10 bg-[#F8FAFC] min-h-full">
+    <div className="p-8 space-y-8 bg-[#F8FAFC] min-h-full font-inter text-slate-800">
       {/* Header Area */}
-      <div className="flex flex-col gap-2">
-         <h1 className="text-4xl font-bold text-slate-800 tracking-tight leading-none">Operational Intelligence Hub</h1>
-         <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase mt-2">
-            <span>Reports</span>
-            <ChevronRight className="w-3 h-3" />
-            <span className="text-blue-600">Staff Performance Analytics</span>
-         </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Staff Performance Reports</h1>
+          <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+             <span>Reports</span>
+             <ChevronRight size={10} className="opacity-50" />
+             <span className="text-blue-600">Staff Performance</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={loadData}
+            className="flex items-center gap-1.5 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+          >
+            <RotateCcw className="w-3.5 h-3.5" /> Refresh Data
+          </button>
+          <button
+            onClick={exportCSV}
+            className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 transition-all shadow-md shadow-blue-600/10"
+          >
+            <Download className="w-3.5 h-3.5" /> Export Report
+          </button>
+        </div>
       </div>
 
-      <p className="text-sm font-bold text-slate-400">Deep dive into staff efficiency, resolution velocity and operational platform contributions.</p>
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider -mt-4">
+        Track and monitor staff tasks, visits, and performance metrics.
+      </p>
 
       {/* Hero Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-        <StatCardLarge label="Resolution Velocity" value="94.2%" trend="+ 4.6% Efficiency" up icon={Zap} color="blue" />
-        <StatCardLarge label="Avg. Resolution Time" value="1.8 hrs" trend="- 12m Response" up icon={Timer} color="indigo" />
-        <StatCardLarge label="Top Performer" value="Rahul S." trend="98% Efficiency Score" up icon={Award} color="green" />
-        <StatCardLarge label="Active Tickets" value="48" trend="Platform Wide" up icon={Activity} color="orange" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
+            <Zap className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Visits Submitted</p>
+            <h3 className="text-xl font-bold text-slate-800 leading-tight">{visitsCreated} Visits</h3>
+            <p className="text-[9px] text-slate-400 mt-1">All properties submitted by staff</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Approved Visits</p>
+            <h3 className="text-xl font-bold text-emerald-600 leading-tight">{totalApproved} Approved</h3>
+            <p className="text-[9px] text-slate-400 mt-1">Verified and listed properties</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center shrink-0">
+            <Award className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Top Staff Member</p>
+            <h3 className="text-xl font-bold text-slate-800 leading-tight truncate max-w-[150px]">{topPerformer}</h3>
+            <p className="text-[9px] text-slate-400 mt-1">Highest tasks submitted this month</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shrink-0">
+            <Activity className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Active Staff Members</p>
+            <h3 className="text-xl font-bold text-slate-800 leading-tight">{activeStaffCount} Employees</h3>
+            <p className="text-[9px] text-slate-400 mt-1">Tracked platform staff metrics</p>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-         {/* Throughput Chart */}
-         <div className="lg:col-span-8 bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col">
-            <div className="flex items-center justify-between mb-10">
-               <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Resolution Throughput</h3>
-               <div className="flex items-center gap-6 text-[10px] font-bold text-slate-400 uppercase">
-                  <div className="flex items-center gap-2">
-                     <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-                     Resolved
-                  </div>
-                  <div className="flex items-center gap-2">
-                     <div className="w-2.5 h-2.5 rounded-full bg-slate-200" />
-                     Pending
-                  </div>
+      <div className="grid grid-cols-12 gap-6">
+         {/* Efficiency Scorecard / Leaderboard */}
+         <div className="col-span-12 lg:col-span-4 bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex flex-col justify-between">
+            <div>
+               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6">Top Performing Staff</h3>
+               <div className="space-y-6">
+                  {staffPerformance.slice(0, 4).map((s, i) => (
+                    <div key={i} className="flex items-center gap-4">
+                       <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 flex items-center justify-center font-bold text-sm shrink-0">
+                          {s.name ? s.name.split(' ').map(n => n[0]).join('') : "ST"}
+                       </div>
+                       <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                             <p className="text-xs font-bold text-slate-800 truncate">{s.name}</p>
+                             <p className="text-xs font-bold text-blue-600">{s.score}</p>
+                          </div>
+                          <div className="mt-1.5 w-full h-1.5 bg-slate-50 rounded-full overflow-hidden">
+                             <div 
+                                className="h-full rounded-full bg-blue-600 transition-all duration-500" 
+                                style={{ width: s.score }} 
+                             />
+                          </div>
+                       </div>
+                    </div>
+                  ))}
                </div>
             </div>
-            <div className="flex-1 min-h-[400px]">
-               <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={taskData}>
-                     <defs>
-                        <linearGradient id="colorRes" x1="0" y1="0" x2="0" y2="1">
-                           <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.1}/>
-                           <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
-                        </linearGradient>
-                     </defs>
-                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 700}} dy={15} />
-                     <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 700}} dx={-15} />
-                     <Tooltip contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)'}} />
-                     <Area type="monotone" dataKey="resolved" stroke="#3B82F6" strokeWidth={5} fillOpacity={1} fill="url(#colorRes)" />
-                     <Area type="monotone" dataKey="pending" stroke="#E2E8F0" strokeWidth={5} fill="transparent" />
-                  </AreaChart>
-               </ResponsiveContainer>
-            </div>
          </div>
 
-         {/* Efficiency Scorecard */}
-         <div className="lg:col-span-4 bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col">
-            <h3 className="text-xl font-bold text-slate-800 tracking-tight mb-10">Leaderboard</h3>
-            <div className="space-y-8 flex-1">
-               {staffPerf.map((s, i) => (
-                 <div key={i} className="flex items-center gap-4 group cursor-default">
-                    <div className={cn(
-                       "w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-sm shadow-lg transition-transform group-hover:scale-110",
-                       s.color === "blue" ? "bg-blue-600 shadow-blue-100" :
-                       s.color === "indigo" ? "bg-indigo-600 shadow-indigo-100" :
-                       s.color === "emerald" ? "bg-emerald-600 shadow-emerald-100" : "bg-amber-600 shadow-amber-100"
-                    )}>
-                       {s.name.split(' ').map(n => n[0]).join('')}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                       <div className="flex items-center justify-between">
-                          <p className="text-sm font-bold text-slate-800">{s.name}</p>
-                          <p className="text-xs font-bold text-blue-600">{s.score}</p>
-                       </div>
-                       <div className="mt-2 w-full h-1.5 bg-slate-50 rounded-full overflow-hidden">
-                          <div 
-                             className={cn("h-full rounded-full transition-all duration-1000", 
-                             s.color === "blue" ? "bg-blue-600" : "bg-indigo-600")} 
-                             style={{width: s.score}} 
-                          />
-                       </div>
-                    </div>
-                 </div>
-               ))}
+         {/* Staff Performance & Visit Logs Table */}
+         <div className="col-span-12 lg:col-span-8 bg-white rounded-2xl p-6 border border-slate-100 shadow-sm overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+               <div>
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Staff Performance & Visit Logs</h3>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Visits and property updates completed by staff</p>
+               </div>
+               <div className="relative w-full sm:w-64">
+                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                 <input
+                   type="text"
+                   value={searchQuery}
+                   onChange={e => setSearchQuery(e.target.value)}
+                   placeholder="Search Staff or Role..."
+                   className="w-full bg-slate-50 border border-transparent rounded-xl py-1.5 pl-9 pr-4 text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-slate-200 focus:ring-4 focus:ring-slate-100 transition-all"
+                 />
+               </div>
             </div>
-            <button className="mt-10 w-full py-4 rounded-2xl bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-widest hover:bg-slate-100 transition-all">
-               View Full Staff Metrics
-            </button>
-         </div>
-      </div>
 
-      {/* Staff Activity Ledger */}
-      <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
-         <div className="flex items-center justify-between mb-10">
-            <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Staff Activity Ledger</h3>
-            <button className="flex items-center gap-2 bg-blue-50 text-blue-600 px-6 py-3 rounded-2xl text-[10px] font-bold uppercase hover:bg-blue-600 hover:text-white transition-all shadow-sm">
-               <Download className="w-4 h-4" /> Export Ledger
-            </button>
-         </div>
-         <div className="overflow-x-auto">
-            <table className="w-full text-left min-w-[1000px]">
-               <thead>
-                  <tr className="text-slate-400 text-[10px] font-bold uppercase border-b border-slate-50">
-                     <th className="pb-6">Staff Member</th>
-                     <th className="pb-6">Operational Role</th>
-                     <th className="pb-6 text-center">Total Tasks</th>
-                     <th className="pb-6 text-center">Resolved</th>
-                     <th className="pb-6 text-center">Efficiency Score</th>
-                     <th className="pb-6 text-center">Audit Status</th>
-                     <th className="pb-6 text-right">Actions</th>
-                  </tr>
-               </thead>
-               <tbody className="divide-y divide-slate-50">
-                  {staffPerf.map((s, i) => (
-                    <tr key={i} className="group hover:bg-slate-50/50 transition-colors cursor-pointer">
-                       <td className="py-6">
-                          <div className="flex items-center gap-4">
-                             <div className={cn(
-                                "w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-xs shadow-md",
-                                s.color === "blue" ? "bg-blue-600" :
-                                s.color === "indigo" ? "bg-indigo-600" : "bg-emerald-600"
-                             )}>
-                                {s.name.split(' ').map(n => n[0]).join('')}
+            <div className="overflow-x-auto">
+               <table className="w-full text-left border-collapse">
+                  <thead>
+                     <tr className="border-b border-slate-100">
+                        <th className="pb-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Staff Member</th>
+                        <th className="pb-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Staff Role</th>
+                        <th className="pb-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">Total Visits</th>
+                        <th className="pb-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">Approved Visits</th>
+                        <th className="pb-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">Performance Score</th>
+                        <th className="pb-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">Performance Rank</th>
+                     </tr>
+                  </thead>
+                  <tbody>
+                     {filteredStaff.length === 0 ? (
+                       <tr>
+                         <td colSpan={6} className="py-8 text-center text-slate-400 font-semibold">No staff performance logs found</td>
+                       </tr>
+                     ) : filteredStaff.map((s, i) => (
+                       <tr key={i} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                          <td className="py-4">
+                             <div className="flex items-center gap-3">
+                                <div className={cn(
+                                   "w-8 h-8 rounded-xl flex items-center justify-center font-bold text-white text-xs",
+                                   s.color === "blue" ? "bg-blue-600" :
+                                   s.color === "indigo" ? "bg-indigo-600" :
+                                   s.color === "emerald" ? "bg-emerald-600" : "bg-amber-600"
+                                )}>
+                                   {s.name ? s.name.split(' ').map(n => n[0]).join('') : "ST"}
+                                </div>
+                                <div>
+                                   <p className="text-xs font-bold text-slate-800 leading-none">{s.name}</p>
+                                   <p className="text-[9px] text-slate-400 font-mono mt-1 leading-none">STF-0{i+101}</p>
+                                </div>
                              </div>
-                             <div>
-                                <p className="text-sm font-bold text-slate-800">{s.name}</p>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">ID: STF-202{i+1}</p>
-                             </div>
-                          </div>
-                       </td>
-                       <td className="py-6">
-                          <span className="text-[10px] font-bold px-3 py-1.5 rounded-xl bg-slate-50 text-slate-600 border border-slate-100 uppercase group-hover:bg-white group-hover:shadow-sm transition-all">
+                          </td>
+                          <td className="py-4 text-xs font-semibold text-slate-600">
                              {s.role}
-                          </span>
-                       </td>
-                       <td className="py-6 text-center font-bold text-slate-800">{s.tasks}</td>
-                       <td className="py-6 text-center font-bold text-emerald-600">{s.resolved}</td>
-                       <td className="py-6 text-center">
-                          <p className="text-base font-bold text-blue-600">{s.score}</p>
-                       </td>
-                       <td className="py-6 text-center">
-                          <span className={cn(
-                            "text-[9px] font-bold px-3 py-1 rounded-full border shadow-sm uppercase",
-                            s.status === "Elite" ? "bg-blue-50 text-blue-600 border-blue-100" : 
-                            s.status === "Excellent" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                            "bg-amber-50 text-amber-600 border-amber-100"
-                          )}>
-                             {s.status}
-                          </span>
-                       </td>
-                       <td className="py-6 text-right">
-                          <div className="flex items-center justify-end gap-3">
-                             <button className="p-3 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-md transition-all">
-                                <Eye className="w-4 h-4" />
-                             </button>
-                             <button className="p-3 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-md transition-all">
-                                <MoreVertical className="w-4 h-4" />
-                             </button>
-                          </div>
-                       </td>
-                    </tr>
-                  ))}
-               </tbody>
-            </table>
+                          </td>
+                          <td className="py-4 text-center font-bold text-slate-800 text-xs">{s.tasks}</td>
+                          <td className="py-4 text-center font-bold text-emerald-600 text-xs">{s.resolved}</td>
+                          <td className="py-4 text-center font-bold text-blue-600 text-xs">
+                             {s.score}
+                          </td>
+                          <td className="py-4 text-center">
+                             <span className={cn(
+                               "text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase",
+                               s.status === "Elite" ? "bg-blue-50 text-blue-600 border-blue-100" : 
+                               s.status === "Excellent" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                               s.status === "On Track" ? "bg-slate-50 text-slate-600 border-slate-100" :
+                               "bg-amber-50 text-amber-600 border-amber-100"
+                             )}>
+                                {s.status}
+                             </span>
+                          </td>
+                       </tr>
+                     ))}
+                  </tbody>
+               </table>
+            </div>
          </div>
-      </div>
-    </div>
-  );
-}
-
-function StatCardLarge({ label, value, trend, up, icon: Icon, color }) {
-  const bgColors = { 
-    blue: "bg-blue-600 shadow-blue-200", 
-    indigo: "bg-indigo-600 shadow-indigo-200", 
-    green: "bg-emerald-600 shadow-emerald-200", 
-    orange: "bg-amber-600 shadow-amber-200" 
-  };
-  
-  return (
-    <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col gap-8 group hover:translate-y-[-8px] transition-all duration-500">
-      <div className={cn("w-20 h-20 rounded-[1.75rem] flex items-center justify-center text-white shadow-2xl transition-transform group-hover:rotate-6", bgColors[color])}>
-         <Icon className="w-10 h-10" />
-      </div>
-      <div>
-         <p className="text-[11px] font-bold text-slate-400 uppercase mb-4 leading-none truncate">{label}</p>
-         <p className="text-5xl font-bold text-slate-800 tracking-tighter leading-none">{value}</p>
-      </div>
-      <div className={cn(
-        "flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-2xl w-fit",
-        up ? "text-emerald-600 bg-emerald-50 border border-emerald-100" : "text-rose-600 bg-rose-50 border border-rose-100"
-      )}>
-         {up ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-         {trend}
       </div>
     </div>
   );

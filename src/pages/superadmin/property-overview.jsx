@@ -38,11 +38,11 @@ export default function PropertyOverview() {
 
         if (statsRes?.success && statsRes.summary) {
           setStats({
-            total: statsRes.summary.totalProperties || 0,
-            active: statsRes.summary.activeProperties || statsRes.summary.approvedProperties || 0,
-            pending: statsRes.summary.pendingReview || statsRes.summary.pendingProperties || 0,
-            rejected: statsRes.summary.rejectedProperties || 0,
-            leads: statsRes.summary.totalLeads || 0
+            total: statsRes.summary.total || statsRes.summary.totalProperties || 0,
+            active: statsRes.summary.approved || statsRes.summary.activeProperties || statsRes.summary.approvedProperties || 0,
+            pending: statsRes.summary.pending || statsRes.summary.pendingReview || statsRes.summary.pendingProperties || 0,
+            rejected: statsRes.summary.rejected || statsRes.summary.rejectedProperties || 0,
+            leads: statsRes.summary.newThisMonth || statsRes.summary.totalLeads || 0
           });
         }
 

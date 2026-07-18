@@ -1,351 +1,885 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { useHtmlPage } from "../../utils/htmlPage";
-import HowRoomhyWorks from "../../components/website/HowRoomhyWorks";
-import { fetchPropertyTypes } from "../../utils/api";
+import { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Search, MapPin, Star, BadgeCheck, TrendingUp, ChevronLeft, ChevronRight, ChevronDown, X, Building2, Home, Users, MessageSquare, Gavel } from 'lucide-react';
+import HowRoomhyWorks from '../../components/website/HowRoomhyWorks';
+import WhyRoomhy from '../../components/website/WhyRoomhy';
+import FindYourHome from '../../components/website/FindYourHome';
+import WhyStudentsChooseUs from '../../components/website/WhyStudentsChooseUs';
+import WebsiteNavbar from '../../components/website/WebsiteNavbar';
+import WebsiteFooter from '../../components/website/WebsiteFooter';
+import MobileBottomNav from '../../components/website/MobileBottomNav';
+import MobileHamburgerMenu from '../../components/website/MobileHamburgerMenu';
+import MobilePropertiesSection from '../../components/website/MobilePropertiesSection';
+import MobileVideoSection from '../../components/website/MobileVideoSection';
+import { fetchCities, fetchProperties, trackPropertyClick } from '../../utils/api';
 
-// Custom hook for navigation history
-function useNavigationHistory() {
-  const [history, setHistory] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(-1);
+const cityAreas = {
+  'Indore': ['Vijay Nagar', 'Bhawar Kuan', 'Rajwada', 'Palasia'],
+  'Jaipur': ['Malviya Nagar', 'Mansarovar', 'Vaishali Nagar', 'C-Scheme'],
+  'Mumbai': ['Andheri', 'Bandra', 'Borivali', 'Worli'],
+  'Bhopal': ['MP Nagar', 'Arera Colony', 'Bittan Market', 'Kolar'],
+  'Delhi': ['South Delhi', 'North Delhi', 'Rohini', 'Dwarka'],
+  'Nagpur': ['Civil Lines', 'Dharampeth', 'Manish Nagar', 'Sitabuldi']
+};
 
-  useEffect(() => {
-    const currentPath = window.location.pathname;
-    setHistory([currentPath]);
-    setCurrentIndex(0);
-  }, []);
+// Static fallback data - moved outside to prevent re-renders
+const staticCities = [
+  { name: 'Kota', properties: '2,500+', image: 'https://picsum.photos/600/400?random=1' },
+  { name: 'Indore', properties: '1,800+', image: 'https://picsum.photos/600/400?random=2' },
+  { name: 'Jaipur', properties: '3,200+', image: 'https://picsum.photos/600/400?random=3' },
+  { name: 'Delhi', properties: '5,000+', image: 'https://picsum.photos/600/400?random=4' },
+  { name: 'Bhopal', properties: '1,200+', image: 'https://picsum.photos/600/400?random=5' },
+  { name: 'Nagpur', properties: '980+', image: 'https://picsum.photos/600/400?random=6' },
+  { name: 'Jodhpur', properties: '850+', image: 'https://picsum.photos/600/400?random=7' },
+  { name: 'Mumbai', properties: '4,500+', image: 'https://picsum.photos/600/400?random=8' },
+];
 
-  const push = useCallback((path) => {
-    setHistory((prev) => {
-      const newHistory = prev.slice(0, currentIndex + 1);
-      const updated = [...newHistory, path];
-      setCurrentIndex(updated.length - 1);
-      return updated;
-    });
-  }, [currentIndex]);
-
-  const goBack = useCallback(() => {
-    if (currentIndex > 0) {
-      const newIndex = currentIndex - 1;
-      setCurrentIndex(newIndex);
-      const path = history[newIndex];
-      window.location.href = path;
-      return path;
-    }
-    return null;
-  }, [history, currentIndex]);
-
-  const goNext = useCallback(() => {
-    if (currentIndex < history.length - 1) {
-      const newIndex = currentIndex + 1;
-      setCurrentIndex(newIndex);
-      const path = history[newIndex];
-      window.location.href = path;
-      return path;
-    }
-    return null;
-  }, [history, currentIndex]);
-
-  const canGoBack = currentIndex > 0;
-  const canGoNext = currentIndex < history.length - 1;
-
-  return { push, goBack, goNext, canGoBack, canGoNext, currentPath: history[currentIndex] };
-}
-
-// Reviews data
-const reviews = [
+const staticOfferings = [
   {
-    id: 1,
-    name: "Rahul Sharma",
-    role: "Student at IIT Delhi",
-    rating: 5,
-    text: "Roomhy made finding my hostel so easy! Zero brokerage and the bidding feature helped me get a great deal.",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face"
+    title: 'PG',
+    category: 'PG',
+    description: 'Comfortable paying guest accommodations with all amenities',
+    images: [
+      'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1513694203232-719a280e022f?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=600&auto=format&fit=crop'
+    ]
   },
   {
-    id: 2,
-    name: "Priya Patel",
-    role: "Medical Student",
-    rating: 5,
-    text: "The 24/7 support team helped me find a safe PG near my college. Best platform for students!",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face"
+    title: 'Hostel',
+    category: 'Hostel',
+    description: 'Affordable hostel living for students and working professionals',
+    images: [
+      'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1505691938895-1758d7feb511?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1536376072261-38c75010e6c9?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?q=80&w=600&auto=format&fit=crop'
+    ]
   },
   {
-    id: 3,
-    name: "Amit Kumar",
-    role: "Engineering Student",
-    rating: 5,
-    text: "Found a fully furnished apartment in just 2 days. The direct chat with owners saved so much time.",
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face"
+    title: 'Co-living',
+    category: 'Co-living',
+    description: 'Modern co-living spaces with community and facilities',
+    images: [
+      'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1513694203232-719a280e022f?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=600&auto=format&fit=crop'
+    ]
   },
   {
-    id: 4,
-    name: "Sneha Gupta",
-    role: "MBA Student",
-    rating: 5,
-    text: "Love the verified listings! No fake photos or hidden charges. Roomhy is a game changer.",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face"
+    title: 'Apartment/Flats',
+    category: 'Apartment',
+    description: 'Private apartments for individuals and small groups',
+    images: [
+      'https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1484154218962-a197022b5858?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=600&auto=format&fit=crop'
+    ]
   },
   {
-    id: 5,
-    name: "Vikram Singh",
-    role: "Law Student",
-    rating: 4,
-    text: "The ₹500 booking token is such a smart feature. It shows owners you're serious about renting.",
-    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face"
-  },
-  {
-    id: 6,
-    name: "Anjali Mehta",
-    role: "CA Student",
-    rating: 5,
-    text: "Moved to Kota for coaching and found the perfect hostel within a day. Thank you Roomhy!",
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face"
+    title: 'List Property',
+    category: 'List',
+    description: 'Are you an owner? List your property on Roomhy for free!',
+    link: '/website/list',
+    images: [
+      'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1582408921715-18e7806365c1?q=80&w=600&auto=format&fit=crop'
+    ]
   }
 ];
 
-export default function WebsiteIndex() {
-  const { push, goBack, goNext, canGoBack, canGoNext } = useNavigationHistory();
-  const [currentReview, setCurrentReview] = useState(0);
-  const [offerings, setOfferings] = useState([]);
-  const [loadingOfferings, setLoadingOfferings] = useState(true);
-  
-  useHtmlPage({
-    title: "Roomhy - Find Your Student Home",
-    htmlAttrs: { "lang": "en", "class": "scroll-smooth" },
-    metas: [
-      { "charset": "UTF-8" },
-      { "name": "viewport", "content": "width=device-width, initial-scale=1.0" },
-      { "name": "referrer", "content": "no-referrer-when-downgrade" },
-      { "name": "description", "content": "Find verified PGs, hostels & co-living spaces across 50+ Indian cities. Zero brokerage, smart bidding system." }
-    ],
-    bases: [],
-    links: [
-      { "rel": "canonical", "href": "https://roomhy.com/website/index" },
-      { "rel": "preconnect", "href": "https://fonts.googleapis.com" },
-      { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": true },
-      { "href": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap", "rel": "stylesheet" },
-      { "rel": "stylesheet", "href": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css", "crossorigin": "anonymous", "referrerpolicy": "no-referrer" },
-      { "rel": "stylesheet", "href": "/website/assets/css/index.css" }
-    ],
-    styles: [],
-    scripts: [
-      { "src": "https://cdn.tailwindcss.com" },
-      { "src": "https://unpkg.com/lucide@latest" },
-      { "src": "/website/js/auth-utils.js" },
-      { "src": "/website/assets/js/index.js" }
-    ]
-  });
+const featuredProperties = [
+  { _id: 'static1', name: 'Sunrise PG', location: 'Kota, Rajasthan', price: '₹6,500', rating: 4.8, image: 'https://picsum.photos/600/400?random=29', verified: true },
+  { _id: 'static2', name: 'Elite Hostel', location: 'Indore, MP', price: '₹5,200', rating: 4.6, image: 'https://picsum.photos/600/400?random=30', verified: true },
+  { _id: 'static3', name: 'Urban Co-Space', location: 'Jaipur, Rajasthan', price: '₹8,900', rating: 4.9, image: 'https://picsum.photos/600/400?random=31', verified: true },
+  { _id: 'static4', name: 'Campus View PG', location: 'Delhi NCR', price: '₹7,800', rating: 4.7, image: 'https://picsum.photos/600/400?random=32', verified: true },
+  { _id: 'static8', name: 'Royal Residency', location: 'Mumbai, Maharashtra', price: '₹12,500', rating: 4.5, image: 'https://picsum.photos/600/400?random=33', verified: true },
+  { _id: 'static5', name: 'Smart Stay PG', location: 'Bhopal, MP', price: '₹5,800', rating: 4.4, image: 'https://picsum.photos/600/400?random=34', verified: true },
+  { _id: 'static6', name: 'Grand Hostel', location: 'Nagpur, Maharashtra', price: '₹4,800', rating: 4.3, image: 'https://picsum.photos/600/400?random=35', verified: true },
+  { _id: 'static7', name: 'City Center PG', location: 'Jodhpur, Rajasthan', price: '₹6,200', rating: 4.6, image: 'https://picsum.photos/600/400?random=36', verified: true },
+  { _id: 'static9', name: 'Premium Co-Living', location: 'Pune, Maharashtra', price: '₹10,500', rating: 4.8, image: 'https://picsum.photos/600/400?random=37', verified: true },
+  { _id: 'static10', name: 'Student Hub', location: 'Lucknow, UP', price: '₹5,500', rating: 4.2, image: 'https://picsum.photos/600/400?random=38', verified: true }
+];
 
-  // Auto-slide reviews
+const heroImages = [
+  'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=1980&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=2070&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1494203484021-3c454daf695d?q=80&w=2070&auto=format&fit=crop'
+];
+
+export default function WebsiteIndex() {
+  const navigate = useNavigate();
+  const [cities, setCities] = useState([]);
+  const [cityAreasMap, setCityAreasMap] = useState(cityAreas);
+  const [offerings, setOfferings] = useState([]);
+  const [trendingProperties, setTrendingProperties] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [selectedType, setSelectedType] = useState('');
+
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const typeDropdownRef = useRef(null);
+
+  const [isFloatingSearchVisible, setIsFloatingSearchVisible] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.innerWidth < 768) {
+        setIsFloatingSearchVisible(window.scrollY > 350);
+      } else {
+        setIsFloatingSearchVisible(false);
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const [recentlyViewed, setRecentlyViewed] = useState([]);
+
+  useEffect(() => {
+    const loadRecentlyViewed = () => {
+      try {
+        const stored = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
+        const now = Date.now();
+        const oneDay = 24 * 60 * 60 * 1000;
+        const validItems = stored.filter(item => (now - item.timestamp) < oneDay);
+        validItems.sort((a, b) => b.timestamp - a.timestamp);
+        setRecentlyViewed(validItems);
+        if (validItems.length !== stored.length) {
+          localStorage.setItem('recentlyViewed', JSON.stringify(validItems));
+        }
+      } catch (err) {
+        console.error('Error loading recently viewed:', err);
+      }
+    };
+    loadRecentlyViewed();
+    const interval = setInterval(loadRecentlyViewed, 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const getCityImage = (cityName) => {
+    const cityImages = {
+      'Kota': 'https://picsum.photos/600/400?random=1',
+      'Indore': 'https://picsum.photos/600/400?random=2',
+      'Jaipur': 'https://picsum.photos/600/400?random=3',
+      'Delhi': 'https://picsum.photos/600/400?random=4',
+      'Bhopal': 'https://picsum.photos/600/400?random=5',
+      'Nagpur': 'https://picsum.photos/600/400?random=6',
+      'Sikar': 'https://picsum.photos/600/400?random=7',
+      'Mumbai': 'https://picsum.photos/600/400?random=8',
+      'Bangalore': 'https://picsum.photos/600/400?random=9',
+      'Pune': 'https://picsum.photos/600/400?random=10'
+    };
+    return cityImages[cityName] || 'https://picsum.photos/600/400?random=1';
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const citiesData = await fetchCities();
+        if (citiesData && citiesData.length > 0) {
+          const formattedCities = citiesData.map((city, index) => ({
+            name: city.name || city,
+            properties: typeof city.propertyCount === 'number' ? `${city.propertyCount}` : staticCities[index]?.properties || '0',
+            image: city.imageUrl || city.image || staticCities[index]?.image || getCityImage(city.name)
+          }));
+          setCities(formattedCities);
+        } else {
+          setCities(staticCities);
+        }
+
+        setOfferings(staticOfferings);
+
+        const allProperties = await fetchProperties();
+        if (allProperties && allProperties.length > 0) {
+          const filteredProperties = allProperties.filter(p => {
+            const name = (p.name || p.property_name || '').toLowerCase();
+            return !name.includes('jhvhhjhjv') && !name.includes('test');
+          });
+          setTrendingProperties(filteredProperties);
+
+          const areasMap = {};
+          filteredProperties.forEach(p => {
+            const cityName = p.city || '';
+            const area = p.area || p.locality || p.neighborhood || p.location || '';
+            if (cityName) {
+              if (!areasMap[cityName]) areasMap[cityName] = new Set();
+              if (area && area !== cityName) areasMap[cityName].add(area);
+            }
+          });
+          const builtMap = {};
+          for (const [city, areaSet] of Object.entries(areasMap)) {
+            builtMap[city] = [...areaSet].slice(0, 4);
+          }
+          if (Object.keys(builtMap).length > 0) setCityAreasMap(builtMap);
+        } else {
+          setTrendingProperties(featuredProperties);
+        }
+      } catch (error) {
+        console.error('Error loading homepage data:', error);
+        setCities(staticCities);
+        setOfferings(staticOfferings);
+        setTrendingProperties(featuredProperties);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  const handleSearch = (query) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setShowSearchDropdown(false);
+      return;
+    }
+    setIsSearching(true);
+    const lowerQuery = query.toLowerCase();
+    try {
+      const results = [];
+      const cityMatches = cities.filter(city => city.name?.toLowerCase().includes(lowerQuery)).map(city => ({
+        type: 'city', title: city.name, subtitle: `${city.properties || '1000+'} properties`,
+        link: `/website/ourproperty?city=${encodeURIComponent(city.name.toLowerCase())}`, icon: 'MapPin'
+      }));
+      results.push(...cityMatches);
+      const propertyMatches = trendingProperties.filter(prop => {
+        const propName = prop.propertyName || prop.property_name || prop.name || '';
+        return propName.toLowerCase().includes(lowerQuery);
+      }).slice(0, 5).map(prop => ({
+        type: 'property', title: prop.propertyName || prop.property_name || prop.name,
+        subtitle: `${prop.city || prop.location || ''} - ${prop.propertyType || prop.type || 'Property'}`,
+        link: `/website/property-details/${prop._id || prop.visitId}`, icon: 'Building2'
+      }));
+      results.push(...propertyMatches);
+      const typeMatches = offerings.filter(offering =>
+        offering.title?.toLowerCase().includes(lowerQuery) || offering.category?.toLowerCase().includes(lowerQuery)
+      ).map(offering => ({
+        type: 'type', title: offering.title, subtitle: `Find ${offering.title} accommodations`,
+        link: `/website/ourproperty?type=${encodeURIComponent(offering.category.toLowerCase())}`, icon: 'Home'
+      }));
+      results.push(...typeMatches);
+      setSearchResults(results.slice(0, 8));
+      setShowSearchDropdown(true);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => { if (searchQuery) handleSearch(searchQuery); }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    setHasSearched(true);
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) params.append('search', searchQuery.trim());
+    if (selectedType) params.append('type', selectedType.toLowerCase());
+    const queryString = params.toString();
+    navigate(queryString ? `/website/ourproperty?${queryString}` : '/website/ourproperty');
+    setShowSearchDropdown(false);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showSearchDropdown && !event.target.closest('.search-container')) setShowSearchDropdown(false);
+      if (isTypeDropdownOpen && typeDropdownRef.current && !typeDropdownRef.current.contains(event.target)) setIsTypeDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showSearchDropdown]);
+
+  const [cityStartIndex, setCityStartIndex] = useState(0);
+  const citiesPerView = 4;
+  const [mobileCityIndex, setMobileCityIndex] = useState(0);
+  const [trendingStartIndex, setTrendingStartIndex] = useState(0);
+  const trendingPerView = 5;
+  const [offeringSelectedImage, setOfferingSelectedImage] = useState({});
+  const [mobileOfferingIndex, setMobileOfferingIndex] = useState(0);
+  const [mobileImageIndex, setMobileImageIndex] = useState(0);
+
+  const offeringScrollContainerRef = useRef(null);
+  const trendingScrollContainerRef = useRef(null);
+  const citiesScrollContainerRef = useRef(null);
+
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentReview((prev) => (prev + 1) % reviews.length);
+      setCurrentImageIndex((prev) => (prev + 1) % heroImages.length);
     }, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch dynamic offerings
-  useEffect(() => {
-    const loadOfferings = async () => {
-      try {
-        setLoadingOfferings(true);
-        const types = await fetchPropertyTypes();
-        setOfferings(types);
-      } catch (error) {
-        console.error("Error loading offerings:", error);
-      } finally {
-        setLoadingOfferings(false);
-      }
-    };
-    loadOfferings();
-  }, []);
+  const nextCities = () => setCityStartIndex((prev) => prev + citiesPerView >= cities.length ? 0 : prev + citiesPerView);
+  const prevCities = () => setCityStartIndex((prev) => prev - citiesPerView < 0 ? Math.max(0, cities.length - citiesPerView) : prev - citiesPerView);
+  const nextTrending = () => setTrendingStartIndex((prev) => prev + trendingPerView >= trendingProperties.length ? 0 : prev + trendingPerView);
+  const prevTrending = () => setTrendingStartIndex((prev) => prev - trendingPerView < 0 ? Math.max(0, trendingProperties.length - trendingPerView) : prev - trendingPerView);
 
-  const nextReview = () => setCurrentReview((prev) => (prev + 1) % reviews.length);
-  const prevReview = () => setCurrentReview((prev) => (prev - 1 + reviews.length) % reviews.length);
+  const visibleCities = cities.slice(cityStartIndex, cityStartIndex + citiesPerView);
+  const visibleTrending = trendingProperties.slice(trendingStartIndex, trendingStartIndex + trendingPerView);
+  const canShowNextCities = cityStartIndex + citiesPerView < cities.length;
+  const canShowPrevCities = cityStartIndex > 0;
+  const canShowNextTrending = trendingStartIndex + trendingPerView < trendingProperties.length;
+  const canShowPrevTrending = trendingStartIndex > 0;
+
+  const [recentlyViewedStartIndex, setRecentlyViewedStartIndex] = useState(0);
+  const recentlyViewedPerView = 5;
+  const nextRecentlyViewed = () => setRecentlyViewedStartIndex((prev) => prev + recentlyViewedPerView >= recentlyViewed.length ? 0 : prev + recentlyViewedPerView);
+  const prevRecentlyViewed = () => setRecentlyViewedStartIndex((prev) => prev - recentlyViewedPerView < 0 ? Math.max(0, recentlyViewed.length - recentlyViewedPerView) : prev - recentlyViewedPerView);
+  const visibleRecentlyViewed = recentlyViewed.slice(recentlyViewedStartIndex, recentlyViewedStartIndex + recentlyViewedPerView);
+  const canShowNextRecentlyViewed = recentlyViewedStartIndex + recentlyViewedPerView < recentlyViewed.length;
+  const canShowPrevRecentlyViewed = recentlyViewedStartIndex > 0;
+
+  const canShowNextMobileCity = mobileCityIndex + 4 < cities.length;
+  const canShowPrevMobileCity = mobileCityIndex > 0;
+  const canShowNextMobileOffering = mobileOfferingIndex + 3 < offerings.length;
+  const canShowPrevMobileOffering = mobileOfferingIndex > 0;
+  const visibleMobileCities = cities.slice(mobileCityIndex, mobileCityIndex + 4);
+  const visibleMobileOfferings = offerings.slice(mobileOfferingIndex, mobileOfferingIndex + 3);
 
   return (
-    <div className="html-page">
-      <header className="sticky top-0 z-30 w-full bg-white/95 backdrop-blur-sm shadow-sm">
-        <div className="container mx-auto px-4 sm:px-6">
-          <div className="flex h-20 items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1">
-                <button 
-                  onClick={goBack}
-                  disabled={!canGoBack}
-                  className={`p-2 rounded-md transition-colors ${canGoBack ? 'hover:bg-gray-100 text-gray-600' : 'text-gray-300 cursor-not-allowed'}`}
-                  title="Go Back"
-                  aria-label="Go Back"
-                >
-                  <i data-lucide="chevron-left" className="w-5 h-5"></i>
-                </button>
-                <button 
-                  onClick={goNext}
-                  disabled={!canGoNext}
-                  className={`p-2 rounded-md transition-colors ${canGoNext ? 'hover:bg-gray-100 text-gray-600' : 'text-gray-300 cursor-not-allowed'}`}
-                  title="Go Forward"
-                  aria-label="Go Forward"
-                >
-                  <i data-lucide="chevron-right" className="w-5 h-5"></i>
-                </button>
-              </div>
-              <a href="#" aria-label="Roomhy Home" className="flex-shrink-0">
-                <img src="https://res.cloudinary.com/dpwgvcibj/image/upload/v1768990260/roomhy/website/logoroomhy.png" alt="Roomhy Logo" width="100" height="40" className="h-10 w-auto" />
-              </a>
-            </div>
-            
-            <div className="flex items-center gap-3 sm:gap-6">
-              <nav className="hidden lg:flex items-center space-x-6">
-                <a href="/website/about" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">About Us</a>
-                <a href="#faq" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">FAQ</a>
-                <a href="/website/contact" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">Contact</a>
-              </nav>
+    <div className="min-h-screen bg-white">
+      <WebsiteNavbar />
 
-              <div className="relative">
-                <a href="/website/fast-bidding" className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white px-3 sm:px-4 py-2 rounded-md text-sm sm:text-base font-semibold hover:shadow-lg transition-all flex items-center gap-1">
-                  <i data-lucide="zap" className="w-4 h-4"></i> <span className="hidden sm:inline">Fast Bidding</span>
-                </a>
-              </div>
+      {/* Floating Search Bar for Mobile */}
+      <div
+        className={`md:hidden fixed top-0 left-0 right-0 z-[60] p-3 transition-all duration-300 transform ${
+          isFloatingSearchVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
+        }`}
+      >
+        <div
+          onClick={() => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setTimeout(() => {
+              const searchInput = document.querySelector('.search-container input');
+              if (searchInput) searchInput.focus();
+            }, 400);
+          }}
+          className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 px-4 py-2.5 flex items-center gap-3 active:scale-95 transition-transform"
+        >
+          <div className="w-8 h-8 rounded-xl bg-teal-500 flex items-center justify-center flex-shrink-0">
+            <Search className="w-4 h-4 text-white" />
+          </div>
+          <p className="text-gray-400 text-sm font-medium flex-1">Search for PG, Hostels...</p>
+          <div className="px-2 py-1 bg-gray-50 rounded-lg text-[10px] font-bold text-gray-400 border border-gray-100">Search</div>
+        </div>
+      </div>
 
-              <a href="/website/list" aria-label="List your property" className="flex-shrink-0 flex items-center justify-center px-3 sm:px-4 py-2 rounded-md text-sm font-semibold transition-colors w-10 h-10 sm:w-auto sm:h-auto sm:px-4">
-                <span className="text-3xl font-bold">+</span>
-              </a>
-              
-              <button id="menu-toggle" aria-label="Toggle Menu" className="p-2 rounded-md hover:bg-gray-100 transition-colors">
-                <i data-lucide="menu" className="w-7 h-7 text-gray-800"></i>
-              </button>
+      <main className="min-h-screen">
+        {/* Hero Section */}
+        <div className="relative min-h-[160px] md:min-h-0 md:h-[320px] bg-gradient-to-br from-teal-600 via-blue-600 to-cyan-500 z-10">
+          <div className="absolute inset-0 overflow-hidden">
+            {heroImages.map((image, index) => (
+              <div
+                key={index}
+                className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ease-in-out ${
+                  index === currentImageIndex ? 'opacity-100' : 'opacity-0'
+                }`}
+                style={{ backgroundImage: `url(${image})` }}
+              >
+                <div className="absolute inset-0 bg-black/60"></div>
+              </div>
+            ))}
+          </div>
+
+          <div className="relative max-w-none w-full mx-auto px-4 md:px-8 lg:px-12 h-full flex flex-col justify-start pt-4 md:pt-10">
+            <h1 className="text-xl sm:text-4xl md:text-6xl font-bold text-white mb-1 md:mb-4 leading-tight text-center drop-shadow-lg">
+              Find Your Perfect <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-400 drop-shadow-2xl">Student Stay</span>
+            </h1>
+            <p className="text-xs sm:text-lg md:text-xl text-white/95 mb-2 md:mb-6 max-w-4xl mx-auto leading-relaxed text-center px-2">
+              Search verified PGs, hostels & co-living spaces across 50+ Indian cities
+            </p>
+
+            <div className="max-w-5xl mx-auto w-full px-2 md:px-4 search-container relative z-50">
+              <form onSubmit={handleSearchSubmit} className="bg-white/95 md:bg-white backdrop-blur-md md:backdrop-blur-none rounded-2xl md:rounded shadow-2xl p-2 md:p-0 flex flex-row gap-2 md:gap-0 items-center relative z-20 md:h-16 w-full">
+
+                {/* Mobile Only: Type Dropdown */}
+                <div className="md:hidden relative flex-shrink-0" ref={typeDropdownRef}>
+                  <div
+                    onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
+                    className="flex items-center justify-between bg-teal-50 text-gray-700 px-2 py-2 rounded-lg font-medium focus:outline-none cursor-pointer w-[70px] text-[10px]"
+                  >
+                    <span className="truncate">{selectedType || 'Type'}</span>
+                    <ChevronLeft className={`w-3 h-3 text-teal-600 transition-transform`} style={{ transform: isTypeDropdownOpen ? 'rotate(90deg)' : 'rotate(270deg)' }} />
+                  </div>
+                  {isTypeDropdownOpen && (
+                    <div className="absolute top-full left-0 mt-2 w-[120px] bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-[70]">
+                      {offerings.map((offering) => (
+                        <div
+                          key={offering.category}
+                          onClick={() => { setSelectedType(offering.category.toLowerCase()); setIsTypeDropdownOpen(false); }}
+                          className={`px-3 py-2 cursor-pointer hover:bg-teal-50 ${selectedType === offering.category.toLowerCase() ? 'bg-teal-50 border-l-2 border-teal-500' : ''}`}
+                        >
+                          <div className="text-[10px] font-bold text-gray-900">{offering.title}</div>
+                          <div className="text-[8px] text-gray-500 truncate">{offering.description}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 1. Property Type (Desktop Only) */}
+                <div className="relative flex-1 hidden md:flex items-center px-5 h-full bg-white border-r border-gray-300 cursor-pointer hover:bg-gray-50" onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}>
+                  <div className="flex-1 flex justify-between items-center text-base font-semibold text-gray-900">
+                    <span className="truncate">{selectedType ? selectedType.charAt(0).toUpperCase() + selectedType.slice(1) : 'Property Type'}</span>
+                    <ChevronLeft className="w-4 h-4 text-gray-400" style={{ transform: isTypeDropdownOpen ? 'rotate(90deg)' : 'rotate(270deg)' }} />
+                  </div>
+                  {isTypeDropdownOpen && (
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white rounded shadow-xl border border-gray-100 overflow-hidden z-[70]">
+                      {offerings.map((offering) => (
+                        <div
+                          key={offering.category}
+                          onClick={(e) => { e.stopPropagation(); setSelectedType(offering.category.toLowerCase()); setIsTypeDropdownOpen(false); }}
+                          className="px-5 py-3 cursor-pointer hover:bg-gray-50 border-b border-gray-50 last:border-0 group"
+                        >
+                          <div className="flex flex-col">
+                            <span className={`text-sm font-bold transition-colors ${selectedType === offering.category.toLowerCase() ? 'text-teal-600' : 'text-gray-900 group-hover:text-teal-600'}`}>
+                              {offering.title}
+                            </span>
+                            <span className="text-xs text-gray-500 line-clamp-1">{offering.description}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Search Query */}
+                <div className="flex-1 md:flex-[1.5] flex items-center px-2 md:px-5 py-2 md:py-0 h-full bg-gray-50 md:bg-white rounded-lg md:rounded-none relative min-w-0">
+                  <Search className="w-3 h-3 md:w-5 md:h-5 text-gray-400 mr-1 md:mr-3 flex-shrink-0" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search city, locality, or landmark"
+                    className="flex-1 bg-transparent outline-none text-gray-900 text-[10px] md:text-base font-semibold min-w-0 w-full h-full"
+                  />
+                </div>
+
+                {/* Search Button */}
+                <button type="submit" className="bg-gradient-to-r from-teal-500 to-teal-600 md:bg-none md:bg-[#1AB64F] hover:bg-[#18a245] text-white px-3 md:px-10 py-2 md:py-0 h-full rounded-lg md:rounded-none font-bold text-[10px] md:text-lg transition-all flex-shrink-0 whitespace-nowrap border-l border-transparent md:border-[#18a245]">
+                  Search
+                </button>
+              </form>
+
+              {/* Search Suggestions Dropdown */}
+              {showSearchDropdown && searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden z-50">
+                  <div className="max-h-80 overflow-y-auto">
+                    {searchResults.map((result, idx) => (
+                      <Link
+                        key={idx}
+                        to={result.link}
+                        onClick={() => setShowSearchDropdown(false)}
+                        className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 border-b border-gray-100 last:border-0 transition-colors"
+                      >
+                        <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          {result.icon === 'MapPin' && <MapPin className="w-5 h-5 text-teal-600" />}
+                          {result.icon === 'Building2' && <Building2 className="w-5 h-5 text-teal-600" />}
+                          {result.icon === 'Home' && <Home className="w-5 h-5 text-teal-600" />}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-900">{result.title}</p>
+                          <p className="text-sm text-gray-500">{result.subtitle}</p>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-gray-400" />
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
-      </header>
 
-      <section className="relative py-20 md:py-28 text-white">
-        <div className="absolute inset-0 w-full h-full overflow-hidden">
-          <img src="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=1980&auto=format&fit=crop" fetchpriority="high" width="1980" height="1080" alt="Hero background" className="absolute inset-0 w-full h-full object-cover animate-kenburns" />
-          <div className="absolute inset-0 w-full h-full bg-black/60"></div> 
-        </div>
-
-        <div className="container mx-auto px-4 sm:px-6 text-center relative z-10">
-          <h1 className="text-3xl md:text-4xl font-bold mb-6" style={{ color: "#fffcf2" }}>
-            SEARCH. CONNECT. SUCCEED.
-          </h1>
-          <div className="relative w-full max-w-2xl mx-auto">
-            <input type="text" placeholder="Search for 'PG near me' or 'Hostel in Kota'" className="w-full p-4 pl-5 pr-14 rounded-md bg-white text-gray-900 border-transparent focus:ring-4 focus:ring-cyan-300/50 focus:outline-none placeholder-gray-500 shadow-lg" />
-            <button type="submit" aria-label="Search" className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2.5 bg-blue-600 hover:bg-blue-700 rounded-md transition-colors">
-              <i data-lucide="search" className="w-5 h-5 text-white"></i>
-            </button>
+        {/* Cities Sub-navigation */}
+        <div className="hidden md:block bg-[#f8f9fa] border-b border-gray-200">
+          <div className="max-w-none w-full mx-auto px-4 md:px-8 lg:px-12">
+            <div className="flex items-center justify-center h-8 text-[13px] font-medium text-gray-600">
+              <div className="flex items-center justify-center space-x-10 w-full">
+                {Object.keys(cityAreasMap).slice(0, 6).map((city) => {
+                  const areas = cityAreasMap[city] || [];
+                  return (
+                    <div key={city} className="relative group h-full flex items-center">
+                      <Link to={`/website/ourproperty?city=${encodeURIComponent(city)}`} className="flex items-center space-x-1 hover:text-black cursor-pointer h-full">
+                        <span>{city}</span>
+                        <ChevronDown className="w-3.5 h-3.5 text-gray-400 group-hover:text-black transition-colors" />
+                      </Link>
+                      {areas.length > 0 && (
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 w-48 bg-white shadow-xl rounded-b-lg border border-gray-100 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100]">
+                          {areas.map((area) => (
+                            <Link
+                              key={area}
+                              to={`/website/ourproperty?city=${encodeURIComponent(city)}&area=${encodeURIComponent(area)}`}
+                              className="block px-4 py-2 text-xs text-gray-600 hover:bg-teal-50 hover:text-teal-600 transition-colors"
+                            >
+                              {area}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <Link to="/website/ourproperty" className="flex items-center space-x-1 hover:text-black cursor-pointer group font-semibold h-full">
+                  <span>All Cities</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-400 group-hover:text-black transition-colors" />
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
-      </section>
 
-      <main className="container mx-auto px-4 sm:px-6 py-8 md:py-12 space-y-16">
-        {/* Offerings Section */}
-        <section className="light-card rounded-2xl p-6">
-          <h2 className="text-2xl font-bold mb-6 text-gray-900">Our Offerings</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {loadingOfferings ? (
-              // Skeleton loaders
-              [1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="animate-pulse bg-gray-200 rounded-xl h-40"></div>
-              ))
-            ) : offerings.length > 0 ? (
-              offerings.map((item, idx) => (
-                <a 
-                  key={idx} 
-                  href={item.link || `/website/ourproperty?type=${item.category.toLowerCase()}`} 
-                  className="group block"
-                >
-                  <div className="relative rounded-xl shadow-md hover:shadow-lg overflow-hidden h-40 cursor-pointer transition-shadow duration-300">
-                    <img 
-                      src={item.images?.[0] || item.image || `https://res.cloudinary.com/dpwgvcibj/image/upload/v1768990227/roomhy/website/${idx === 0 ? 'angels-hostel' : idx === 1 ? '401230348' : idx === 2 ? 'pg' : 'post'}.jpg`} 
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                      alt={item.title} 
-                      loading="lazy"
-                      width="400"
-                      height="300"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent">
-                      <div className="absolute bottom-0 left-0 right-0 p-4">
-                        <h3 className="text-white text-center text-sm sm:text-base font-bold">{item.title}</h3>
-                        <p className="text-white/60 text-[10px] text-center line-clamp-1">{item.description}</p>
+        {/* What We Offer */}
+        <section className="py-1 md:py-4 bg-white">
+          <div className="max-w-none w-full mx-auto px-4 md:px-8 lg:px-12 mt-1 md:mt-4">
+            <div className="text-center mb-4">
+              <h2 className="text-xl md:text-3xl font-bold text-gray-900 mb-1">What We Offer</h2>
+              <p className="text-xs md:text-base text-gray-600">Choose from a variety of accommodation types tailored for students</p>
+            </div>
+
+            {/* Desktop Grid */}
+            <div className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
+              {offerings.map((offering) => {
+                const selectedIdx = offeringSelectedImage[offering.title] || 0;
+                const allImages = offering.images;
+                const totalImages = allImages.length;
+
+                const nextImage = () => {
+                  setOfferingSelectedImage(prev => ({ ...prev, [offering.title]: (selectedIdx + 1) % totalImages }));
+                };
+                const prevImage = () => {
+                  setOfferingSelectedImage(prev => ({ ...prev, [offering.title]: (selectedIdx - 1 + totalImages) % totalImages }));
+                };
+
+                return (
+                  <div
+                    key={offering.title}
+                    onClick={() => offering.link ? navigate(offering.link) : navigate(`/website/ourproperty?type=${offering.category.toLowerCase()}`)}
+                    className="bg-white rounded-xl overflow-hidden shadow hover:shadow-xl transition-all group cursor-pointer"
+                  >
+                    <div className="h-40 overflow-hidden relative">
+                      <img src={allImages[selectedIdx]} alt={offering.title} className="w-full h-full object-cover transition-all duration-300" loading="lazy" width="200" height="160" />
+                      <div className="absolute top-0 left-0 right-0 p-2 bg-gradient-to-b from-black/50 to-transparent">
+                        <h3 className="text-base font-bold text-white drop-shadow-md">{offering.title}</h3>
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 p-2 transform translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+                        <p className="text-xs text-white drop-shadow-md line-clamp-2">{offering.description}</p>
+                      </div>
+                      {totalImages > 1 && (
+                        <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); prevImage(); }} className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-transparent hover:bg-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-10">
+                          <ChevronLeft className="w-6 h-6 text-white drop-shadow-lg" />
+                        </button>
+                      )}
+                      {totalImages > 1 && (
+                        <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); nextImage(); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-transparent hover:bg-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-10">
+                          <ChevronRight className="w-6 h-6 text-white drop-shadow-lg" />
+                        </button>
+                      )}
+                      <div className="absolute top-2 right-2 bg-black/60 text-white px-2 py-1 rounded text-xs">{selectedIdx + 1} / {totalImages}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Mobile Scroll */}
+            <div className="md:hidden relative -mx-4">
+              <div ref={offeringScrollContainerRef} className="overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing">
+                <div className="flex gap-4 w-max px-2 py-3">
+                  {offerings.map((offering) => (
+                    <div
+                      key={offering.title}
+                      onClick={() => navigate(`/website/ourproperty?type=${offering.category.toLowerCase()}`)}
+                      className="flex-shrink-0 w-32 bg-white rounded-lg overflow-hidden shadow cursor-pointer"
+                    >
+                      <div className="h-24 overflow-hidden relative group">
+                        <img src={offering.images[0]} alt={offering.title} className="w-full h-full object-cover" loading="lazy" width="128" height="96" />
+                        <div className="absolute top-0 left-0 right-0 p-1 bg-gradient-to-b from-black/50 to-transparent">
+                          <h3 className="text-xs font-bold text-white drop-shadow-md truncate">{offering.title}</h3>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </a>
-              ))
-            ) : (
-              <p className="col-span-full text-center text-gray-500">No offerings available</p>
-            )}
-          </div>
-        </section>
-
-        <HowRoomhyWorks />
-
-        {/* Why Roomhy Section */}
-        <section className="scroll-mt-20 light-card rounded-2xl p-6 md:p-8">
-          <div className="lg:grid lg:grid-cols-2 lg:gap-16 lg:items-center">
-            <div className="text-left lg:order-2">
-              <h2 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600">Why Roomhy?</h2>
-              <p className="text-gray-600 mb-6 text-lg mt-4">Roomhy was built by students, for students. We experienced the chaos of finding a reliable place to live and knew there had to be a better way.</p>
-              <p className="text-gray-600">We're more than a platform; we're your first friend in a new city, dedicated to helping you find a space where you can thrive.</p>
-            </div>
-            <div className="w-full max-w-3xl mx-auto grid grid-cols-2 grid-rows-2 gap-4 mt-8 lg:mt-0 lg:order-1">
-              <div className="row-span-2 col-span-1">
-                <img src="https://res.cloudinary.com/dpwgvcibj/image/upload/v1768990242/roomhy/website/hostel1.png.jpg" loading="lazy" width="400" height="600" className="h-full w-full object-cover rounded-2xl shadow-lg" alt="Student accommodation" />
-              </div>
-              <div className="col-span-1">
-                <img src="https://res.cloudinary.com/dpwgvcibj/image/upload/v1768990244/roomhy/website/hostel2.jpg" loading="lazy" width="400" height="300" className="h-full w-full object-cover rounded-2xl shadow-lg" alt="Common room" />
-              </div>
-              <div className="col-span-1">
-                <img src="https://res.cloudinary.com/dpwgvcibj/image/upload/v1768990245/roomhy/website/hostel3.jpg" loading="lazy" width="400" height="300" className="h-full w-full object-cover rounded-2xl shadow-lg" alt="Student hallway" />
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* FAQ Section */}
-        <section id="faq" className="scroll-mt-20 py-12">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid lg:grid-cols-12 gap-10">
-              <div className="lg:col-span-4">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">Frequently Asked Questions</h2>
-                <p className="text-lg text-gray-500 hidden lg:block">Everything you need to know about finding your perfect home with Roomhy.</p>
+        <MobileVideoSection />
+
+        {/* How Roomhy Works */}
+        <section className="hidden md:block py-4 bg-white border-t border-gray-100 mt-4">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-2">
+            <div className="text-center mb-4">
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-0.5">How Roomhy Works</h2>
+              <p className="text-sm text-gray-600">Find, compare, and book your perfect stay in just a few steps</p>
+            </div>
+            <div className="relative max-w-xl mx-auto rounded-2xl overflow-hidden shadow-lg group aspect-video">
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent z-10 pointer-events-none"></div>
+              <iframe
+                className="absolute top-0 left-0 w-full h-full"
+                src="https://www.youtube.com/embed/4pFUP0HZwWM"
+                title="How Roomhy Works"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              ></iframe>
+              <div className="absolute bottom-5 left-5 z-20 text-white">
+                <h3 className="text-xl font-semibold">Watch Demo</h3>
+                <p className="text-sm text-white/80">See how booking works</p>
               </div>
-              <div className="lg:col-span-8 space-y-2">
-                {[
-                  { q: "What is Roomhy and how does it work?", a: "Roomhy is a student accommodation platform that connects students directly with verified property owners. You search, shortlist, and book properties like PG, hostels, and apartments without paying any brokerage fees." },
-                  { q: "Is Roomhy completely broker-free?", a: "Yes, absolutely. Our core promise is zero brokerage. We eliminate the middleman, ensuring you only pay the rent and a small, refundable security deposit directly to the property owner." },
-                  { q: "How do I place a bid on a property?", a: "When viewing a property, you can see the owner's expected price. You can then submit a 'bid' or offer that you are willing to pay. The owner can accept, reject, or counter your offer." },
-                  { q: "What types of properties are listed?", a: "We offer Hostels (shared rooms, budget-friendly), PGs (Paying Guest accommodation with meals and services), and Apartments (private flats for independent living)." }
-                ].map((faq, idx) => (
-                  <div key={idx} className="faq-item border border-gray-200 rounded-lg">
-                    <div className="faq-question p-4 flex justify-between items-center cursor-pointer hover:bg-gray-50">
-                      <span className="font-medium text-gray-900">{faq.q}</span>
-                      <i data-lucide="chevron-down" className="w-5 h-5 text-gray-500"></i>
+            </div>
+          </div>
+        </section>
+
+        {/* Trending Stays - Desktop */}
+        <section className="hidden md:block py-1 md:py-2 bg-white">
+          <div className="max-w-none w-full mx-auto px-4 md:px-8 lg:px-12 mt-1 md:mt-2">
+            <div className="flex flex-col items-center justify-center text-center mb-4">
+              <h2 className="text-3xl font-bold text-gray-900 mb-1">Trending Stays This Week</h2>
+              <p className="text-base text-gray-600">Most popular properties among students</p>
+            </div>
+            <div className="relative">
+              {trendingProperties.length > trendingPerView && canShowPrevTrending && (
+                <button onClick={prevTrending} className="absolute -left-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center hover:shadow-xl transition-all">
+                  <ChevronLeft className="w-5 h-5 text-gray-600" />
+                </button>
+              )}
+              {trendingProperties.length > trendingPerView && canShowNextTrending && (
+                <button onClick={nextTrending} className="absolute -right-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center hover:shadow-xl transition-all">
+                  <ChevronRight className="w-5 h-5 text-gray-600" />
+                </button>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-6">
+                {visibleTrending.map((property) => (
+                  <Link key={property._id} to={`/website/property-details/${property._id}`} className="group block cursor-pointer">
+                    <div className="relative h-36 rounded-md overflow-hidden mb-2">
+                      <img src={property.image} alt={property.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" width="300" height="144"
+                        onError={(e) => { e.target.src = `https://picsum.photos/600/400?random=${Math.floor(Math.random() * 100)}`; }}
+                      />
+                      {property.verified && (
+                        <div className="absolute top-2 left-2 bg-white/20 backdrop-blur border border-white/30 rounded px-1.5 py-0.5 flex items-center shadow-lg">
+                          <BadgeCheck className="w-3.5 h-3.5 text-teal-600 mr-1" />
+                          <span className="text-[10px] font-bold text-gray-900">Verified</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="faq-answer px-4 pb-4 text-gray-600 hidden">
-                      <p>{faq.a}</p>
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-sm mb-0.5 line-clamp-1 group-hover:text-teal-600 transition-colors">{property.name || 'Roomhy Property'}</h3>
+                      <div className="text-gray-500 text-[11px] mb-1 line-clamp-1">{property.location}</div>
+                      <div className="flex items-center gap-1.5 mb-1 text-[11px]">
+                        <div className="bg-[#1AB64F] text-white px-1 py-0.5 rounded text-[10px] font-bold flex items-center gap-0.5">
+                          {property.rating} <Star className="w-2.5 h-2.5 fill-white text-white" />
+                        </div>
+                        <span className="text-gray-500">Excellent</span>
+                      </div>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-base font-bold text-gray-900">
+                          {property.monthlyRent ? `₹${property.monthlyRent.toLocaleString()}` : (property.price || '₹0')}
+                        </span>
+                        <span className="text-[10px] text-gray-500 line-through">₹9,999</span>
+                        <span className="text-[10px] font-semibold text-[#f5a623]">40% off</span>
+                      </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>
           </div>
         </section>
-      </main>
 
-      {/* Simple Footer */}
-      <footer className="bg-gray-50 border-t border-gray-200">
-        <div className="container mx-auto px-4 sm:px-6 py-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-500 text-sm">© 2025 Roomhy. All Rights Reserved.</p>
-            <div className="flex gap-4 mt-4 md:mt-0">
-              <a href="/website/terms" className="text-gray-500 hover:text-gray-700 text-sm">Terms</a>
-              <a href="/website/privacy" className="text-gray-500 hover:text-gray-700 text-sm">Privacy</a>
+        {/* Mobile Trending Stays */}
+        <section className="md:hidden py-1 bg-gray-50">
+          <div className="max-w-none w-full mx-auto px-4 md:px-8 lg:px-12">
+            <div className="text-center mb-3">
+              <h2 className="text-xl font-bold text-gray-900 mb-1">Trending Stays This Week</h2>
+              <p className="text-xs text-gray-600">Most popular properties among students</p>
+            </div>
+            <div className="relative -mx-4">
+              <div ref={trendingScrollContainerRef} className="overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing">
+                <div className="flex gap-3 w-max px-2 py-3">
+                  {trendingProperties.map((property) => (
+                    <Link key={property._id} to={`/website/property-details/${property._id}`} onClick={() => property._id && trackPropertyClick(property._id)} className="flex-shrink-0 w-36 block active:scale-95 transition-transform">
+                      <div className="relative h-24 rounded-2xl overflow-hidden shadow-md mb-2">
+                        <img src={property.image} alt={property.name} className="w-full h-full object-cover" loading="lazy" width="144" height="96"
+                          onError={(e) => { e.target.src = `https://picsum.photos/600/400?random=${Math.floor(Math.random() * 100)}`; }}
+                        />
+                        <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur rounded-md px-1.5 py-0.5 flex items-center gap-1 shadow-sm">
+                          <Star className="w-2.5 h-2.5 fill-yellow-400 text-yellow-400" />
+                          <span className="text-[10px] font-bold text-gray-800">{property.rating}</span>
+                        </div>
+                      </div>
+                      <h3 className="font-bold text-gray-900 text-sm mb-0 line-clamp-1">{property.name || 'Roomhy Property'}</h3>
+                      <div className="flex items-center text-gray-600 font-medium text-[10px] mb-0">
+                        <MapPin className="w-2.5 h-2.5 mr-0.5 flex-shrink-0" />
+                        <span className="line-clamp-1">{property.location}</span>
+                      </div>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-sm font-bold text-gray-900">{property.monthlyRent ? `₹${property.monthlyRent.toLocaleString()}` : (property.price || '₹0')}</span>
+                        <span className="text-[10px] text-gray-500 line-through">₹9,999</span>
+                        <span className="text-[10px] font-semibold text-teal-600">30% off</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </footer>
+        </section>
+
+        {/* Recently Viewed Properties */}
+        {recentlyViewed.length > 0 && (
+          <section className="py-1 md:py-2 bg-white">
+            <div className="max-w-none w-full mx-auto px-4 md:px-8 lg:px-12 mt-1 md:mt-2">
+              <div className="text-center mb-2">
+                <div className="flex items-center justify-center gap-2 mb-0.5">
+                  <TrendingUp className="w-4 h-4 text-teal-600" />
+                  <h2 className="text-xl md:text-2xl font-bold text-gray-900">Recently Viewed</h2>
+                </div>
+                <p className="text-[10px] md:text-sm text-gray-600">Pick up where you left off</p>
+              </div>
+              <div className="relative hidden md:block">
+                {recentlyViewed.length > recentlyViewedPerView && canShowPrevRecentlyViewed && (
+                  <button onClick={prevRecentlyViewed} className="absolute -left-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center hover:shadow-xl transition-all">
+                    <ChevronLeft className="w-5 h-5 text-gray-600" />
+                  </button>
+                )}
+                {recentlyViewed.length > recentlyViewedPerView && canShowNextRecentlyViewed && (
+                  <button onClick={nextRecentlyViewed} className="absolute -right-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center hover:shadow-xl transition-all">
+                    <ChevronRight className="w-5 h-5 text-gray-600" />
+                  </button>
+                )}
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-x-4 gap-y-6">
+                  {visibleRecentlyViewed.map((item) => (
+                    <Link key={item.id} to={`/website/property-details/${item.id}`} className="group block cursor-pointer">
+                      <div className="relative h-36 rounded-md overflow-hidden mb-2">
+                        <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" width="300" height="144"
+                          onError={(e) => { e.target.src = `https://picsum.photos/600/400?random=${Math.floor(Math.random() * 100)}`; }}
+                        />
+                        <div className="absolute top-2 left-2 flex gap-1">
+                          <div className="bg-white/20 backdrop-blur border border-white/30 rounded px-1.5 py-0.5 flex items-center shadow-lg">
+                            <span className="text-[9px] font-bold text-teal-600 uppercase tracking-wider">{item.type || 'PG'}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-gray-900 text-sm mb-0.5 line-clamp-1 group-hover:text-teal-600 transition-colors">{item.name}</h3>
+                        <div className="text-gray-500 text-[11px] mb-1 line-clamp-1">{item.location}</div>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-base font-bold text-gray-900">₹{item.price}</span>
+                          <span className="text-[10px] text-gray-500 line-through">₹9,999</span>
+                          <span className="text-[10px] font-semibold text-[#f5a623]">30% off</span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+              <div className="md:hidden -mx-4 overflow-x-auto scrollbar-hide">
+                <div className="flex gap-3 px-2 pb-4 w-max">
+                  {recentlyViewed.map((item) => (
+                    <Link key={item.id} to={`/website/property-details/${item.id}`} className="flex-shrink-0 w-36">
+                      <div className="relative h-24 rounded-2xl overflow-hidden shadow-md mb-2">
+                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" loading="lazy" width="144" height="96" />
+                        <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur rounded-md px-1.5 py-0.5 flex items-center gap-1 shadow-sm">
+                          <Star className="w-2.5 h-2.5 fill-yellow-400 text-yellow-400" />
+                          <span className="text-[10px] font-bold text-gray-800">4.5</span>
+                        </div>
+                      </div>
+                      <h3 className="font-bold text-gray-900 text-sm mb-0 line-clamp-1">{item.name}</h3>
+                      <div className="flex items-center text-gray-600 font-medium text-[10px] mb-0">
+                        <MapPin className="w-2.5 h-2.5 mr-0.5 flex-shrink-0" />
+                        <span className="line-clamp-1">{item.location}</span>
+                      </div>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-sm font-bold text-gray-900">₹{item.price}</span>
+                        <span className="text-[10px] text-gray-500 line-through">₹{Math.round(item.price * 1.3)}</span>
+                        <span className="text-[10px] font-semibold text-teal-600">30% off</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Why Choose Roomhy */}
+        <WhyRoomhy />
+
+        {/* Reviews Slider Section */}
+        <section className="py-2 md:py-4 bg-gradient-to-b from-white to-gray-50 overflow-hidden mt-2">
+          <div className="max-w-none w-full mx-auto px-4 md:px-8 lg:px-12 mb-2 md:mb-4">
+            <div className="text-center">
+              <h2 className="text-xl md:text-3xl font-bold text-gray-900 mb-1">What Students Say</h2>
+              <p className="text-xs md:text-base text-gray-600">Trusted by 10,000+ students across India</p>
+            </div>
+          </div>
+          <div className="relative">
+            <div className="flex animate-scroll-left hover:pause-animation">
+              {[...Array(2)].flatMap((_, setIdx) => [
+                { name: "Rahul Sharma", role: "IIT Delhi Student", rating: 5, text: "Roomhy made finding my hostel so easy! Zero brokerage and the bidding feature helped me get a great deal.", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face" },
+                { name: "Priya Patel", role: "Medical Student", rating: 5, text: "The 24/7 support team helped me find a safe PG near my college. Best platform for students!", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face" },
+                { name: "Amit Kumar", role: "Engineering Student", rating: 5, text: "Found a fully furnished apartment in just 2 days. The direct chat with owners saved so much time.", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face" },
+                { name: "Sneha Gupta", role: "MBA Student", rating: 5, text: "Love the verified listings! No fake photos or hidden charges. Roomhy is a game changer.", avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face" },
+                { name: "Vikram Singh", role: "Law Student", rating: 4, text: "The ₹500 booking token is such a smart feature. It shows owners you're serious about renting.", avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face" },
+                { name: "Anjali Mehta", role: "CA Student", rating: 5, text: "Moved to Kota for coaching and found the perfect hostel within a day. Thank you Roomhy!", avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face" }
+              ].map((review, idx) => (
+                <div key={`${setIdx}-${idx}`} className="flex-shrink-0 w-[280px] mx-2">
+                  <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100 h-full">
+                    <div className="flex items-center gap-2 mb-3">
+                      <img src={review.avatar} alt={review.name} className="w-10 h-10 rounded-full object-cover border-2 border-teal-100" loading="lazy" width="40" height="40" />
+                      <div>
+                        <h4 className="font-semibold text-gray-900 text-sm">{review.name}</h4>
+                        <p className="text-xs text-gray-500">{review.role}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1 mb-2">
+                      {[...Array(5)].map((_, i) => (
+                        <Star key={i} className={`w-3 h-3 ${i < review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
+                      ))}
+                    </div>
+                    <p className="text-gray-600 text-xs leading-relaxed italic">"{review.text}"</p>
+                  </div>
+                </div>
+              )))}
+            </div>
+          </div>
+          <style>{`
+            @keyframes scroll-left {
+              0% { transform: translateX(0); }
+              100% { transform: translateX(-50%); }
+            }
+            .animate-scroll-left {
+              animation: scroll-left 30s linear infinite;
+            }
+            .animate-scroll-left:hover {
+              animation-play-state: paused;
+            }
+            .scrollbar-hide::-webkit-scrollbar { display: none; }
+            .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+          `}</style>
+        </section>
+
+      </main>
+
+      <WebsiteFooter />
+      <MobileBottomNav />
     </div>
   );
 }

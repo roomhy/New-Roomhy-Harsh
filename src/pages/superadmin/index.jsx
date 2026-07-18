@@ -44,14 +44,24 @@ export default function SuperadminIndexPage() {
     const handleLogin = async (e) => {
         e.preventDefault();
         setError("");
-        
+
+        // Read directly from form elements as fallback for browser autofill edge cases
+        const formEl = e.target;
+        const identifierVal = loginId || (formEl.elements['identifier']?.value || "").trim();
+        const passwordVal = password || (formEl.elements['password']?.value || "").trim();
+
+        if (!identifierVal || !passwordVal) {
+            setError("Please enter your email/ID and password.");
+            return;
+        }
+
         const API_URL = getApiBase();
 
         try {
             const res = await fetch(`${API_URL}/api/auth/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ identifier: loginId, password })
+                body: JSON.stringify({ identifier: identifierVal, password: passwordVal })
             });
             const data = await res.json();
 
@@ -327,9 +337,12 @@ export default function SuperadminIndexPage() {
                                     <User size={20} />
                                 </span>
                                 <input 
-                                    type="text" 
+                                    type="text"
+                                    name="identifier"
+                                    autoComplete="username"
                                     value={loginId}
                                     onChange={(e) => setLoginId(e.target.value)}
+                                    onBlur={(e) => setLoginId(e.target.value)}
                                     className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 transition-all outline-none text-slate-800 placeholder:text-slate-400" 
                                     placeholder="Enter your ID..." 
                                     required
@@ -345,9 +358,12 @@ export default function SuperadminIndexPage() {
                                     <Lock size={20} />
                                 </span>
                                 <input 
-                                    type={showPassword ? "text" : "password"} 
+                                    type={showPassword ? "text" : "password"}
+                                    name="password"
+                                    autoComplete="current-password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
+                                    onBlur={(e) => setPassword(e.target.value)}
                                     className="w-full pl-12 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 transition-all outline-none text-slate-800 placeholder:text-slate-400" 
                                     placeholder="••••••••" 
                                     required

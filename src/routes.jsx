@@ -1,5 +1,6 @@
 import React, { lazy } from "react";
 
+// Force Vite to re-evaluate import.meta.glob for the new alerts routes
 const pageModules = import.meta.glob("./pages/**/*.jsx");
 const rootModules = import.meta.glob("./HomePage.jsx");
 const frontendModules = import.meta.glob("../../Frontend/src/*.jsx");
@@ -62,10 +63,26 @@ const routeEntries = [
   ["/superadmin/accounting/commission", "./pages/superadmin/accounting_commission.jsx"],
   ["/superadmin/accounting/subscriptions", "./pages/superadmin/accounting_subscriptions.jsx"],
   ["/superadmin/accounting/payouts", "./pages/superadmin/accounting_payouts.jsx"],
+  ["/superadmin/accounting/payouts/cycle", "./pages/superadmin/accounting_payouts_cycle.jsx"],
+  ["/superadmin/accounting/payouts/options", "./pages/superadmin/accounting_payouts_options.jsx"],
+  ["/superadmin/accounting/payouts/pending", "./pages/superadmin/accounting_payouts_pending.jsx"],
+  ["/superadmin/accounting/payouts/cash-received", "./pages/superadmin/accounting_payouts_cash_received.jsx"],
+  ["/superadmin/accounting/payouts/failed", "./pages/superadmin/accounting_payouts_failed.jsx"],
   ["/superadmin/accounting/invoices", "./pages/superadmin/accounting_invoices.jsx"],
   ["/superadmin/accounting/taxes", "./pages/superadmin/accounting_taxes.jsx"],
   ["/superadmin/accounting/reports", "./pages/superadmin/accounting_reports.jsx"],
+  ["/superadmin/accounting/reports/roomhy-revenue", "./pages/superadmin/accounting_reports_roomhy_revenue.jsx"],
+  ["/superadmin/accounting/reports/owner-revenue", "./pages/superadmin/accounting_reports_owner_revenue.jsx"],
+  ["/superadmin/accounting/reports/due-rents", "./pages/superadmin/accounting_reports_due_rents.jsx"],
+  ["/superadmin/accounting/reports/profit-loss", "./pages/superadmin/accounting_reports_profit_loss.jsx"],
+  ["/superadmin/accounting/reports/cashflow", "./pages/superadmin/accounting_reports_cashflow.jsx"],
+  ["/superadmin/accounting/reports/transactions", "./pages/superadmin/accounting_reports_transactions.jsx"],
+  ["/superadmin/accounting/alerts/rent-due-reminders", "./pages/superadmin/accounting_alerts_rent_due_reminders.jsx"],
+  ["/superadmin/accounting/alerts/payments", "./pages/superadmin/accounting_alerts_payments.jsx"],
+  ["/superadmin/accounting/alerts/payouts", "./pages/superadmin/accounting_alerts_payouts.jsx"],
   ["/superadmin/accounting/settings", "./pages/superadmin/accounting_settings.jsx"],
+  ["/superadmin/accounting-overview", "./pages/superadmin/accounting-overview.jsx"],
+  ["/superadmin/home/revenue-overview", "./pages/superadmin/home-revenue-overview.jsx"],
   ["/superadmin/reports", "./pages/superadmin/reports_overview.jsx"],
   ["/superadmin/reports/listings", "./pages/superadmin/reports_listings.jsx"],
   ["/superadmin/reports/users", "./pages/superadmin/reports_users.jsx"],

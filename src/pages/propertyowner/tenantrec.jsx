@@ -724,6 +724,52 @@ export default function TenantRec() {
   const handleSubmit = async () => {
     if (submitting) return;
 
+    // Run validation checks
+    const newErrors = {};
+    if (!basicDetails.fullName) newErrors.fullName = "Name is required";
+    if (!basicDetails.email) newErrors.email = "Email is required";
+    const phoneDigits = (basicDetails.phone || "").replace(/\D/g, "");
+    if (!phoneDigits) newErrors.phone = "Phone is required";
+    else if (!/^[6-9]\d{9}$/.test(phoneDigits)) newErrors.phone = "Please enter a valid mobile number";
+    if (!basicDetails.dob) newErrors.dob = "Date of Birth is required";
+    if (!basicDetails.gender) newErrors.gender = "Gender is required";
+    if (!basicDetails.idProofNumber) newErrors.idProofNumber = "ID Proof No is required";
+    if (!basicDetails.idProofFile) newErrors.idProofFile = "Proof upload is required";
+
+    if (!roomAssignment.propertyId) newErrors.propertyId = "Property is required";
+    if (!roomAssignment.floor) newErrors.floor = "Floor is required";
+    if (!roomAssignment.rentAgreementType) newErrors.rentAgreementType = "Agreement type is required";
+
+    if (!tenancyDetails.rentAmount) newErrors.rentAmount = "Rent is required";
+    if (!tenancyDetails.depositAmount) newErrors.depositAmount = "Deposit is required";
+    if (!tenancyDetails.moveInDate) newErrors.moveInDate = "Move-in date is required";
+    if (!tenancyDetails.paymentFrequency) newErrors.paymentFrequency = "Payment frequency is required";
+
+    if (!additionalDetails.emergencyName) newErrors.emergencyName = "Emergency name is required";
+    const emergencyDigits = (additionalDetails.emergencyPhone || "").replace(/\D/g, "");
+    if (!emergencyDigits) newErrors.emergencyPhone = "Emergency phone is required";
+    else if (!/^[6-9]\d{9}$/.test(emergencyDigits)) newErrors.emergencyPhone = "Please enter a valid mobile number";
+    else if (emergencyDigits === phoneDigits) newErrors.emergencyPhone = "Emergency number cannot be the same as tenant's number";
+    if (!additionalDetails.relationship) newErrors.relationship = "Relationship is required";
+
+    setErrors(newErrors);
+
+    if (Object.keys(newErrors).length > 0) {
+      toast.error("Please fill all required fields correctly.");
+      if (isMobile) {
+        if (newErrors.fullName || newErrors.email || newErrors.phone || newErrors.dob || newErrors.gender || newErrors.idProofNumber || newErrors.idProofFile) {
+          setActiveMobileTab(1);
+        } else if (newErrors.propertyId || newErrors.floor || newErrors.roomUnit || newErrors.rentAgreementType) {
+          setActiveMobileTab(2);
+        } else if (newErrors.rentAmount || newErrors.depositAmount || newErrors.moveInDate || newErrors.paymentFrequency) {
+          setActiveMobileTab(3);
+        } else if (newErrors.emergencyName || newErrors.emergencyPhone || newErrors.relationship) {
+          setActiveMobileTab(4);
+        }
+      }
+      return;
+    }
+
     if (!confirmDetails) {
       toast.error("Please confirm the details are correct.");
       return;
@@ -880,7 +926,7 @@ export default function TenantRec() {
               className="px-4 h-10 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-md shadow-slate-900/10"
             >
               {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              Save & Onboard
+              {editMode ? "Save Changes" : "Save & Onboard"}
             </button>
           )}
         </div>
@@ -1379,7 +1425,7 @@ export default function TenantRec() {
                 className="w-full h-10 rounded-lg bg-emerald-600 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2"
               >
                 {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                Save & Onboard
+                {editMode ? "Save Changes" : "Save & Onboard"}
               </button>
             </div>
           )}
@@ -1392,7 +1438,9 @@ export default function TenantRec() {
 
               {/* Onboarding Summary */}
               <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-                <h3 className="font-serif text-[16px] text-foreground">Onboarding Summary</h3>
+                <h3 className="font-serif text-[16px] text-foreground">
+                  {editMode ? "Tenant Details Summary" : "Onboarding Summary"}
+                </h3>
                 <div className="divide-y divide-border">
                   {(() => {
                     const propName = properties.find(p => p._id === roomAssignment.propertyId)?.title;

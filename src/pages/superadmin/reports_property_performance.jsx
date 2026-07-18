@@ -45,14 +45,18 @@ export default function ReportsPropertyPerformance() {
   const propertyPerformance = data?.charts?.propertyPerformance || [];
 
   const filteredProperties = propertyPerformance.filter(p => 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    p.loc.toLowerCase().includes(searchQuery.toLowerCase())
+    (p.name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (p.loc || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const chartData = propertyPerformance.map(p => ({
-    name: p.name.length > 15 ? p.name.substring(0, 15) + "..." : p.name,
-    Revenue: parseFloat(p.revenue.replace(/[^0-9.]/g, "")) || 0
-  }));
+  const chartData = propertyPerformance.map(p => {
+    const nameStr = p.name || "";
+    const revVal = p.rev !== undefined && p.rev !== null ? p.rev : 0;
+    return {
+      name: nameStr.length > 15 ? nameStr.substring(0, 15) + "..." : nameStr,
+      Revenue: Number(revVal) || 0
+    };
+  });
 
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-full font-inter text-slate-900">

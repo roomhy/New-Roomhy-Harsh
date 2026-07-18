@@ -143,7 +143,7 @@ export default function RentHistory() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
          <div className="flex flex-col gap-2">
             <h1 className="text-4xl font-bold text-slate-800 tracking-tight leading-none">Rent History</h1>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-2">Global Revenue Collection, Financial Yield Monitoring & Fiscal Compliance Matrix</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-2">Track rents collected, pending dues, and view payment logs.</p>
          </div>
          <div className="flex items-center gap-4">
             <button 
@@ -156,24 +156,24 @@ export default function RentHistory() {
               onClick={exportToExcel}
               className="bg-white text-slate-600 border border-slate-100 px-8 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest shadow-xl shadow-slate-200 transition-all flex items-center gap-3 active:scale-95"
             >
-               <Sheet className="w-4 h-4" /> Export Fiscal Audit
+               <Sheet className="w-4 h-4" /> Export Excel
             </button>
          </div>
       </div>
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCardHorizontal label="Gross Receivables" value={formatMoney(stats.total)} trend="Contractual" up icon={IndianRupee} color="blue" />
-        <StatCardHorizontal label="Collected Pulse" value={formatMoney(stats.collected)} trend="Realized" up icon={CheckCircle2} color="emerald" />
-        <StatCardHorizontal label="Pending Risk" value={formatMoney(stats.pending)} trend="Exposure" up={false} icon={AlertCircle} color="amber" />
-        <StatCardHorizontal label="Collection Rate" value={`${stats.rate}%`} trend="Velocity" up icon={Activity} color="indigo" />
+        <StatCardHorizontal label="Expected Rent" value={formatMoney(stats.total)} trend="Expected" up icon={IndianRupee} color="blue" />
+        <StatCardHorizontal label="Rent Collected" value={formatMoney(stats.collected)} trend="Received" up icon={CheckCircle2} color="emerald" />
+        <StatCardHorizontal label="Pending Rent" value={formatMoney(stats.pending)} trend="Pending" up={false} icon={AlertCircle} color="amber" />
+        <StatCardHorizontal label="Collection Rate" value={`${stats.rate}%`} trend="Percentage" up icon={Activity} color="indigo" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Fiscal Health Hub */}
         <div className="lg:col-span-4 bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-2xl shadow-slate-200/50 flex flex-col items-center">
            <div className="flex items-center justify-between w-full mb-10">
-              <h3 className="text-[10px] font-bold text-slate-800 uppercase tracking-widest leading-none">Fiscal Health Matrix</h3>
+              <h3 className="text-[10px] font-bold text-slate-800 uppercase tracking-widest leading-none">Collection Summary</h3>
               <button onClick={loadData} className="p-3 rounded-2xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-all border border-slate-100 shadow-sm">
                  <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
               </button>
@@ -188,12 +188,12 @@ export default function RentHistory() {
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                  <p className="text-3xl font-black text-slate-800 tracking-tighter leading-none">{formatMoney(stats.collected)}</p>
-                 <p className="text-[8px] text-slate-400 font-bold uppercase mt-2 tracking-widest">Realized Yield</p>
+                 <p className="text-[8px] text-slate-400 font-bold uppercase mt-2 tracking-widest">Collected</p>
               </div>
            </div>
            <div className="w-full space-y-4">
-              <HealthItem label="Realized Yield" value={`₹${stats.collected.toLocaleString()}`} color="#10B981" percent={`${stats.rate}%`} />
-              <HealthItem label="Pending Pulse" value={`₹${stats.pending.toLocaleString()}`} color="#F59E0B" percent={`${100 - stats.rate}%`} />
+              <HealthItem label="Collected Rent" value={`₹${stats.collected.toLocaleString()}`} color="#10B981" percent={`${stats.rate}%`} />
+              <HealthItem label="Pending Rent" value={`₹${stats.pending.toLocaleString()}`} color="#F59E0B" percent={`${100 - stats.rate}%`} />
            </div>
         </div>
 
@@ -205,8 +205,8 @@ export default function RentHistory() {
                     <Layers size={20} />
                  </div>
                  <div>
-                    <h3 className="text-xl font-bold text-slate-800">Transaction Pulse Ledger</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Granular monitoring of all revenue inflows and defaults</p>
+                    <h3 className="text-xl font-bold text-slate-800">Rent Payment Logs</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">View detailed records of all rent payments.</p>
                  </div>
               </div>
               
@@ -218,7 +218,7 @@ export default function RentHistory() {
                       onChange={e => setFilterStatus(e.target.value)}
                       className="bg-transparent text-[10px] font-bold text-slate-600 outline-none uppercase tracking-widest border-none p-0 focus:ring-0"
                     >
-                       <option value="all">All Cycles</option>
+                       <option value="all">All Payments</option>
                        <option value="paid">Paid</option>
                        <option value="pending">Pending</option>
                        <option value="partially_paid">Partial</option>
@@ -229,7 +229,7 @@ export default function RentHistory() {
                     <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
                     <input 
                       value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                      placeholder="Search Ledger..." 
+                      placeholder="Search by tenant or property..." 
                       className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-6 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all shadow-sm" 
                     />
                  </div>
@@ -240,25 +240,25 @@ export default function RentHistory() {
               <table className="w-full text-left">
                  <thead>
                     <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] border-b border-slate-100">
-                       <th className="px-10 py-8">Resident / Property</th>
-                       <th className="px-6 py-8">Collection Cycle</th>
+                       <th className="px-10 py-8">Tenant &amp; Property</th>
+                       <th className="px-6 py-8">Month</th>
                        <th className="px-6 py-8 text-center">Amount Due</th>
                        <th className="px-6 py-8 text-center">Status</th>
-                       <th className="px-10 py-8 text-right">Method</th>
+                       <th className="px-10 py-8 text-right">Payment Method</th>
                     </tr>
                  </thead>
                  <tbody className="divide-y divide-slate-50">
                     {loading ? (
                       <tr><td colSpan="5" className="py-40 text-center">
                          <div className="w-16 h-16 border-4 border-blue-600/10 border-t-blue-600 rounded-full animate-spin mx-auto mb-8" />
-                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">Accessing Fiscal Database...</p>
+                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">Loading rent records...</p>
                       </td></tr>
                     ) : filteredData.length === 0 ? (
                       <tr><td colSpan="5" className="py-40 text-center">
                          <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-200">
                             <Wallet size={40} />
                          </div>
-                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No transaction records found</p>
+                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No rent payments found</p>
                       </td></tr>
                     ) : filteredData.map((r, i) => (
                       <tr key={i} className="group hover:bg-slate-50/50 transition-all duration-300">

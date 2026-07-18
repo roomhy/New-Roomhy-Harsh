@@ -48,6 +48,7 @@ export const sharedNavConfig = {
         label: "ACCOUNTING",
         links: [
           { label: "Dashboard", to: "/superadmin/accounting", icon: "dollar-sign" },
+          { label: "Revenue Overview", to: "/superadmin/home/revenue-overview", icon: "indian-rupee" },
           { label: "Transactions", to: "/superadmin/accounting/transactions", icon: "credit-card" },
           { label: "Disbursements", to: "/superadmin/accounting/payouts", icon: "send" },
           { label: "Rent Collections", to: "/superadmin/rentcollection", icon: "wallet" },

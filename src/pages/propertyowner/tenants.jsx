@@ -106,31 +106,9 @@ export default function Tenants() {
   });
 
   const handleEditClick = (t) => {
-    setEditingTenant(t);
-    setEditForm({
-      name: t.name || "",
-      phone: t.phone || "",
-      email: t.email || t.gmail || "",
-      dob: t.dob ? new Date(t.dob).toISOString().split('T')[0] : "",
-      gender: t.gender || "",
-      idProofType: t.idProof?.type || t.idProofType || "Aadhaar Card",
-      idProofNumber: t.idProof?.number || t.idProofNumber || "",
-      roomNo: t.roomNo || "",
-      bedNo: t.bedNo || "",
-      agreedRent: t.agreedRent || t.rent || "",
-      depositAmount: t.securityDepositTotal || t.depositAmount || "",
-      moveInDate: t.moveInDate ? new Date(t.moveInDate).toISOString().split('T')[0] : "",
-      paymentFrequency: t.paymentFrequency || "Monthly",
-      floor: t.floor || "",
-      building: t.building || "",
-      emergencyName: t.emergencyContact?.name || t.additional?.emergencyName || t.emergencyName || "",
-      emergencyPhone: t.emergencyContact?.phone || t.additional?.emergencyPhone || t.emergencyPhone || "",
-      relationship: t.emergencyContact?.relationship || t.additional?.relationship || t.relationship || "",
-      occupation: t.occupation || t.additional?.occupation || "",
-      permanentAddress: t.permanentAddress || t.additional?.permanentAddress || "",
-      remarks: t.remarks || t.additional?.remarks || "",
-    });
-    setEditModalOpen(true);
+    // Navigate to full Add Tenant form in edit mode (same page, pre-filled)
+    const tenantId = t._id || t.id;
+    window.location.href = `/propertyowner/tenantrec?edit=${tenantId}`;
   };
 
   const handleSaveEdit = async (e) => {
@@ -663,11 +641,11 @@ export default function Tenants() {
                           setSelectedIds(next);
                         }}
                       />
-                      <div className="w-11 h-11 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-[16px] font-bold shrink-0 border border-slate-200/50 shadow-inner">
+                      <div className="w-11 h-11 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-[16px] font-bold shrink-0 border border-slate-200/50 shadow-inner cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedTenant(t); setModalTab("overview"); setModalOpen(true); }}>
                         {getInitial(t.name)}
                       </div>
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <h3 className="text-[15px] font-bold text-slate-900 leading-tight">{t.name || "—"}</h3>
+                      <div onClick={(e) => { e.stopPropagation(); setSelectedTenant(t); setModalTab("overview"); setModalOpen(true); }} className="cursor-pointer">
+                        <h3 className="text-[15px] font-bold text-slate-900 leading-tight hover:text-primary transition-colors">{t.name || "—"}</h3>
                         <p className="text-[11.5px] text-slate-500 mt-0.5 flex items-center gap-1 font-medium">
                           <Building2 className="w-3 h-3 text-slate-400" />
                           Room {t.roomNo || "—"} • {t.propertyTitle || t.propertyName || (t.property && typeof t.property === "object" ? t.property.title || t.property.name : t.property) || "Property"}
@@ -692,7 +670,7 @@ export default function Tenants() {
                       </span>
                     </div>
                   </div>
-
+ 
                   {/* Footer: Financials and Actions */}
                   <div className="flex items-center justify-between pt-2.5 border-t border-slate-100/80" onClick={(e) => e.stopPropagation()}>
                     <div className="flex gap-4 mb-1">
@@ -709,7 +687,7 @@ export default function Tenants() {
                           )}
                        </div>
                     </div>
-
+ 
                     <div className="flex gap-1.5 items-center shrink-0">
                        <a href={`tel:${t.phone}`} className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200/50 flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors">
                           <Phone size={13} />
@@ -717,6 +695,12 @@ export default function Tenants() {
                        <a href={`https://wa.me/${String(t.phone).replace(/\D/g, '')}?text=Hi%20${t.name}`} target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-full bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 hover:bg-emerald-100 transition-colors">
                           <MessageSquare size={13} className="fill-emerald-600/20" />
                        </a>
+                       <button onClick={() => { setSelectedTenant(t); setModalTab("overview"); setModalOpen(true); }} className="w-8 h-8 rounded-full bg-purple-50 border border-purple-200/50 flex items-center justify-center text-purple-600 hover:bg-purple-100 transition-colors" title="View Details">
+                          <Eye size={13} />
+                       </button>
+                       <button onClick={() => handleEditClick(t)} className="w-8 h-8 rounded-full bg-amber-50 border border-amber-200/50 flex items-center justify-center text-amber-600 hover:bg-amber-100 transition-colors" title="Edit Tenant">
+                          <Edit size={13} />
+                       </button>
                        <button onClick={() => window.location.href = `/propertyowner/payment?tenant=${t._id}`} className="h-8 px-3.5 rounded-full bg-blue-50 border border-blue-100/50 text-blue-700 flex items-center gap-1.5 hover:bg-blue-100 transition-colors text-[11px] font-bold ml-1">
                           Collect
                        </button>
@@ -1035,7 +1019,21 @@ export default function Tenants() {
               </div>
 
               {/* Footer */}
-              <div className="px-6 py-4 border-t border-border bg-muted/30 flex justify-end">
+              <div className="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => { setModalOpen(false); handleEditClick(t); }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-amber-600 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
+                  >
+                    <Edit size={14} /> Edit Tenant
+                  </button>
+                  <button 
+                    onClick={() => { setModalOpen(false); handleTransferClick(t); }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                  >
+                    <ArrowUpDown size={14} /> Transfer Room
+                  </button>
+                </div>
                 <button
                   onClick={() => { setModalOpen(false); setSelectedTenant(null); }}
                   className="px-6 py-2 rounded-lg bg-foreground text-background text-[13px] font-medium hover:opacity-90 transition-opacity"

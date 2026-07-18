@@ -1,21 +1,20 @@
 import React, { useState, useEffect } from "react";
 import { 
-  Settings as SettingsIcon, UserCog, Bell, 
-  ShieldCheck, Globe, Moon, Sun, Monitor,
-  AlertTriangle, Trash2, ChevronRight, Save,
-  RotateCcw, Lock, Eye, Mail, Smartphone,
-  Database, Zap, ShieldAlert, Key, Fingerprint,
-  Languages, Palette, Sparkles, Sliders,
-  Percent
+  Percent, User, Lock, Save, RefreshCw, 
+  ChevronRight, Sparkles, CheckCircle2, ShieldAlert
 } from "lucide-react";
 import { fetchJson } from "../../utils/api";
-
-const cn = (...classes) => classes.filter(Boolean).join(" ");
+import useSEO from "../../hooks/useSEO";
 
 export default function SuperadminSettings() {
+  useSEO({
+    title: "Settings – Roomhy Superadmin",
+    description: "Manage commission rates and profile settings.",
+  });
+
   const [commissionPercentage, setCommissionPercentage] = useState(10);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
 
   // Profile state
   const [profile, setProfile] = useState({ firstName: "", lastName: "", phone: "", email: "" });
@@ -26,6 +25,14 @@ export default function SuperadminSettings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
+
+  // Alert message banner state
+  const [banner, setBanner] = useState({ show: false, text: "", type: "success" });
+
+  const showBanner = (text, type = "success") => {
+    setBanner({ show: true, text, type });
+    setTimeout(() => setBanner({ show: false, text: "", type: "success" }), 4000);
+  };
 
   useEffect(() => {
     async function loadSettingsAndProfile() {
@@ -55,8 +62,8 @@ export default function SuperadminSettings() {
     loadSettingsAndProfile();
   }, []);
 
-  const handleSave = async () => {
-    setSaving(true);
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
     try {
       const res = await fetchJson("/api/superadmin/settings", {
         method: "POST",
@@ -64,14 +71,14 @@ export default function SuperadminSettings() {
         body: JSON.stringify({ commission_percentage: Number(commissionPercentage) })
       });
       if (res.success) {
-        alert("Platform settings saved successfully!");
+        showBanner("Commission percentage updated successfully!", "success");
       } else {
-        alert(res.message || "Failed to save settings");
+        showBanner(res.message || "Failed to update commission settings", "error");
       }
     } catch (err) {
-      alert("Error saving settings: " + err.message);
+      showBanner("Error saving settings: " + err.message, "error");
     } finally {
-      setSaving(false);
+      setSavingSettings(false);
     }
   };
 
@@ -89,12 +96,12 @@ export default function SuperadminSettings() {
         })
       });
       if (res.success) {
-        alert("Profile updated successfully!");
+        showBanner("Profile details saved successfully!", "success");
       } else {
-        alert(res.message || "Failed to update profile");
+        showBanner(res.message || "Failed to update profile", "error");
       }
     } catch (err) {
-      alert("Error updating profile: " + err.message);
+      showBanner("Error updating profile: " + err.message, "error");
     } finally {
       setProfileSaving(false);
     }
@@ -103,11 +110,11 @@ export default function SuperadminSettings() {
   const handleChangePassword = async (e) => {
     e.preventDefault();
     if (!currentPassword || !newPassword || !confirmPassword) {
-      alert("Please fill all password fields.");
+      showBanner("Please fill in all password fields.", "error");
       return;
     }
     if (newPassword !== confirmPassword) {
-      alert("New password and confirm password do not match.");
+      showBanner("New passwords do not match.", "error");
       return;
     }
     setPasswordSaving(true);
@@ -118,331 +125,273 @@ export default function SuperadminSettings() {
         body: JSON.stringify({ currentPassword, newPassword })
       });
       if (res.success) {
-        alert("Password changed successfully!");
+        showBanner("Password changed successfully!", "success");
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
       } else {
-        alert(res.message || "Failed to change password");
+        showBanner(res.message || "Failed to update password", "error");
       }
     } catch (err) {
-      alert("Error changing password: " + err.message);
+      showBanner("Error updating password: " + err.message, "error");
     } finally {
       setPasswordSaving(false);
     }
   };
 
+  // Helper calculation for illustration
+  const mockTenantPayment = 10000;
+  const platformEarning = (mockTenantPayment * commissionPercentage) / 100;
+  const ownerPayout = mockTenantPayment - platformEarning;
+
+  if (loading) {
+    return (
+      <div className="p-8 space-y-6 flex flex-col items-center justify-center min-h-[400px]">
+        <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+        <p className="text-sm font-bold text-slate-400">Loading settings...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-8 space-y-10 bg-[#F8FAFC] min-h-full">
-      {/* Header Area */}
-      <div className="flex flex-col gap-2">
-         <h1 className="text-4xl font-bold text-slate-800 tracking-tight leading-none">Governance Configuration Hub</h1>
-         <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase mt-2">
-            <span>Platform Governance</span>
-            <ChevronRight className="w-3 h-3" />
-            <span className="text-blue-600">Global System Settings</span>
-         </div>
+    <div className="p-6 max-w-5xl mx-auto space-y-8 pb-16">
+      {/* ── Banner Notification ── */}
+      {banner.show && (
+        <div 
+          className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-xl transition-all duration-300 transform translate-y-0 ${
+            banner.type === "success" 
+              ? "bg-emerald-600 text-white" 
+              : "bg-rose-600 text-white"
+          }`}
+        >
+          {banner.type === "success" ? <CheckCircle2 size={18} /> : <ShieldAlert size={18} />}
+          <p className="text-xs font-bold uppercase tracking-wider">{banner.text}</p>
+        </div>
+      )}
+
+      {/* ── Header ── */}
+      <div className="flex flex-col gap-1.5">
+        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Settings</h1>
+        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          <span>Superadmin</span>
+          <ChevronRight className="w-3 h-3 text-slate-300" />
+          <span className="text-blue-600">Settings</span>
+        </div>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-         <p className="text-sm font-bold text-slate-400 max-w-2xl">Configure platform-wide administrative protocols, manage security keys and calibrate system-wide operational preferences with high-fidelity control.</p>
-         <div className="flex items-center gap-3">
-            <button className="bg-white text-slate-400 border border-slate-100 px-6 py-4 rounded-2xl text-[10px] font-bold uppercase hover:bg-slate-50 transition-all flex items-center gap-2">
-               <RotateCcw className="w-4 h-4" /> Reset Defaults
-            </button>
-            <button 
-              onClick={handleSave}
-              disabled={saving || loading}
-              className="bg-slate-800 text-white px-8 py-4 rounded-2xl text-[10px] font-bold uppercase shadow-xl shadow-slate-800/20 hover:bg-slate-900 transition-all flex items-center gap-2 disabled:opacity-50"
-            >
-               <Save className="w-4 h-4" /> {saving ? "Saving..." : "Commit Changes"}
-            </button>
-         </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-         {/* Left Column: Settings Categories */}
-         <div className="lg:col-span-8 space-y-8">
-            {/* Account & Profile */}
-            <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50">
-               <div className="flex items-center gap-4 mb-10">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-sm">
-                     <UserCog className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Administrative Identity</h3>
-               </div>
-               
-               <form onSubmit={handleSaveProfile} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                     <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">First Name</label>
-                        <input
-                           type="text"
-                           value={profile.firstName}
-                           onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
-                           className="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
-                           required
-                        />
-                     </div>
-                     <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Last Name</label>
-                        <input
-                           type="text"
-                           value={profile.lastName}
-                           onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
-                           className="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
-                        />
-                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                     <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Master Email Access</label>
-                        <input
-                           type="email"
-                           value={profile.email}
-                           disabled
-                           className="w-full bg-slate-100 border-none rounded-2xl py-4 px-6 text-sm font-bold text-slate-400 outline-none cursor-not-allowed"
-                        />
-                     </div>
-                     <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Phone Number</label>
-                        <input
-                           type="text"
-                           value={profile.phone}
-                           onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                           className="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
-                        />
-                     </div>
-                  </div>
-
-                  <div className="flex justify-end pt-4">
-                     <button
-                        type="submit"
-                        disabled={profileSaving}
-                        className="bg-blue-600 text-white px-8 py-3.5 rounded-2xl text-[10px] font-bold uppercase shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all disabled:opacity-50"
-                     >
-                        {profileSaving ? "Saving Identity..." : "Save Identity"}
-                     </button>
-                  </div>
-               </form>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        {/* ── Left Side: Commission Split Setting ── */}
+        <div className="md:col-span-2 space-y-6">
+          
+          {/* Card: Platform Commission Calibration */}
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                <Percent className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Platform Commission</h3>
+                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Set your percentage</p>
+              </div>
             </div>
 
-            {/* System Preferences */}
-            <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50">
-               <div className="flex items-center gap-4 mb-10">
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-sm">
-                     <SettingsIcon className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Platform Core Configuration</h3>
-               </div>
-               
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-2">
-                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Visual Theme Mode</label>
-                     <div className="grid grid-cols-3 gap-3">
-                        <ThemeOption icon={Sun} label="Light" active />
-                        <ThemeOption icon={Moon} label="Dark" />
-                        <ThemeOption icon={Monitor} label="System" />
-                     </div>
-                  </div>
-                  <div className="space-y-2">
-                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Interface Language</label>
-                     <select className="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer">
-                        <option>English (Global Hub)</option>
-                        <option>Hindi (Regional Matrix)</option>
-                     </select>
-                  </div>
-               </div>
-
-               <div className="mt-10 pt-10 border-t border-slate-50 space-y-6">
-                  <SettingRow 
-                    icon={Zap} 
-                    label="Performance Velocity" 
-                    sub="Optimize interface animations for high-speed audit" 
-                    action={<Toggle active />}
+            <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 space-y-5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-600">Commission %</label>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="number" 
+                    min="0"
+                    max="100"
+                    value={commissionPercentage}
+                    onChange={(e) => setCommissionPercentage(Math.min(100, Math.max(0, Number(e.target.value))))}
+                    className="w-20 bg-white border border-slate-200 rounded-xl py-2 px-3 text-center text-sm font-black text-slate-900 focus:outline-none focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 transition-all"
                   />
-                  <SettingRow 
-                    icon={Database} 
-                    label="Real-time Data Sync" 
-                    sub="Keep all dashboard metrics synchronized in real-time" 
-                    action={<Toggle active />}
-                  />
-                  <SettingRow 
-                    icon={Percent} 
-                    label="Platform Commission split (%)" 
-                    sub="Set global platform transaction fee cut on payments" 
-                    action={
-                      <input 
-                        type="number" 
-                        value={commissionPercentage} 
-                        onChange={(e) => setCommissionPercentage(Number(e.target.value))}
-                        className="w-24 bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100" 
-                      />
-                    }
-                  />
-               </div>
-            </div>
-         </div>
+                  <span className="text-sm font-black text-slate-500">%</span>
+                </div>
+              </div>
 
-         {/* Right Column: Security & Danger Zone */}
-         <div className="lg:col-span-4 space-y-8">
-            {/* Security Hub */}
-            <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50">
-               <div className="flex items-center gap-4 mb-10">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-sm">
-                     <ShieldCheck className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Security Citadel</h3>
-               </div>
+              {/* Slider */}
+              <input 
+                type="range"
+                min="0"
+                max="50"
+                step="0.5"
+                value={commissionPercentage}
+                onChange={(e) => setCommissionPercentage(Number(e.target.value))}
+                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+              />
 
-               <div className="space-y-6">
-                  <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-4 group hover:bg-white hover:shadow-xl transition-all duration-500">
-                     <div className="flex items-center gap-3">
-                        <Fingerprint className="w-5 h-5 text-emerald-600" />
-                        <p className="text-sm font-bold text-slate-800">2FA Biometric Access</p>
-                     </div>
-                     <p className="text-[10px] text-slate-400 font-bold uppercase leading-relaxed">Multi-layer security protocol for administrative identity verification.</p>
-                     <button className="w-full py-3 rounded-xl bg-white text-emerald-600 border border-emerald-100 text-[10px] font-bold uppercase hover:bg-emerald-600 hover:text-white transition-all shadow-sm">Activate Pulse</button>
+              {/* Live Calculator Visualizer */}
+              <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-inner space-y-3">
+                <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                  <Sparkles size={11} className="text-purple-600" /> Live Earnings Calculator
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500 font-semibold">Booking Amount:</span>
+                  <span className="font-bold text-slate-800">₹{mockTenantPayment.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="border-t border-dashed border-slate-100 my-2" />
+                <div className="flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-purple-600 uppercase tracking-wider">Admin Earnings ({commissionPercentage}%)</span>
+                    <span className="text-[9px] text-slate-400">Admin gets</span>
                   </div>
-
-                  <div className="space-y-4 pt-4">
-                     <button className="w-full flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md transition-all group">
-                        <div className="flex items-center gap-3">
-                           <Key className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
-                           <span className="text-xs font-bold text-slate-700">Rotate Access Keys</span>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-slate-300" />
-                     </button>
-                     <button className="w-full flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md transition-all group">
-                        <div className="flex items-center gap-3">
-                           <Lock className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
-                           <span className="text-xs font-bold text-slate-700">Audit Permissions</span>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-slate-300" />
-                     </button>
+                  <span className="text-sm font-black text-purple-700">₹{platformEarning.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-wider">Owner Earnings</span>
+                    <span className="text-[9px] text-slate-400">Owner gets</span>
                   </div>
-               </div>
+                  <span className="text-sm font-bold text-slate-900">₹{ownerPayout.toLocaleString("en-IN")}</span>
+                </div>
+              </div>
             </div>
 
-            {/* Change Password Card */}
-            <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50">
-               <div className="flex items-center gap-4 mb-8">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shadow-sm">
-                     <Key className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Credentials Update</h3>
-               </div>
-
-               <form onSubmit={handleChangePassword} className="space-y-4">
-                  <div className="space-y-1">
-                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Current Password</label>
-                     <input
-                        type="password"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full bg-slate-50 border-none rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-100 transition-all"
-                        required
-                     />
-                  </div>
-                  <div className="space-y-1">
-                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">New Password</label>
-                     <input
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full bg-slate-50 border-none rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-100 transition-all"
-                        required
-                     />
-                  </div>
-                  <div className="space-y-1">
-                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Confirm New Password</label>
-                     <input
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full bg-slate-50 border-none rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-100 transition-all"
-                        required
-                     />
-                  </div>
-                  <button
-                     type="submit"
-                     disabled={passwordSaving}
-                     className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[10px] font-bold uppercase transition-all disabled:opacity-50"
-                  >
-                     {passwordSaving ? "Updating Password..." : "Update Password"}
-                  </button>
-               </form>
+            <div className="flex justify-end">
+              <button 
+                onClick={handleSaveSettings}
+                disabled={savingSettings}
+                className="bg-purple-600 text-white px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-purple-700 transition-all flex items-center gap-2 shadow-lg shadow-purple-600/10 disabled:opacity-50"
+              >
+                <Save size={14} /> {savingSettings ? "Saving..." : "Save Commission"}
+              </button>
             </div>
-
-            {/* Danger Zone */}
-            <div className="bg-rose-50 rounded-[2.5rem] p-10 border border-rose-100 shadow-xl shadow-rose-200/30">
-               <div className="flex items-center gap-4 mb-8">
-                  <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shadow-sm">
-                     <AlertTriangle className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-rose-900 tracking-tight">Danger Zone</h3>
-               </div>
-               
-               <p className="text-xs text-rose-700 font-bold leading-relaxed mb-10 opacity-70">Irreversible administrative actions. Proceed only with direct authorization.</p>
-               
-               <div className="space-y-4">
-                  <button className="w-full py-4 bg-rose-600 text-white rounded-2xl text-[10px] font-bold uppercase shadow-lg shadow-rose-600/20 hover:bg-rose-700 transition-all flex items-center justify-center gap-2">
-                     <Trash2 className="w-4 h-4" /> Reset All System Settings
-                  </button>
-                  <button className="w-full py-4 bg-white text-rose-600 border border-rose-100 rounded-2xl text-[10px] font-bold uppercase hover:bg-rose-50 transition-all flex items-center justify-center gap-2">
-                     <ShieldAlert className="w-4 h-4" /> Purge Cache & Data Hub
-                  </button>
-               </div>
-            </div>
-         </div>
-      </div>
-    </div>
-  );
-}
-
-function SettingRow({ icon: Icon, label, sub, action }) {
-  return (
-    <div className="flex items-center justify-between p-6 bg-slate-50/50 rounded-3xl border border-slate-100 hover:bg-white hover:shadow-xl transition-all duration-500 group">
-       <div className="flex items-center gap-6">
-          <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-blue-600 group-hover:border-blue-100 transition-all">
-             <Icon className="w-5 h-5" />
           </div>
-          <div>
-             <p className="text-base font-bold text-slate-800">{label}</p>
-             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight mt-1">{sub}</p>
+
+          {/* Card: Account Profile Settings */}
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <User className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">My Profile</h3>
+                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Update your details</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">First Name</label>
+                  <input
+                    type="text"
+                    value={profile.firstName}
+                    onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-100 rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white transition-all"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Last Name</label>
+                  <input
+                    type="text"
+                    value={profile.lastName}
+                    onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-100 rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Email</label>
+                  <input
+                    type="email"
+                    value={profile.email}
+                    disabled
+                    className="w-full bg-slate-100 border border-slate-200/60 rounded-xl py-3 px-4 text-xs font-bold text-slate-400 cursor-not-allowed outline-none"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Phone Number</label>
+                  <input
+                    type="text"
+                    value={profile.phone}
+                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-100 rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  disabled={profileSaving}
+                  className="bg-blue-600 text-white px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-600/10 disabled:opacity-50"
+                >
+                  <Save size={14} /> {profileSaving ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
           </div>
-       </div>
-       <div>{action}</div>
-    </div>
-  );
-}
+        </div>
 
-function Toggle({ active }) {
-  return (
-    <div className={cn(
-      "w-12 h-6 rounded-full relative cursor-pointer transition-all duration-300",
-      active ? "bg-blue-600" : "bg-slate-200"
-    )}>
-       <div className={cn(
-          "absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-300",
-          active ? "right-1 shadow-md" : "left-1"
-       )} />
-    </div>
-  );
-}
+        {/* ── Right Side: Change Password ── */}
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Change Password</h3>
+                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Update your password</p>
+              </div>
+            </div>
 
-function ThemeOption({ icon: Icon, label, active }) {
-  return (
-    <button className={cn(
-      "flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all group",
-      active ? "bg-white border-blue-100 shadow-md ring-2 ring-blue-50" : "bg-slate-50 border-transparent hover:bg-white hover:border-slate-100"
-    )}>
-       <Icon className={cn("w-5 h-5", active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")} />
-       <span className={cn("text-[10px] font-bold uppercase tracking-widest", active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")}>{label}</span>
-    </button>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Current Password</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-slate-50 border border-slate-100 rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 focus:bg-white transition-all"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-slate-50 border border-slate-100 rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 focus:bg-white transition-all"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Confirm New Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-slate-50 border border-slate-100 rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 focus:bg-white transition-all"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={passwordSaving}
+                className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-lg shadow-amber-500/10 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <Save size={14} /> {passwordSaving ? "Updating Password..." : "Update Password"}
+              </button>
+            </form>
+          </div>
+        </div>
+
+      </div>
+    </div>
   );
 }

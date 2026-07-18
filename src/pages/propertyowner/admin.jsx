@@ -164,10 +164,8 @@ export default function Admin() {
         setEnquiries(cached.enquiries);
         setNotifications(cached.notifications);
         setLoading(false);
-        // Only background-refresh when cache is getting stale — not on every navigation
-        if (Date.now() - cached.ts > DASH_REVALIDATE_AFTER) {
-          loadDashboard(loginId, { silent: true });
-        }
+        // Always background-refresh to ensure data is correct & not stale
+        loadDashboard(loginId, { silent: true });
         return;
       }
       setLoading(true);

@@ -172,8 +172,7 @@ export default function SuperadminAccountingDashboard() {
       </div>
 
       {/* Mini Insights Bar */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-         <MiniStatCard label="Invoices" value={stats.invoicesCount !== undefined ? stats.invoicesCount.toLocaleString('en-IN') : "0"} icon={Receipt} color="blue" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
          <MiniStatCard label="Payouts" value={stats.payoutsCount !== undefined ? stats.payoutsCount.toLocaleString('en-IN') : "0"} icon={Briefcase} color="emerald" />
          <MiniStatCard label="Fees" value={stats.commissionEarned !== undefined ? `₹${(stats.commissionEarned/1000).toFixed(1)}K` : "₹0.0K"} icon={Database} color="indigo" />
          <MiniStatCard label="Refunds" value={stats.refundsCount !== undefined ? stats.refundsCount.toLocaleString('en-IN') : "0"} icon={RotateCcw} color="rose" />

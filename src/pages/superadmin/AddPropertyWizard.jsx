@@ -64,7 +64,8 @@ const STEPS = [
   { num: 3, label: "Amenities", sub: "What you offer" },
   { num: 4, label: "Photos & Videos", sub: "Show your property" },
   { num: 5, label: "Policies & Pricing", sub: "Rules, pricing & terms" },
-  { num: 6, label: "Review & Submit", sub: "Final review" },
+  { num: 6, label: "SEO Details", sub: "Meta details & schema" },
+  { num: 7, label: "Review & Submit", sub: "Final review" },
 ];
 
 const GENDER_OPTIONS = ["Co-ed","Male Only","Female Only"];
@@ -137,6 +138,12 @@ export default function AddPropertyWizard({ propEditId, isModal, onClose }) {
   const [showOwnerDropdown, setShowOwnerDropdown] = useState(false);
   const ownerDropdownRef = useRef(null);
   const [videoUrl, setVideoUrl] = useState("");
+  
+  // SEO fields state
+  const [metaTitle, setMetaTitle] = useState("");
+  const [metaKeywords, setMetaKeywords] = useState("");
+  const [metaDescriptions, setMetaDescriptions] = useState("");
+  const [metaSchema, setMetaSchema] = useState("");
 
   const parseLatLngFromUrl = (url) => {
     if (!url) return null;
@@ -317,6 +324,12 @@ export default function AddPropertyWizard({ propEditId, isModal, onClose }) {
             if (p.policies) setHouseRules(p.policies);
             if (p.tenantDescription) setTenantDescription(p.tenantDescription);
             if (p.videoUrl) setVideoUrl(p.videoUrl);
+            if (p.seo) {
+              setMetaTitle(p.seo.metaTitle || "");
+              setMetaKeywords(p.seo.metaKeywords || "");
+              setMetaDescriptions(p.seo.metaDescriptions || "");
+              setMetaSchema(p.seo.metaSchema || "");
+            }
           }
         } catch (err) {
           console.error("Failed to fetch property for edit:", err);
@@ -511,6 +524,12 @@ export default function AddPropertyWizard({ propEditId, isModal, onClose }) {
         pricing: { ...pricing, includedInRent, additionalCharges, cancellationPolicy },
         tenantDescription,
         videoUrl,
+        seo: {
+          metaTitle,
+          metaKeywords,
+          metaDescriptions,
+          metaSchema
+        },
         status: "active",
       };
 
@@ -577,9 +596,9 @@ export default function AddPropertyWizard({ propEditId, isModal, onClose }) {
               <button className="px-6 py-2.5 rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all flex items-center gap-2">
                  <Save className="w-3.5 h-3.5" /> Save as Draft
               </button>
-              <button onClick={() => step < 6 ? setStep(s => s + 1) : handleSubmit()} 
+              <button onClick={() => step < 7 ? setStep(s => s + 1) : handleSubmit()} 
                 className="bg-blue-600 text-white px-8 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">
-                {step === 6 ? "Submit Property" : `Next: ${STEPS[step]?.label}`} <ChevronRight className="w-3.5 h-3.5" />
+                {step === 7 ? "Submit Property" : `Next: ${STEPS[step]?.label}`} <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
           }
@@ -612,7 +631,7 @@ export default function AddPropertyWizard({ propEditId, isModal, onClose }) {
 
       {/* Main Content Layout Optimized for Space */}
       <div className="w-full px-4 py-8 grid grid-cols-12 gap-5">
-        <div className={cn(step === 6 ? "col-span-12" : "col-span-9", "space-y-6")}>
+        <div className={cn(step === 7 ? "col-span-12" : "col-span-9", "space-y-6")}>
           
           {step === 1 && (
             <>
@@ -1713,13 +1732,86 @@ export default function AddPropertyWizard({ propEditId, isModal, onClose }) {
                      <ChevronLeft className="w-4 h-4" /> Back: Photos & Videos
                   </button>
                   <button onClick={() => setStep(6)} className="flex items-center gap-2 px-10 py-3 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">
-                     Next: Review & Submit <ChevronRight className="w-4 h-4" />
+                     Next: SEO Details <ChevronRight className="w-4 h-4" />
                   </button>
                </div>
             </div>
           )}
 
           {step === 6 && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-5">
+                  <div className="mb-8">
+                     <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">SEO Details</h2>
+                     <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Only for SEO Purpose (Meta Title, Meta Keywords and Meta Descriptions).</p>
+                  </div>
+                  
+                  <div className="space-y-6">
+                     <div className="flex flex-col">
+                        <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">Meta Title</label>
+                        <div className="flex items-center bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 focus-within:bg-white focus-within:border-blue-200 focus-within:ring-2 focus-within:ring-blue-500/10 transition-all">
+                           <input 
+                              type="text" 
+                              value={metaTitle} 
+                              onChange={e => setMetaTitle(e.target.value)} 
+                              placeholder="e.g. Best Roomhy PG | Premium Co-living" 
+                              className="w-full bg-transparent text-[10px] font-black text-slate-800 outline-none placeholder:text-slate-300"
+                           />
+                        </div>
+                     </div>
+
+                     <div className="flex flex-col">
+                        <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">Meta Keywords</label>
+                        <div className="flex items-center bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 focus-within:bg-white focus-within:border-blue-200 focus-within:ring-2 focus-within:ring-blue-500/10 transition-all">
+                           <input 
+                              type="text" 
+                              value={metaKeywords} 
+                              onChange={e => setMetaKeywords(e.target.value)} 
+                              placeholder="e.g. pg, hostel, rent room, co-living" 
+                              className="w-full bg-transparent text-[10px] font-black text-slate-800 outline-none placeholder:text-slate-300"
+                           />
+                        </div>
+                     </div>
+
+                     <div className="flex flex-col">
+                        <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">Meta Descriptions</label>
+                        <div className="flex items-center bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 focus-within:bg-white focus-within:border-blue-200 focus-within:ring-2 focus-within:ring-blue-500/10 transition-all">
+                           <input 
+                              type="text" 
+                              value={metaDescriptions} 
+                              onChange={e => setMetaDescriptions(e.target.value)} 
+                              placeholder="Describe your property for search engines..." 
+                              className="w-full bg-transparent text-[10px] font-black text-slate-800 outline-none placeholder:text-slate-300"
+                           />
+                        </div>
+                     </div>
+
+                     <div className="flex flex-col">
+                        <label className="text-[10px] font-black text-slate-800 uppercase mb-3 block tracking-tight">Meta Schema</label>
+                        <textarea 
+                           rows={6} 
+                           value={metaSchema} 
+                           onChange={e => setMetaSchema(e.target.value)} 
+                           placeholder="Paste JSON-LD schema markup code here..." 
+                           className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-5 text-[10px] font-bold text-slate-600 outline-none focus:bg-white focus:border-blue-200 transition-all resize-none"
+                        />
+                     </div>
+                  </div>
+               </div>
+
+               {/* Step Footer Buttons */}
+               <div className="flex items-center justify-between pt-4">
+                  <button onClick={() => setStep(5)} className="flex items-center gap-2 px-6 py-3 rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all">
+                     <ChevronLeft className="w-4 h-4" /> Back: Policies & Pricing
+                  </button>
+                  <button onClick={() => setStep(7)} className="flex items-center gap-2 px-10 py-3 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">
+                     Next: Review & Submit <ChevronRight className="w-4 h-4" />
+                  </button>
+               </div>
+            </div>
+          )}
+
+          {step === 7 && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                <div className="grid grid-cols-12 gap-8">
                   {/* Left: Summary Details */}
@@ -1796,6 +1888,19 @@ export default function AddPropertyWizard({ propEditId, isModal, onClose }) {
                                   )}
                                </div>
                            </section>
+
+                            <section>
+                               <div className="flex items-center justify-between mb-4">
+                                  <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">6. SEO Details</h3>
+                                  <button onClick={() => setStep(6)} className="text-[9px] font-black text-blue-600 uppercase tracking-widest hover:underline">Edit</button>
+                                </div>
+                               <div className="bg-slate-50/50 rounded-2xl p-6 border border-slate-50 space-y-4">
+                                  <div className="flex justify-between items-center"><span className="text-[9px] font-bold text-slate-400 uppercase">Meta Title</span><span className="text-[10px] font-black text-slate-800 uppercase truncate max-w-[300px]">{metaTitle || "—"}</span></div>
+                                  <div className="flex justify-between items-center"><span className="text-[9px] font-bold text-slate-400 uppercase">Meta Keywords</span><span className="text-[10px] font-black text-slate-800 uppercase truncate max-w-[300px]">{metaKeywords || "—"}</span></div>
+                                  <div className="flex justify-between items-center"><span className="text-[9px] font-bold text-slate-400 uppercase">Meta Description</span><span className="text-[10px] font-black text-slate-800 uppercase truncate max-w-[300px]">{metaDescriptions || "—"}</span></div>
+                                  <div className="flex justify-between items-center"><span className="text-[9px] font-bold text-slate-400 uppercase">Meta Schema</span><span className="text-[10px] font-black text-slate-800 uppercase truncate max-w-[300px]">{metaSchema ? "Configured" : "—"}</span></div>
+                               </div>
+                            </section>
 
                            <section>
                               <div className="flex items-center justify-between mb-4">
@@ -1893,7 +1998,7 @@ export default function AddPropertyWizard({ propEditId, isModal, onClose }) {
         </div>
 
         {/* Right Column: Sidebar Info Optimized */}
-        {step !== 6 && (
+        {step !== 7 && (
         <div className="col-span-3 space-y-6 sticky top-24 self-start">
            {step === 1 && (
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">

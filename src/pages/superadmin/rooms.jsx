@@ -565,6 +565,36 @@ export default function RoomsManagement() {
             {/* Modal Form Scroll Area */}
             <form onSubmit={handleFormSubmit} className="flex-1 overflow-y-auto p-10 space-y-6">
               
+              {/* Owner Info Card - Pre-filled from property data */}
+              {selectedRoom?.property && (
+                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                    {(selectedRoom.property.ownerName || "O").charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Property Owner Info</p>
+                    <p className="text-sm font-bold text-slate-800 leading-none">{selectedRoom.property.ownerName || "Owner"}</p>
+                    {selectedRoom.property.ownerLoginId && (
+                      <p className="text-[10px] font-semibold text-slate-500 mt-0.5">ID: {selectedRoom.property.ownerLoginId}</p>
+                    )}
+                    <div className="flex flex-wrap gap-3 mt-1.5">
+                      {selectedRoom.property.ownerPhone && (
+                        <span className="text-[10px] font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-lg">📞 {selectedRoom.property.ownerPhone}</span>
+                      )}
+                      {selectedRoom.property.ownerEmail && (
+                        <span className="text-[10px] font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-lg">✉ {selectedRoom.property.ownerEmail}</span>
+                      )}
+                      {selectedRoom.property.address && (
+                        <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">📍 {selectedRoom.property.address}</span>
+                      )}
+                    </div>
+                    <p className="text-xs font-bold text-slate-700 mt-1.5">
+                      Property: <span className="text-blue-700">{selectedRoom.property.title}</span>
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Grid 1: Basic details */}
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">

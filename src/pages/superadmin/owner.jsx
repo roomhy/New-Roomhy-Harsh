@@ -131,7 +131,41 @@ export default function Owner() {
     setSavingEdit(true);
     try {
       const id = selectedOwner.loginId || selectedOwner._id;
+      // Always send both top-level and checkin-prefixed fields so DB is consistent
       const payload = {
+        // Identity
+        email: editOwnerForm.email,
+        checkinEmail: editOwnerForm.email,
+        phone: editOwnerForm.phone,
+        checkinPhone: editOwnerForm.phone,
+        checkinDob: editOwnerForm.checkinDob,
+        address: editOwnerForm.address,
+        checkinAddress: editOwnerForm.address,
+        // Banking
+        bankName: editOwnerForm.bankName,
+        checkinBankName: editOwnerForm.bankName,
+        accountNumber: editOwnerForm.accountNumber,
+        checkinBankAccountNumber: editOwnerForm.accountNumber,
+        ifscCode: editOwnerForm.ifscCode,
+        checkinIfscCode: editOwnerForm.ifscCode,
+        branchName: editOwnerForm.branchName,
+        checkinBranchName: editOwnerForm.branchName,
+        checkinAccountHolderName: editOwnerForm.accountHolderName,
+        checkinUpiId: editOwnerForm.checkinUpiId
+      };
+      
+      await fetchJson(`/api/owners/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: getAuthHeader(),
+        body: JSON.stringify(payload)
+      });
+      
+      alert("Owner details updated successfully!");
+      setIsEditingOwner(false);
+      // Refresh the full owner list and update selected owner with saved values
+      loadOwners();
+      setSelectedOwner(prev => ({
+        ...prev,
         email: editOwnerForm.email,
         checkinEmail: editOwnerForm.email,
         phone: editOwnerForm.phone,
@@ -145,19 +179,11 @@ export default function Owner() {
         checkinBankAccountNumber: editOwnerForm.accountNumber,
         ifscCode: editOwnerForm.ifscCode,
         checkinIfscCode: editOwnerForm.ifscCode,
+        branchName: editOwnerForm.branchName,
+        checkinBranchName: editOwnerForm.branchName,
+        checkinAccountHolderName: editOwnerForm.accountHolderName,
         checkinUpiId: editOwnerForm.checkinUpiId
-      };
-      
-      await fetchJson(`/api/owners/${encodeURIComponent(id)}`, {
-        method: "PATCH",
-        headers: getAuthHeader(),
-        body: JSON.stringify(payload)
-      });
-      
-      alert("Owner details updated successfully!");
-      setIsEditingOwner(false);
-      loadOwners();
-      setSelectedOwner(prev => ({ ...prev, ...payload }));
+      }));
     } catch (err) {
       alert("Failed to update owner details: " + (err.body?.message || err.message));
     } finally {
@@ -536,9 +562,11 @@ export default function Owner() {
                              checkinDob: o.checkinDob || "",
                              address: o.address || o.checkinAddress || "",
                              bankName: o.bankName || o.checkinBankName || "",
+                             branchName: o.branchName || o.checkinBranchName || "",
                              accountNumber: o.accountNumber || o.checkinBankAccountNumber || "",
                              ifscCode: o.ifscCode || o.checkinIfscCode || "",
-                             checkinUpiId: o.checkinUpiId || ""
+                             accountHolderName: o.accountHolderName || o.checkinAccountHolderName || "",
+                             checkinUpiId: o.checkinUpiId || o.upiId || ""
                            });
                         }}>
                            <td className="px-10 py-8">
@@ -718,6 +746,9 @@ export default function Owner() {
                        <DetailItem isEditing={isEditingOwner} onChange={e => setEditOwnerForm({...editOwnerForm, checkinDob: e.target.value})} type="date" icon={Calendar} label="Birth Index" value={isEditingOwner ? editOwnerForm.checkinDob : (selectedOwner.checkinDob || "Not Defined")} />
                        <DetailItem isEditing={isEditingOwner} onChange={e => setEditOwnerForm({...editOwnerForm, address: e.target.value})} icon={MapPin} label="Home Base" value={isEditingOwner ? editOwnerForm.address : (selectedOwner.address || selectedOwner.checkinAddress)} />
                     </div>
+                    {!isEditingOwner && selectedOwner.checkinDob && (
+                      <p className="text-[10px] text-slate-400 mt-2">DOB: {new Date(selectedOwner.checkinDob).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                    )}
                  </section>
 
                  {/* Asset Pulse */}
@@ -821,8 +852,10 @@ export default function Owner() {
                     </div>
                     <div className="grid grid-cols-2 gap-8">
                        <DetailItem isEditing={isEditingOwner} onChange={e => setEditOwnerForm({...editOwnerForm, bankName: e.target.value})} icon={Building2} label="Institution" value={isEditingOwner ? editOwnerForm.bankName : (selectedOwner.bankName || selectedOwner.checkinBankName)} />
+                       <DetailItem isEditing={isEditingOwner} onChange={e => setEditOwnerForm({...editOwnerForm, branchName: e.target.value})} icon={Landmark} label="Branch Name" value={isEditingOwner ? editOwnerForm.branchName : (selectedOwner.branchName || selectedOwner.checkinBranchName)} />
                        <DetailItem isEditing={isEditingOwner} onChange={e => setEditOwnerForm({...editOwnerForm, accountNumber: e.target.value})} icon={CreditCard} label="Ledger Number" value={isEditingOwner ? editOwnerForm.accountNumber : (selectedOwner.accountNumber || selectedOwner.checkinBankAccountNumber)} />
                        <DetailItem isEditing={isEditingOwner} onChange={e => setEditOwnerForm({...editOwnerForm, ifscCode: e.target.value})} icon={Zap} label="Routing (IFSC)" value={isEditingOwner ? editOwnerForm.ifscCode : (selectedOwner.ifscCode || selectedOwner.checkinIfscCode)} />
+                       <DetailItem isEditing={isEditingOwner} onChange={e => setEditOwnerForm({...editOwnerForm, accountHolderName: e.target.value})} icon={User} label="Account Holder" value={isEditingOwner ? editOwnerForm.accountHolderName : (selectedOwner.checkinAccountHolderName)} />
                        <DetailItem isEditing={isEditingOwner} onChange={e => setEditOwnerForm({...editOwnerForm, checkinUpiId: e.target.value})} icon={Wallet} label="UPI Link" value={isEditingOwner ? editOwnerForm.checkinUpiId : selectedOwner.checkinUpiId} />
                     </div>
                  </section>

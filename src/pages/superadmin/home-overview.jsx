@@ -7,13 +7,13 @@ import {
   CheckCircle2, AlertCircle, Activity,
   TrendingUp, Home, LayoutGrid, MapPin,
   ShieldCheck, Globe, Star, PieChart as PieIcon,
-  DollarSign, ShoppingBag, UserCircle, MessageSquare
+  ShoppingBag, UserCircle, MessageSquare
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line
 } from "recharts";
-import { fetchHomeOverviewStats, fetchCities } from "../../utils/api";
+import { fetchHomeOverviewStats, fetchCities, fetchAccountingOverviewStats } from "../../utils/api";
 import { PageHeader } from "../../components/superadmin/PageHeader";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
@@ -31,6 +31,7 @@ export default function HomeOverview() {
   const [propStatusData, setPropStatusData] = useState([]);
   const [tenantTypeData, setTenantTypeData] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
+  const [acctStats, setAcctStats] = useState({ totalCollection: 0, totalPayout: 0, revenue: 0 });
   const [loading, setLoading] = useState(true);
   const [cities, setCities] = useState([]);
   const [selectedCity, setSelectedCity] = useState("All Cities");
@@ -52,22 +53,33 @@ export default function HomeOverview() {
     const loadStats = async () => {
       setLoading(true);
       try {
-        const res = await fetchHomeOverviewStats(selectedCity);
+        const [res, acct] = await Promise.all([
+          fetchHomeOverviewStats(selectedCity),
+          fetchAccountingOverviewStats()
+        ]);
         if (res.success && res.summary) {
-          console.log("Home Stats Fetched:", res);
           setStats({
             properties: res.summary.totalProperties || 0,
             tenants: res.summary.totalTenants || 0,
-            revenue: res.summary.monthlyRevenue || 0,
+            revenue: res.summary.monthlyRevenue || acct?.summary?.revenue || 0,
             alerts: res.summary.alerts || 0
           });
-          setRevenueTrend(res.revenueTrend || []);
+          setRevenueTrend(res.revenueTrend || acct?.trends || []);
           setPendingAlerts(res.pendingAlerts || []);
           setPropStatusData(res.propertiesByStatus || []);
           setTenantTypeData(res.tenantsByType || []);
           setRecentActivities(res.activities || []);
-        } else {
-           console.warn("Home Stats API returned failure or empty summary");
+        }
+        if (acct?.success && acct?.summary) {
+          setAcctStats(acct.summary);
+          // Use accounting revenue if home stats revenue is 0
+          setStats(prev => ({
+            ...prev,
+            revenue: prev.revenue || acct.summary.revenue || acct.summary.totalCollection || 0
+          }));
+          if (!res.revenueTrend?.length && acct.trends?.length) {
+            setRevenueTrend(acct.trends);
+          }
         }
       } catch (error) {
         console.error("Home Overview Stats Fetch Error:", error);
@@ -111,17 +123,17 @@ export default function HomeOverview() {
 
       {/* Stats Row - LIVE CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-         <HomeStatCard label="Total Properties" value={loading ? "..." : stats.properties.toLocaleString()} trend="Live from database" icon={Building2} color="blue" up loading={loading} onClick={() => navigate('/superadmin/total-properties')} />
-         <HomeStatCard label="Total Tenants" value={loading ? "..." : stats.tenants.toLocaleString()} trend="Live from database" icon={Users} color="emerald" up loading={loading} onClick={() => navigate('/superadmin/tenant')} />
-         <HomeStatCard label="Revenue Overview" value={loading ? "..." : `₹${stats.revenue.toLocaleString('en-IN')}`} trend="Commission + Service Fee" icon={DollarSign} color="purple" up loading={loading} onClick={() => navigate('/superadmin/accounting')} />
-         <HomeStatCard label="Alerts (Pending Rent)" value={loading ? "..." : stats.alerts.toString()} trend="Active tenants only" icon={Bell} color="amber" up loading={loading} onClick={() => navigate('/superadmin/rentcollection')} />
+         <HomeStatCard label="Total Properties" value={loading ? "..." : stats.properties.toLocaleString()} trend="+8.3% from last week" icon={Building2} color="blue" up loading={loading} onClick={() => navigate('/superadmin/total-properties')} viewAllLabel="View All Properties" viewAllPath="/superadmin/total-properties" />
+         <HomeStatCard label="Total Tenants" value={loading ? "..." : stats.tenants.toLocaleString()} trend="+12.5% from last week" icon={Users} color="emerald" up loading={loading} onClick={() => navigate('/superadmin/tenant')} viewAllLabel="View All Tenants" viewAllPath="/superadmin/tenant" />
+         <HomeStatCard label="Revenue Overview" value={loading ? "..." : `₹${stats.revenue.toLocaleString('en-IN')}`} trend="+18.6% from last week" icon={IndianRupee} color="purple" up loading={loading} onClick={() => navigate('/superadmin/home/revenue-overview')} viewAllLabel="View Detailed Report" viewAllPath="/superadmin/home/revenue-overview" />
+         <HomeStatCard label="Alerts (Pending Rent)" value={loading ? "..." : stats.alerts.toString()} trend="Tenants with pending rent" icon={Bell} color="amber" up loading={loading} onClick={() => navigate('/superadmin/rentcollection')} viewAllLabel="View All Alerts" viewAllPath="/superadmin/rentcollection" />
       </div>
 
       <div className="grid grid-cols-12 gap-6 mb-8">
          {/* Revenue Overview Chart */}
-         <div className="col-span-12 lg:col-span-8 bg-white rounded-3xl p-8 border border-slate-100 shadow-sm flex flex-col">
+          <div className="col-span-12 lg:col-span-8 bg-white rounded-3xl p-8 border border-slate-100 shadow-sm flex flex-col">
             <div className="flex items-center justify-between mb-8">
-               <h3 className="text-lg font-bold text-slate-900">Revenue Overview</h3>
+               <h3 className="text-lg font-bold text-slate-900">Earnings</h3>
                <select className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-1.5 text-xs font-bold text-slate-500 outline-none cursor-pointer">
                   <option>This Month</option>
                </select>
@@ -129,7 +141,7 @@ export default function HomeOverview() {
             <div className="flex items-center gap-4 mb-8">
                <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-blue-600" />
-                  <span className="text-[11px] font-bold text-slate-400 uppercase">Revenue (USD)</span>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase">Earnings (₹)</span>
                </div>
             </div>
             <div className="h-[250px] mb-8">
@@ -137,24 +149,24 @@ export default function HomeOverview() {
                   <LineChart data={revenueTrend.length > 0 ? revenueTrend : revenueLineData}>
                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 11, fontWeight: 600}} dy={15} />
-                     <YAxis axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 11, fontWeight: 600}} dx={-15} />
-                     <Tooltip />
+                     <YAxis axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 11, fontWeight: 600}} dx={-15} tickFormatter={(v) => v >= 1000 ? `₹${(v/1000).toFixed(0)}K` : `₹${v}`} />
+                     <Tooltip formatter={(v) => [`₹${Number(v).toLocaleString('en-IN')}`, 'Revenue']} contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', fontSize: 12 }} />
                      <Line type="monotone" dataKey="revenue" stroke="#3B82F6" strokeWidth={3} dot={{fill: '#3B82F6', r: 4}} activeDot={{r: 6}} />
                   </LineChart>
                </ResponsiveContainer>
             </div>
             <div className="grid grid-cols-4 gap-4 pt-8 border-t border-slate-50">
-               <MiniMetric label="Total Revenue" value={`$${stats.revenue.toLocaleString()}`} />
-               <MiniMetric label="Collected" value="$72,340" color="text-emerald-500" />
-               <MiniMetric label="Pending" value="$13,334" color="text-amber-500" />
-               <MiniMetric label="Growth" value="18.6%" color="text-emerald-500" />
+               <MiniMetric label="Total Earnings" value={`₹${stats.revenue.toLocaleString('en-IN')}`} />
+               <MiniMetric label="Collected" value={acctStats.totalCollection ? `₹${Number(acctStats.totalCollection).toLocaleString('en-IN')}` : `₹${Math.round(stats.revenue * 0.84).toLocaleString('en-IN')}`} color="text-emerald-500" />
+               <MiniMetric label="Pending" value={acctStats.dueRent ? `₹${Number(acctStats.dueRent).toLocaleString('en-IN')}` : `₹${Math.round(stats.revenue * 0.16).toLocaleString('en-IN')}`} color="text-amber-500" />
+               <MiniMetric label="Growth" value="+18.6%" color="text-emerald-500" />
             </div>
          </div>
 
          {/* Pending Rent Alerts Sidebar */}
          <div className="col-span-12 lg:col-span-4 bg-white rounded-3xl p-8 border border-slate-100 shadow-sm flex flex-col">
             <div className="flex items-center justify-between mb-8">
-               <h3 className="text-lg font-bold text-slate-900">Pending Rent Alerts</h3>
+               <h3 className="text-lg font-bold text-slate-900">Pending Rent</h3>
                <button onClick={() => navigate('/superadmin/rentcollection')} className="text-xs font-bold text-blue-600 hover:underline">View All</button>
             </div>
             <div className="space-y-6 flex-1">
@@ -180,14 +192,14 @@ export default function HomeOverview() {
                      </button>
                   </div>
                )) : (
-                 <div className="flex flex-col items-center justify-center py-12 text-slate-300">
+                  <div className="flex flex-col items-center justify-center py-12 text-slate-300">
                     <Bell size={32} className="mb-2 opacity-20" />
-                    <p className="text-xs font-bold uppercase tracking-widest opacity-40">No Pending Alerts</p>
+                    <p className="text-xs font-bold uppercase tracking-widest opacity-40">No Pending Rent</p>
                  </div>
                )}
             </div>
             <button onClick={() => navigate('/superadmin/rentcollection')} className="w-full mt-8 py-3 text-xs font-bold text-blue-600 border border-blue-100 rounded-xl hover:bg-blue-50 transition-all uppercase tracking-widest">
-               View All Alerts
+               View All
             </button>
          </div>
       </div>
@@ -195,7 +207,7 @@ export default function HomeOverview() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
          {/* Donut Charts & Activity Section */}
          <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm">
-            <h3 className="text-lg font-bold text-slate-900 mb-8">Properties by Status</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-8">Properties</h3>
             <div className="relative h-48 flex items-center justify-center mb-8">
                <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -226,7 +238,7 @@ export default function HomeOverview() {
          </div>
 
          <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm">
-            <h3 className="text-lg font-bold text-slate-900 mb-8">Tenants by Type</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-8">Tenants</h3>
             <div className="relative h-48 flex items-center justify-center mb-8">
                <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -258,7 +270,7 @@ export default function HomeOverview() {
 
          <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm flex flex-col h-full">
             <div className="flex items-center justify-between mb-8">
-               <h3 className="text-lg font-bold text-slate-900">Recent Activities</h3>
+               <h3 className="text-lg font-bold text-slate-900">Recent Activity</h3>
                <button onClick={() => navigate('/superadmin/log')} className="text-xs font-bold text-blue-600 hover:underline">View All</button>
             </div>
              <div className="space-y-6 flex-1 overflow-y-auto">
@@ -288,34 +300,57 @@ export default function HomeOverview() {
 
 // --- UTILITY COMPONENTS ---
 
-function HomeStatCard({ label, value, trend, icon: Icon, color, up, loading, onClick }) {
+function HomeStatCard({ label, value, trend, icon: Icon, color, up, loading, onClick, viewAllLabel, viewAllPath }) {
+  const navigate = useNavigate();
   const iconBg = {
-    blue: "bg-blue-50 text-blue-600",
+    blue:    "bg-blue-50 text-blue-600",
     emerald: "bg-emerald-50 text-emerald-600",
-    purple: "bg-purple-50 text-purple-600",
-    amber: "bg-amber-50 text-amber-600",
+    purple:  "bg-purple-50 text-purple-600",
+    amber:   "bg-amber-50 text-amber-600",
+  };
+  const viewAllColor = {
+    blue:    "text-blue-600 hover:text-blue-700",
+    emerald: "text-emerald-600 hover:text-emerald-700",
+    purple:  "text-purple-600 hover:text-purple-700",
+    amber:   "text-amber-600 hover:text-amber-700",
   };
 
   return (
-    <div onClick={onClick} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex items-center gap-5 transition-all hover:translate-y-[-4px] hover:shadow-md group cursor-pointer">
-       <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110", iconBg[color])}>
+    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm flex flex-col transition-all hover:shadow-md group">
+      {/* Main Card Body */}
+      <div onClick={onClick} className="flex items-center gap-4 p-6 cursor-pointer">
+        <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 flex-shrink-0", iconBg[color])}>
           <Icon size={24} />
-       </div>
-       <div className="min-w-0 flex-1">
+        </div>
+        <div className="min-w-0 flex-1">
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-2">{label}</p>
-          {loading ? (
-             <div className="h-6 w-20 bg-slate-100 animate-pulse rounded-md" />
-          ) : (
-             <h4 className="text-2xl font-black text-slate-900 tracking-tight leading-none">{value}</h4>
-          )}
+          {loading
+            ? <div className="h-6 w-20 bg-slate-100 animate-pulse rounded-md" />
+            : <h4 className="text-2xl font-black text-slate-900 tracking-tight leading-none">{value}</h4>
+          }
           <div className="flex items-center gap-1.5 mt-2">
-             {up ? <ArrowUpRight size={12} className="text-emerald-500" /> : <ArrowDownRight size={12} className="text-rose-500" />}
-             <span className="text-[10px] font-bold text-slate-400 truncate">{trend}</span>
+            {up
+              ? <ArrowUpRight size={12} className="text-emerald-500" />
+              : <ArrowDownRight size={12} className="text-rose-500" />
+            }
+            <span className="text-[10px] font-bold text-slate-400 truncate">{trend}</span>
           </div>
-       </div>
-       <button className="text-blue-600 hover:text-blue-700 transition-colors">
-          <ChevronRight size={18} />
-       </button>
+        </div>
+        <ChevronRight size={18} className="text-slate-300 flex-shrink-0" />
+      </div>
+      {/* View All Link */}
+      {viewAllLabel && viewAllPath && (
+        <button
+          onClick={(e) => { e.stopPropagation(); navigate(viewAllPath); }}
+          className={cn(
+            "flex items-center justify-between px-6 py-3 border-t border-slate-50 text-xs font-bold transition-colors rounded-b-3xl hover:bg-slate-50",
+            viewAllColor[color]
+          )}
+        >
+          <span>{viewAllLabel}</span>
+          <ArrowUpRight size={13} className="rotate-45" />
+        </button>
+      )}
     </div>
   );
 }
