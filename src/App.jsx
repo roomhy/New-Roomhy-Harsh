@@ -7,8 +7,20 @@ import routes from "./routes";
 import { getOwnerSession } from "./utils/ownerSession";
 import SharedShell from "./components/SharedShell";
 import { OwnerPanelShell } from "./components/propertyowner/OwnerPanelErrorBoundary";
+import TenantProtectedRoute from "./pages/tenant/TenantProtectedRoute";
+import { getStaffSession, setStaffSession, clearStaffSession, canAccessOwnerPathAsStaff, STAFF_HOME_PATH, UNIFIED_LOGIN_PATH } from "./utils/staffAccess";
+import { fetchJson } from "./utils/api";
 import { Toaster } from "react-hot-toast";
 import InstallPWA from "./components/InstallPWA";
+
+// Routes that require the user to be an authenticated tenant.
+// /tenant/tenantlogin and /visitor-verify are deliberately excluded (public).
+const PROTECTED_TENANT_PATHS = new Set([
+  "/tenant/tenantdashboard",
+  "/tenant/tenantcomplints",
+  "/tenant/tenantchat",
+  "/tenant/tenantagreement",
+]);
 
 const PageLoader = () => (
   <div className="min-h-[40vh] flex items-center justify-center px-4 py-12 text-sm text-slate-500">
@@ -107,7 +119,7 @@ const ManagerRouteGuard = () => {
             const parsed = JSON.parse(val);
             if (parsed && parsed.role) return String(parsed.role).toLowerCase();
           }
-        } catch (_) {}
+        } catch (_) { }
       }
       return "";
     };
@@ -166,6 +178,76 @@ const RouteRoleGuard = () => {
   return null;
 };
 
+// Keeps a logged-in staff member's cached session in sync with the backend so
+// permission changes the owner makes take effect. Without this, the sidebar
+// filters against the permissions captured at login time and shows stale menus.
+// Runs once per load; only reloads if the permissions/active state actually
+// changed (so no reload loop).
+const StaffSessionSync = () => {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const session = getStaffSession();
+    if (!session?.loginId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchJson(`/api/employees/${session.loginId}`);
+        const emp = res?.data;
+        if (!emp || cancelled) return;
+
+        if (emp.isActive === false) {
+          clearStaffSession();
+          window.location.replace(`${UNIFIED_LOGIN_PATH}?expired=1`);
+          return;
+        }
+
+        const nextPerms = Array.isArray(emp.permissions) ? emp.permissions : [];
+        const prevPerms = Array.isArray(session.permissions) ? session.permissions : [];
+        const changed =
+          JSON.stringify([...nextPerms].sort()) !== JSON.stringify([...prevPerms].sort()) ||
+          (emp.role || "") !== (session.role || "");
+
+        const token = sessionStorage.getItem("token") || localStorage.getItem("token");
+        setStaffSession(emp, token);
+        if (changed) window.location.reload();
+      } catch (_) {
+        // Best-effort — keep the existing session if the record can't be fetched.
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
+  return null;
+};
+
+// There is ONE panel. Staff share the Property Owner Panel via a staff-proxy
+// session and may only open the owner pages their permissions map to (see
+// canAccessOwnerPathAsStaff). Real owners (with an owner session) and everyone
+// else are left untouched — this guard only constrains staff proxies.
+const StaffRouteGuard = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const path = location.pathname || "";
+    if (!path.startsWith("/propertyowner")) return;
+
+    const owner = getOwnerSession();
+    if (owner?.loginId) return; // genuine owner session — full access
+
+    const session = getStaffSession();
+    if (!session?.loginId) return; // not a staff proxy — page handles its own auth
+
+    if (!canAccessOwnerPathAsStaff(session, path)) {
+      window.location.replace(STAFF_HOME_PATH);
+    }
+  }, [location.pathname]);
+
+  return null;
+};
+
 const DomainGuard = () => {
   const location = useLocation();
 
@@ -173,7 +255,7 @@ const DomainGuard = () => {
     if (typeof window === "undefined") return;
 
     const host = (window.location.hostname || "").toLowerCase();
-    
+
     // Allow all paths on localhost/127.0.0.1 for local development ease
     const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || !host.includes(".");
     if (isLocalhost) return;
@@ -300,6 +382,8 @@ export default function App() {
             <InstallPWA />
             <ManagerRouteGuard />
             <RouteRoleGuard />
+            <StaffSessionSync />
+            <StaffRouteGuard />
             <RouteChromeCleanup />
             <Suspense fallback={<PageLoader />}>
               <Routes>
@@ -318,15 +402,34 @@ export default function App() {
                 </Route>
 
                 {/* Other standalone routes (tenant, website, staff, etc.) */}
-                {otherStandaloneRoutes.map(route => (
-                  <Route key={route.path} path={route.path} element={route.element} />
-                ))}
+                {otherStandaloneRoutes.map(route => {
+                  if (PROTECTED_TENANT_PATHS.has(route.path)) {
+                    return (
+                      <Route
+                        key={route.path}
+                        path={route.path}
+                        element={
+                          <TenantProtectedRoute>
+                            {route.element}
+                          </TenantProtectedRoute>
+                        }
+                      />
+                    );
+                  }
+                  return (
+                    <Route key={route.path} path={route.path} element={route.element} />
+                  );
+                })}
 
                 <Route path="/" element={<Navigate to={resolveHostHome()} replace />} />
                 <Route path="/superadmin" element={<Navigate to="/superadmin/index" replace />} />
                 <Route path="/employee" element={<Navigate to="/employee/areaadmin" replace />} />
                 <Route path="/employee/superadmin" element={<Navigate to="/employee/areaadmin" replace />} />
                 <Route path="/propertyowner" element={<Navigate to="/propertyowner/index" replace />} />
+                {/* The standalone Staff Panel is gone — old links fold into the one panel */}
+                <Route path="/staff/login" element={<Navigate to={UNIFIED_LOGIN_PATH} replace />} />
+                <Route path="/staff" element={<Navigate to={STAFF_HOME_PATH} replace />} />
+                <Route path="/staff/*" element={<Navigate to={STAFF_HOME_PATH} replace />} />
                 <Route path="/website" element={<Navigate to="/website/index" replace />} />
                 <Route path="*" element={<HtmlRedirectOrHome />} />
               </Routes>

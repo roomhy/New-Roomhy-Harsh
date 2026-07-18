@@ -14,12 +14,13 @@ const getAuthApiUrl = () =>
   import.meta.env?.VITE_API_URL ||
   (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
     ? "http://localhost:5001"
-    : "https://api.roomhy.com");
+    : "https://roohmy-backend-xwa9.vercel.app");
 
 const AUTH_STORAGE_KEYS = [
   "token", "staff_token", "user", "staff_user", "manager_user",
   "website_token", "website_user", "userData", "owner_user",
-  "owner_session", "tenant_user", "accessToken"
+  "owner_session", "tenant_user", "accessToken",
+  "staff_session", "employee_session"
 ];
 
 export const clearAllAuthKeys = () => {
@@ -34,16 +35,13 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const isAdminRoute = typeof window !== 'undefined' && 
-      (window.location.pathname.startsWith("/superadmin") || window.location.pathname.startsWith("/employee"));
-
-    const token = isAdminRoute
-      ? (localStorage.getItem("staff_token") || sessionStorage.getItem("staff_token") || localStorage.getItem("token") || sessionStorage.getItem("token"))
-      : (localStorage.getItem("website_token") || sessionStorage.getItem("website_token") || localStorage.getItem("token") || sessionStorage.getItem("token"));
-
-    const rawUser = isAdminRoute
-      ? (localStorage.getItem("staff_user") || sessionStorage.getItem("staff_user") || localStorage.getItem("user") || sessionStorage.getItem("user") || localStorage.getItem("userData"))
-      : (localStorage.getItem("website_user") || sessionStorage.getItem("website_user") || localStorage.getItem("user") || sessionStorage.getItem("user") || localStorage.getItem("userData"));
+    const token =
+      localStorage.getItem("website_token") ||
+      localStorage.getItem("token");
+    const rawUser =
+      localStorage.getItem("website_user") ||
+      localStorage.getItem("user") ||
+      localStorage.getItem("userData");
 
     if (!token || !rawUser) {
       setLoading(false);
@@ -55,9 +53,7 @@ export const AuthProvider = ({ children }) => {
     })
       .then((res) => {
         if (res.ok) return res.json();
-        if (res.status === 401 || res.status === 403) {
-          clearAllAuthKeys();
-        }
+        clearAllAuthKeys();
         setLoading(false);
         return null;
       })
@@ -77,34 +73,18 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
       })
       .catch(() => {
-        // Network failure, timeout, or server connectivity issue — keep cached local credentials.
+        // Network failure, timeout, or any fetch error — never trust cached localStorage.
+        // Require a fresh login so the server remains the sole authentication authority.
+        clearAllAuthKeys();
         setLoading(false);
       });
   }, []);
 
   const login = (userData, token) => {
     setUser(userData);
-    const role = String(userData?.role || '').toLowerCase();
-    const isAdmin = role === 'superadmin' || role === 'admin' || role === 'areamanager' || role === 'employee';
-
-    if (isAdmin) {
-      localStorage.setItem('staff_token', token);
-      localStorage.setItem('staff_user', JSON.stringify(userData));
-      sessionStorage.setItem('staff_token', token);
-      sessionStorage.setItem('staff_user', JSON.stringify(userData));
-    } else {
-      localStorage.setItem('website_token', token);
-      localStorage.setItem('website_user', JSON.stringify(userData));
-      sessionStorage.setItem('website_token', token);
-      sessionStorage.setItem('website_user', JSON.stringify(userData));
-    }
-
-    // Fallbacks for general/legacy components
     localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('userData', JSON.stringify(userData));
     sessionStorage.setItem('token', token);
-    sessionStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('userData', JSON.stringify(userData));
   };
 
   const logout = () => {

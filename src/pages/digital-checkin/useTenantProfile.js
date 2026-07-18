@@ -28,12 +28,13 @@ function calcEndDate(startDate, durationStr) {
   return d.toISOString().slice(0, 10);
 }
 
-// Fields that are locked if the owner provided them at assignment time
+// All fields except backupEmail are locked — tenant cannot change what the owner set
 const OWNER_FIELDS = [
+  "name", "email", "phone", "dob", "permanentAddress", "guardianNumber",
   "propertyName", "roomNo", "agreedRent", "moveInDate",
   "accommodationType", "securityDeposit", "minimumStayDuration", "licenseFeeDueDate",
   "licenseDuration", "moveOutCharges", "noticePeriodCharges", "inclusions", "gstCharges",
-  "propertyAddress"
+  "propertyAddress", "licenseEndDate"
 ];
 
 export const useTenantProfile = () => {
@@ -124,7 +125,7 @@ export const useTenantProfile = () => {
         email:              tenant.email            || profile.email           || "",
         phone:              tenant.phone            || profile.phone           || "",
         dob:                tenant.dob              || profile.dob             || "",
-        guardianNumber:     tenant.guardianNumber   || profile.guardianNumber  || "",
+        guardianNumber:     tenant.guardianNumber   || profile.guardianNumber  || tenant.emergencyContact?.phone || "",
         permanentAddress:   details.permanentAddress|| profile.permanentAddress|| "",
         backupEmail:        details.backupEmail     || "",
         propertyName:       propertyName            || "",
@@ -148,12 +149,9 @@ export const useTenantProfile = () => {
       };
       if (!cancelled) {
         updateForm(patch);
-        // Mark owner-provided fields as locked (non-empty values set by owner at assignment)
+        // All OWNER_FIELDS are always locked — tenant cannot edit anything the owner set
         const lockedMap = {};
-        for (const f of OWNER_FIELDS) {
-          const v = patch[f] || "";
-          if (v && v !== "INR " && v !== "INR 0") lockedMap[f] = true;
-        }
+        for (const f of OWNER_FIELDS) lockedMap[f] = true;
         setLocked(lockedMap);
         setLoading(false);
       }
@@ -174,14 +172,6 @@ export const useTenantProfile = () => {
   const handleSubmit = useCallback(
     async (event) => {
       event.preventDefault();
-      if (!form.permanentAddress.trim()) {
-        alert("Permanent address is required for the Rental Agreement");
-        return;
-      }
-      if (!form.phone.trim()) {
-        alert("Phone number is required");
-        return;
-      }
 
       const rentRaw = (form.agreedRent || "").replace(/[^\d.]/g, "");
       const payload = {

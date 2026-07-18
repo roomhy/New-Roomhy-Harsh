@@ -61,7 +61,7 @@ const getDashCache = (loginId) => {
 const setDashCache = (loginId, data) => {
   try {
     sessionStorage.setItem(`rdash_${loginId}`, JSON.stringify({ ...data, ts: Date.now() }));
-  } catch {} // quota errors are safe to swallow
+  } catch { } // quota errors are safe to swallow
 };
 
 // Natural wavy multiplier patterns for sparklines (index 0 = oldest, 6 = newest)
@@ -327,12 +327,12 @@ export default function Admin() {
 
   const newLeadsCount = enquiries.filter(e => !e.status || String(e.status).toLowerCase() === 'pending').length;
   const bookingsCount = enquiries.filter(e => ['approved', 'accepted', 'active'].includes(String(e.status).toLowerCase())).length;
-  const occupancyPercent = totalBedsCapacity ? Math.min(100, Math.round(((tenantsCount||0) / totalBedsCapacity) * 100)) : 0;
+  const occupancyPercent = totalBedsCapacity ? Math.min(100, Math.round(((tenantsCount || 0) / totalBedsCapacity) * 100)) : 0;
 
   const moveInsToday = tenants.filter(t => {
     if (!t.doj) return false;
     const d = new Date(t.doj);
-    d.setHours(0,0,0,0);
+    d.setHours(0, 0, 0, 0);
     return d.getTime() === todayStart.getTime();
   }).length;
 
@@ -358,7 +358,7 @@ export default function Admin() {
   const enhancedChartData = useMemo(() => {
     if (!chartData?.length) return [];
     const dailyExpected = monthlyRentExpected > 0 ? Math.round(monthlyRentExpected / 30) : 0;
-    const dailyPenalty  = collectionStats?.totalPenalty > 0
+    const dailyPenalty = collectionStats?.totalPenalty > 0
       ? Math.round(collectionStats.totalPenalty / (chartData.length || 1))
       : 0;
     return chartData.map(d => ({
@@ -671,11 +671,10 @@ export default function Admin() {
                   <button
                     key={val}
                     onClick={() => setChartPeriod(val)}
-                    className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all ${
-                      chartPeriod === val
+                    className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all ${chartPeriod === val
                         ? 'bg-card shadow-sm text-foreground'
                         : 'text-muted-foreground hover:text-foreground'
-                    }`}
+                      }`}
                   >
                     {label}
                   </button>
@@ -801,7 +800,7 @@ export default function Admin() {
               <div className="absolute inset-0 grid place-items-center pointer-events-none">
                 <div className="text-center">
                   <div className="font-serif text-[30px] leading-none text-foreground">
-                    {totalBedsCapacity ? Math.min(100, Math.round(((tenantsCount||0) / totalBedsCapacity) * 100)) : 0}%
+                    {totalBedsCapacity ? Math.min(100, Math.round(((tenantsCount || 0) / totalBedsCapacity) * 100)) : 0}%
                   </div>
                   <div className="text-[10px] text-muted-foreground mt-1">{tenantsCount}/{totalBedsCapacity} beds</div>
                 </div>
@@ -936,8 +935,8 @@ export default function Admin() {
                 const badgeClass = isClosed
                   ? 'bg-emerald-50 text-emerald-600'
                   : isInProgress
-                  ? 'bg-amber-50 text-amber-600'
-                  : 'bg-rose-50 text-rose-600';
+                    ? 'bg-amber-50 text-amber-600'
+                    : 'bg-rose-50 text-rose-600';
                 return (
                   <div key={c._id || i} className="px-6 py-4 flex items-center justify-between hover:bg-muted/20 transition-colors">
                     <div className="flex items-center gap-3 min-w-0">

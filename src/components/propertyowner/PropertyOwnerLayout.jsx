@@ -22,6 +22,7 @@ import { LayoutDashboard,
   Search, Lock, ChevronRight, Crown, Zap, Users, BookOpen, FileText, Smartphone, Wallet, PieChart, Shield, Target, Navigation, Megaphone, Coffee, Receipt, Sparkles, LinkIcon, UserPlus, AlertCircle, Calendar, HelpCircle, Building2 } from "lucide-react";
 import { SILVER_NAV, GOLD_NAV } from './navConfig';
 import { fetchOwnerProperties } from "../../utils/propertyowner";
+import { getStaffPanelNav, filterNotificationsForStaff, hasStaffPermission } from "../../utils/staffAccess";
 import { cacheGet, cacheSet, cacheInvalidate } from "../../utils/cache";
 import PropertyOwnerMobileLayout from "./PropertyOwnerMobileLayout";
 
@@ -151,6 +152,40 @@ export default function PropertyOwnerLayout({
     window.location.reload();
   };
 
+  // Staff are locked to their assigned property: they cannot pick "All Properties"
+  // and only see that one hostel. Owners are unrestricted.
+  const isStaffProxy = !!owner?.isStaffProxy;
+
+  // Header "Add Quick" actions. `perm` gates the action for staff (owner sees all);
+  // `staffTo` re-points staff at their own screen where one exists. perm:null =
+  // owner-only (never shown to staff).
+  const QUICK_ACTIONS = [
+    { label: "Add Tenant",      icon: UserPlus,   color: "text-blue-600",    to: "/propertyowner/tenantrec",         perm: "Tenants" },
+    { label: "Collect Rent",    icon: Wallet,     color: "text-emerald-600", to: "/propertyowner/payment",           perm: "Rent Collection" },
+    { label: "Add Complaint",   icon: AlertCircle,color: "text-rose-600",    to: "/propertyowner/complaints",        staffTo: "/propertyowner/staff-complaints", perm: "Complaints" },
+    { label: "Add Expense",     icon: Receipt,    color: "text-amber-600",   to: "/propertyowner/expense-tracking",  perm: null },
+    { label: "Add Property",    icon: Building2,  color: "text-indigo-600",  to: "/propertyowner/add-property",      perm: "Properties" },
+    { label: "Book Bed",        icon: Calendar,   color: "text-violet-600",  to: "/propertyowner/booking",           perm: "Bookings" },
+    { label: "Send Reminder",   icon: Bell,       color: "text-orange-600",  to: "/propertyowner/ownerchat",         perm: null },
+    { label: "Generate Receipt",icon: Receipt,    color: "text-slate-600",   to: "/propertyowner/receipts",          perm: null },
+  ];
+  const visibleQuickActions = isStaffProxy
+    ? QUICK_ACTIONS.filter(a => a.perm && hasStaffPermission(owner, a.perm)).map(a => ({ ...a, to: a.staffTo || a.to }))
+    : QUICK_ACTIONS;
+  const assignedPropId = owner?.assignedProperty ? String(owner.assignedProperty) : "";
+  const switcherProperties = (isStaffProxy && assignedPropId)
+    ? properties.filter(p => String(p._id || p.id) === assignedPropId)
+    : properties;
+  const allowAllProperties = !isStaffProxy;
+
+  useEffect(() => {
+    if (!isStaffProxy || !assignedPropId) return;
+    if (activePropertyId !== assignedPropId) {
+      localStorage.setItem('owner_active_property', assignedPropId);
+      setActivePropertyId(assignedPropId);
+    }
+  }, [isStaffProxy, assignedPropId, activePropertyId]);
+
   const [globalNotifications, setGlobalNotifications] = useState([]);
   
   useEffect(() => {
@@ -158,8 +193,12 @@ export default function PropertyOwnerLayout({
     // If the dashboard (or parent page) already passed notifications via props, use them
     // and skip the independent API call — the dashboard aggregation already fetched them.
     if (skipNotificationFetch) return;
+
+    const isStaff = !!owner?.isStaffProxy;
+    const staffId = owner?.staffLoginId;
+
     const fetchNotifs = async () => {
-      const cacheKey = `notifications:${owner.loginId}`;
+      const cacheKey = `notifications:${isStaff ? (staffId || owner.loginId) : owner.loginId}`;
       const cached = cacheGet(cacheKey);
       if (cached) {
         setGlobalNotifications(cached);
@@ -167,34 +206,63 @@ export default function PropertyOwnerLayout({
       }
       try {
         const { fetchJson } = await import("../../utils/api");
-        const res = await fetchJson(`/api/notifications?toLoginId=${encodeURIComponent(owner.loginId)}`);
-        if (Array.isArray(res)) {
-          const formatted = res.map(n => {
-            const meta = typeof n.meta === 'string' ? JSON.parse(n.meta) : (n.meta || {});
-            return {
-              ...n,
-              title: meta.title || n.title || "Notification",
-              message: meta.message || n.message || "",
-              type: n.type || "system",
-              meta: meta
-            };
-          });
-          cacheSet(cacheKey, formatted, _NOTIF_TTL);
-          setGlobalNotifications(formatted);
-        }
+        // A staff proxy pulls TWO feeds: their own (notifications addressed directly
+        // to them, e.g. an assigned task) plus the owner feed (role-relevant items,
+        // filtered downstream). Owners just pull their own.
+        const targets = isStaff && staffId
+          ? [{ id: staffId, own: true }, { id: owner.loginId, own: false }]
+          : [{ id: owner.loginId, own: false }];
+
+        const lists = await Promise.all(
+          targets.map((t) =>
+            fetchJson(`/api/notifications?toLoginId=${encodeURIComponent(t.id)}`)
+              .then((r) => (Array.isArray(r) ? r.map((n) => ({ ...n, _ownFeed: t.own })) : []))
+              .catch(() => [])
+          )
+        );
+
+        const seen = new Set();
+        const formatted = lists.flat().map(n => {
+          const meta = typeof n.meta === 'string' ? JSON.parse(n.meta) : (n.meta || {});
+          return {
+            ...n,
+            title: meta.title || n.title || "Notification",
+            message: meta.message || n.message || "",
+            type: n.type || "system",
+            meta: meta
+          };
+        }).filter((n) => {
+          const key = String(n._id || `${n.title}-${n.message}`);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+
+        cacheSet(cacheKey, formatted, _NOTIF_TTL);
+        setGlobalNotifications(formatted);
       } catch (e) {
         console.error("Failed to fetch global notifications", e);
       }
     };
     fetchNotifs();
-  }, [owner?.loginId, skipNotificationFetch]);
+  }, [owner?.loginId, owner?.isStaffProxy, owner?.staffLoginId, skipNotificationFetch]);
 
-  const displayNotifications = globalNotifications.length > 0 ? globalNotifications : notifications;
-  const displayNotificationCount = globalNotifications.length > 0 
-    ? globalNotifications.filter(n => !n.read).length 
-    : notificationCount;
+  const rawNotifications = globalNotifications.length > 0 ? globalNotifications : notifications;
+  // Staff share the owner's feed via the proxy session — route only what belongs
+  // to them (never owner-sensitive cash/OTP/financial notifications).
+  const displayNotifications = owner?.isStaffProxy
+    ? filterNotificationsForStaff(owner, rawNotifications)
+    : rawNotifications;
+  const displayNotificationCount = owner?.isStaffProxy
+    ? displayNotifications.filter(n => !n.read).length
+    : (globalNotifications.length > 0 ? globalNotifications.filter(n => !n.read).length : notificationCount);
 
-  const CURRENT_NAV = GOLD_NAV;
+  // Staff members share this exact panel, but see only a permission-filtered
+  // navigation. Owners get the full nav. This is what makes it a single panel.
+  const CURRENT_NAV = useMemo(
+    () => (owner?.isStaffProxy ? getStaffPanelNav(owner) : GOLD_NAV),
+    [owner]
+  );
 
   const handleParentClick = (e, item) => {
     if (subscriptionTier === 'silver' && item.goldOnly) {
@@ -342,9 +410,9 @@ export default function PropertyOwnerLayout({
         onClick={() => setNotificationOpen((prev) => !prev)}
       >
         <Bell className="w-5 h-5" />
-        {notificationCount > 0 ? (
+        {displayNotificationCount > 0 ? (
           <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-            {notificationCount}
+            {displayNotificationCount}
           </span>
         ) : headerVariant === "compact" ? (
           <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-red-500"></span>
@@ -361,12 +429,12 @@ export default function PropertyOwnerLayout({
           <h3 className="text-sm font-semibold text-gray-800">Notifications</h3>
         </div>
         <div id="notificationList" className="max-h-96 overflow-y-auto custom-scrollbar">
-          {notifications.length === 0 ? (
+          {displayNotifications.length === 0 ? (
             <div className="px-4 py-6 text-center text-sm text-gray-400">
               <p>No notifications yet</p>
             </div>
           ) : (
-            notifications.map((item, index) => (
+            displayNotifications.map((item, index) => (
               <div key={`${item.title || item.message || "notification"}-${index}`} className="px-4 py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors">
                 <p className="text-sm font-bold text-gray-800">{item.title || item.meta?.title || (item.type ? item.type.replace(/_/g, ' ').toUpperCase() : "Notification")}</p>
                 <p className="text-xs text-gray-600 mt-1">{item.message || item.meta?.message || (item.type === 'user_filter_match' ? 'A user is viewing properties matching your profile.' : "New update from system")}</p>
@@ -434,10 +502,12 @@ export default function PropertyOwnerLayout({
             <p className="text-xs text-gray-500 truncate">{`ID: ${owner?.loginId || "..."}`}</p>
           </div>
         )}
-        <Link to="/propertyowner/ownerprofile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-          <UserCircle className="w-4 h-4 inline mr-2" />
-          {headerVariant === "compact" ? "Your Profile" : "Profile"}
-        </Link>
+        {!owner?.isStaffProxy && (
+          <Link to="/propertyowner/ownerprofile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+            <UserCircle className="w-4 h-4 inline mr-2" />
+            {headerVariant === "compact" ? "Your Profile" : "Profile"}
+          </Link>
+        )}
         <button
           type="button"
           onClick={handleLogout}
@@ -515,11 +585,13 @@ export default function PropertyOwnerLayout({
         notifications={displayNotifications}
         onLogout={onLogout || handleLogout}
         disableSubmenuStrip={disableSubmenuStrip}
-        properties={properties}
+        properties={switcherProperties}
         activePropertyId={activePropertyId}
         handlePropertySwitch={handlePropertySwitch}
+        allowAllProperties={allowAllProperties}
         rooms={rooms}
         loading={loading}
+        navItems={owner?.isStaffProxy ? CURRENT_NAV : null}
       >
         {children}
       </PropertyOwnerMobileLayout>
@@ -575,23 +647,27 @@ export default function PropertyOwnerLayout({
                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Switch Context</h3>
               </div>
               <div className="max-h-60 overflow-y-auto custom-scrollbar p-2">
-                <button
-                  onClick={() => handlePropertySwitch('all')}
-                  className={cn(
-                    "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-colors text-left",
-                    activePropertyId === 'all' ? "bg-blue-500/20 text-blue-400" : "text-slate-300 hover:bg-slate-800"
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <LayoutDashboard size={16} className={activePropertyId === 'all' ? "text-blue-400" : "text-slate-500"} />
-                    <span>All Properties (Overview)</span>
-                  </div>
-                  {activePropertyId === 'all' && <div className="w-2 h-2 rounded-full bg-blue-500" />}
-                </button>
-                
-                <div className="my-2 border-t border-slate-700/50"></div>
-                
-                {properties.map(p => {
+                {allowAllProperties && (
+                  <>
+                    <button
+                      onClick={() => handlePropertySwitch('all')}
+                      className={cn(
+                        "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-colors text-left",
+                        activePropertyId === 'all' ? "bg-blue-500/20 text-blue-400" : "text-slate-300 hover:bg-slate-800"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <LayoutDashboard size={16} className={activePropertyId === 'all' ? "text-blue-400" : "text-slate-500"} />
+                        <span>All Properties (Overview)</span>
+                      </div>
+                      {activePropertyId === 'all' && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+                    </button>
+
+                    <div className="my-2 border-t border-slate-700/50"></div>
+                  </>
+                )}
+
+                {switcherProperties.map(p => {
                   const pId = String(p._id || p.id);
                   const isActive = activePropertyId === pId;
                   return (
@@ -670,42 +746,28 @@ export default function PropertyOwnerLayout({
 
           <div className="flex items-center gap-6">
             {/* Search Box */}
-            {/* Quick Actions Dropdown */}
-            <div className="relative group">
-              <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl transition-all shadow-lg shadow-blue-600/20 text-sm font-bold">
-                <Plus size={16} />
-                <span className="hidden sm:inline">Add Quick</span>
-                <ChevronDown size={14} className="opacity-70" />
-              </button>
-              <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all -translate-y-2 group-hover:translate-y-0 z-50 overflow-hidden">
-                <div className="p-2 space-y-1">
-                  <button onClick={() => navigate("/propertyowner/tenantrec")} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg text-sm text-slate-600 font-medium transition-colors">
-                    <UserPlus size={16} className="text-blue-600" /> Add Tenant
-                  </button>
-                  <button onClick={() => navigate("/propertyowner/payment")} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg text-sm text-slate-600 font-medium transition-colors">
-                    <Wallet size={16} className="text-emerald-600" /> Collect Rent
-                  </button>
-                  <button onClick={() => navigate("/propertyowner/complaints")} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg text-sm text-slate-600 font-medium transition-colors">
-                    <AlertCircle size={16} className="text-rose-600" /> Add Complaint
-                  </button>
-                  <button onClick={() => navigate("/propertyowner/expense-tracking")} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg text-sm text-slate-600 font-medium transition-colors">
-                    <Receipt size={16} className="text-amber-600" /> Add Expense
-                  </button>
-                  <button onClick={() => navigate("/propertyowner/add-property")} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg text-sm text-slate-600 font-medium transition-colors">
-                    <Building2 size={16} className="text-indigo-600" /> Add Property
-                  </button>
-                  <button onClick={() => navigate("/propertyowner/booking")} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg text-sm text-slate-600 font-medium transition-colors">
-                    <Calendar size={16} className="text-violet-600" /> Book Bed
-                  </button>
-                  <button onClick={() => navigate("/propertyowner/ownerchat")} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg text-sm text-slate-600 font-medium transition-colors">
-                    <Bell size={16} className="text-orange-600" /> Send Reminder
-                  </button>
-                  <button onClick={() => navigate("/propertyowner/receipts")} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg text-sm text-slate-600 font-medium transition-colors">
-                    <Receipt size={16} className="text-slate-600" /> Generate Receipt
-                  </button>
+            {/* Quick Actions Dropdown — permission-filtered for staff */}
+            {visibleQuickActions.length > 0 && (
+              <div className="relative group">
+                <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl transition-all shadow-lg shadow-blue-600/20 text-sm font-bold">
+                  <Plus size={16} />
+                  <span className="hidden sm:inline">Add Quick</span>
+                  <ChevronDown size={14} className="opacity-70" />
+                </button>
+                <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all -translate-y-2 group-hover:translate-y-0 z-50 overflow-hidden">
+                  <div className="p-2 space-y-1">
+                    {visibleQuickActions.map((a) => {
+                      const Icon = a.icon;
+                      return (
+                        <button key={a.label} onClick={() => navigate(a.to)} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg text-sm text-slate-600 font-medium transition-colors">
+                          <Icon size={16} className={a.color} /> {a.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Search Box */}
             <div className="hidden lg:flex items-center bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 w-72 group focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-500/5 focus-within:border-blue-500 transition-all">
@@ -723,17 +785,19 @@ export default function PropertyOwnerLayout({
               />
             </div>
 
-            {/* Messages */}
-            <button aria-label="Messages" onClick={() => navigate("/propertyowner/ownerchat")} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all relative group hidden sm:block">
-              <MessageSquare size={20} className="group-hover:scale-110 transition-transform" />
-            </button>
+            {/* Messages — owner chat, hidden for staff */}
+            {!isStaffProxy && (
+              <button aria-label="Messages" onClick={() => navigate("/propertyowner/ownerchat")} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all relative group hidden sm:block">
+                <MessageSquare size={20} className="group-hover:scale-110 transition-transform" />
+              </button>
+            )}
 
-
-
-            {/* Help Center */}
-            <button title="Complaints/Help" onClick={() => navigate("/propertyowner/complaints")} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all relative group hidden sm:block">
-              <HelpCircle size={20} className="group-hover:scale-110 transition-transform" />
-            </button>
+            {/* Help Center → owner complaints, or the staff complaints screen for staff (hidden if they lack it) */}
+            {(!isStaffProxy || hasStaffPermission(owner, "Complaints")) && (
+              <button title="Complaints/Help" onClick={() => navigate(isStaffProxy ? "/propertyowner/staff-complaints" : "/propertyowner/complaints")} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all relative group hidden sm:block">
+                <HelpCircle size={20} className="group-hover:scale-110 transition-transform" />
+              </button>
+            )}
 
             <div className="relative">
               <button 
@@ -819,7 +883,10 @@ export default function PropertyOwnerLayout({
               </div>
               <div className={cn("absolute top-full right-0 mt-4 w-48 bg-white rounded-xl shadow-xl border border-slate-100 transition-all z-50 overflow-hidden", profileOpen ? "opacity-100 visible translate-y-0" : "opacity-0 invisible -translate-y-2")}>
                 <div className="p-2 space-y-1">
-                  <button onClick={() => navigate("/propertyowner/ownerprofile")} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm text-slate-600 font-medium transition-colors">Profile Settings</button>
+                  {/* Profile Settings is an owner-only screen — hidden for staff */}
+                  {!owner?.isStaffProxy && (
+                    <button onClick={() => navigate("/propertyowner/ownerprofile")} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm text-slate-600 font-medium transition-colors">Profile Settings</button>
+                  )}
                   <button onClick={handleLogout} className="w-full text-left px-3 py-2 hover:bg-rose-50 text-rose-600 rounded-lg text-sm font-medium transition-colors">Log Out</button>
                 </div>
               </div>

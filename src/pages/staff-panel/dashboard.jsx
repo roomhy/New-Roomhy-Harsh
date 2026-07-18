@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import StaffLayout from "../../components/StaffLayout";
 import {
   Users, Home, AlertCircle, ClipboardList,
@@ -6,9 +6,11 @@ import {
   ChevronRight, Loader2, UsersRound, Megaphone,
   Sun, MapPin
 } from "lucide-react";
-import { getApiBase, getAuthHeader } from "../../utils/api";
-
-const apiBase = getApiBase();
+import { useMyAttendance, useCheckIn, useCheckOut } from "../../hooks/useAttendance";
+import { useStaffTasks } from "../../hooks/useTasks";
+import { useOwnerTenants } from "../../hooks/useTenants";
+import { useOwnerVisitors } from "../../hooks/useVisitors";
+import { useOwnerRooms, useOwnerComplaints, useOwnerAnnouncements } from "../../hooks/useDashboardData";
 
 function getStaffSession() {
   try {
@@ -16,7 +18,7 @@ function getStaffSession() {
     if (raw) return JSON.parse(raw);
     const empRaw = sessionStorage.getItem("employee_session") || localStorage.getItem("employee_session");
     if (empRaw) return JSON.parse(empRaw);
-  } catch (_) {}
+  } catch (_) { }
   return null;
 }
 
@@ -159,24 +161,15 @@ export default function StaffDashboard() {
   // Auth guard — no session → redirect to login
   useEffect(() => {
     if (!staffLoginId) {
-      window.location.href = "/staff/login";
+      window.location.href = "/propertyowner/ownerlogin";
     }
   }, [staffLoginId]);
 
   if (!staffLoginId) return null;
 
+  // ── UI-only local state ──
   const [now, setNow] = useState(new Date());
-  const [todayAtt, setTodayAtt] = useState(null);
-  const [tasks, setTasks] = useState({ pending: 0, total: 0 });
-  const [recentTasks, setRecentTasks] = useState([]);
-  const [stats, setStats] = useState({ tenants: 0, rooms: 0, complaints: 0 });
-  const [visitorsToday, setVisitorsToday] = useState([]);
-  const [announcements, setAnnouncements] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [checkInLoading, setCheckInLoading] = useState(false);
-  const [checkOutLoading, setCheckOutLoading] = useState(false);
   const [msg, setMsg] = useState("");
-
   const showMsg = (text) => { setMsg(text); setTimeout(() => setMsg(""), 3000); };
 
   useEffect(() => {
@@ -184,130 +177,84 @@ export default function StaffDashboard() {
     return () => clearInterval(t);
   }, []);
 
-  const fetchDashboard = useCallback(async () => {
-    if (!staffLoginId) return;
-    setLoading(true);
-    try {
-      const today = new Date();
-      const month = today.getMonth() + 1;
-      const year = today.getFullYear();
-
-      const reqs = [
-        fetch(`${apiBase}/api/hr/my-attendance/${staffLoginId}?month=${month}&year=${year}`).catch(() => null),
-        fetch(`${apiBase}/api/tasks?assignedStaffLoginId=${staffLoginId}`).catch(() => null)
-      ];
-
-      if (parentId) {
-        reqs.push(fetch(`${apiBase}/api/tenants/owner/${parentId}`, { headers: getAuthHeader() }).catch(() => null));
-        reqs.push(fetch(`${apiBase}/api/rooms/owner/${parentId}`).catch(() => null));
-        reqs.push(fetch(`${apiBase}/api/complaints/owner/${parentId}`, { headers: getAuthHeader() }).catch(() => null));
-        reqs.push(fetch(`${apiBase}/api/visitors/owner/${parentId}`).catch(() => null));
-        reqs.push(fetch(`${apiBase}/api/announcements/owner/${parentId}`).catch(() => null));
-      }
-
-      const results = await Promise.all(reqs);
-
-      // Attendance
-      if (results[0] && results[0].ok) {
-        const data = await results[0].json();
-        const records = data?.data || [];
-        const toLocalYMD = (d) => {
-          if (!d) return "";
-          const date = new Date(d);
-          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-        };
-        const rec = records.find(r => r.date && toLocalYMD(r.date) === toLocalYMD(new Date()));
-        setTodayAtt(rec || null);
-      }
-
-      // Tasks
-      if (results[1] && results[1].ok) {
-        const data = await results[1].json();
-        const allTasks = data?.data || [];
-        setTasks({
-          total: allTasks.length,
-          pending: allTasks.filter(t => t.status === "Pending").length,
-        });
-        setRecentTasks(allTasks.filter(t => t.status !== "Completed").slice(0, 3));
-      }
-
-      // Stats
-      let tCount = 0, rCount = 0, cCount = 0;
-      if (parentId) {
-        if (results[2] && results[2].ok) {
-          const d = await results[2].json();
-          const arr = Array.isArray(d) ? d : (d?.tenants || d?.data || []);
-          tCount = arr.filter(t => !t.isDeleted && t.status !== "inactive").length;
-        }
-        if (results[3] && results[3].ok) {
-          const d = await results[3].json();
-          const arr = Array.isArray(d) ? d : (d?.rooms || d?.data || []);
-          rCount = arr.length;
-        }
-        if (results[4] && results[4].ok) {
-          const d = await results[4].json();
-          const arr = Array.isArray(d) ? d : (d?.complaints || d?.data || []);
-          const assignedToMe = arr.filter(c => {
-            const assignedIdStr = c.assignedStaffId?._id || c.assignedStaffId || "";
-            return String(assignedIdStr) === String(staffId) ||
-              (c.assignedTo && String(c.assignedTo).toUpperCase() === String(staffLoginId).toUpperCase());
-          });
-          cCount = assignedToMe.filter(c => c.status !== "Resolved" && c.status !== "Closed").length;
-        }
-        if (results[5] && results[5].ok) {
-          const d = await results[5].json();
-          const arr = Array.isArray(d) ? d : (d?.visitors || d?.data || []);
-          setVisitorsToday(arr.filter(v => isToday(v.createdAt || v.date || v.visitDate)));
-        }
-        if (results[6] && results[6].ok) {
-          const d = await results[6].json();
-          const arr = Array.isArray(d) ? d : (d?.announcements || d?.data || []);
-          setAnnouncements(arr.slice(0, 4));
-        }
-      }
-      setStats({ tenants: tCount, rooms: rCount, complaints: cCount });
-    } catch (_) {}
-    finally { setLoading(false); }
-  }, [staffLoginId, staffId, parentId]);
-
   useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
+    const t = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(t);
+  }, []);
 
-  const handleCheckIn = async () => {
-    if (!staffLoginId) return;
-    setCheckInLoading(true);
-    try {
-      const res = await fetch(`${apiBase}/api/hr/checkin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ staffLoginId }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setTodayAtt(data.data);
-        showMsg(`Checked in at ${data.checkInTime} ✓`);
-      }
-    } catch (_) {}
-    finally { setCheckInLoading(false); }
+  // ── Server state via React Query. These use the SAME query keys as the
+  //    Attendance / Tasks / Visitors pages, so React Query serves them from one
+  //    shared cache — returning here makes no duplicate calls within staleTime. ──
+  const attQuery = useMyAttendance(staffLoginId, now.getMonth() + 1, now.getFullYear());
+  const tasksQuery = useStaffTasks(staffLoginId);
+  const tenantsQuery = useOwnerTenants(parentId);
+  const roomsQuery = useOwnerRooms(parentId);
+  const complaintsQuery = useOwnerComplaints(parentId);
+  const visitorsQuery = useOwnerVisitors(parentId);
+  const announcementsQuery = useOwnerAnnouncements(parentId);
+
+  const checkInMut = useCheckIn(staffLoginId);
+  const checkOutMut = useCheckOut(staffLoginId);
+  const checkInLoading = checkInMut.isPending;
+  const checkOutLoading = checkOutMut.isPending;
+
+  const loading = attQuery.isLoading || tasksQuery.isLoading ||
+    (!!parentId && (tenantsQuery.isLoading || roomsQuery.isLoading || complaintsQuery.isLoading || visitorsQuery.isLoading));
+
+  const toLocalYMD = (d) => {
+    if (!d) return "";
+    const date = new Date(d);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   };
 
-  const handleCheckOut = async () => {
+  // ── Everything below is DERIVED from cached server data (never stored) ──
+  const todayAtt = useMemo(() => {
+    const records = attQuery.data || [];
+    return records.find(r => r.date && toLocalYMD(r.date) === toLocalYMD(new Date())) || null;
+  }, [attQuery.data]);
+
+  const allTasks = tasksQuery.data || [];
+  const tasks = useMemo(() => ({
+    total: allTasks.length,
+    pending: allTasks.filter(t => t.status === "Pending").length,
+  }), [allTasks]);
+  const recentTasks = useMemo(() => allTasks.filter(t => t.status !== "Completed").slice(0, 3), [allTasks]);
+
+  const stats = useMemo(() => {
+    const tenantsArr = tenantsQuery.data || [];
+    const roomsArr = roomsQuery.data || [];
+    const complaintsArr = complaintsQuery.data || [];
+    const complaints = complaintsArr.filter(c => {
+      const assignedIdStr = c.assignedStaffId?._id || c.assignedStaffId || "";
+      const mine = String(assignedIdStr) === String(staffId) ||
+        (c.assignedTo && String(c.assignedTo).toUpperCase() === String(staffLoginId).toUpperCase());
+      return mine && c.status !== "Resolved" && c.status !== "Closed";
+    }).length;
+    return {
+      tenants: tenantsArr.filter(t => !t.isDeleted && t.status !== "inactive").length,
+      rooms: roomsArr.length,
+      complaints,
+    };
+  }, [tenantsQuery.data, roomsQuery.data, complaintsQuery.data, staffId, staffLoginId]);
+
+  const visitorsToday = useMemo(
+    () => (visitorsQuery.data || []).filter(v => isToday(v.createdAt || v.date || v.visitDate)),
+    [visitorsQuery.data]
+  );
+  const announcements = useMemo(() => (announcementsQuery.data || []).slice(0, 4), [announcementsQuery.data]);
+
+  const handleCheckIn = () => {
     if (!staffLoginId) return;
-    setCheckOutLoading(true);
-    try {
-      const res = await fetch(`${apiBase}/api/hr/checkout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ staffLoginId }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setTodayAtt(data.data);
-        showMsg(`Checked out at ${data.checkOutTime} ✓`);
-      }
-    } catch (_) {}
-    finally { setCheckOutLoading(false); }
+    checkInMut.mutate(undefined, {
+      onSuccess: (data) => { if (data?.success) showMsg(`Checked in at ${data.checkInTime} ✓`); },
+    });
+  };
+
+  const handleCheckOut = () => {
+    if (!staffLoginId) return;
+    checkOutMut.mutate(undefined, {
+      onSuccess: (data) => { if (data?.success) showMsg(`Checked out at ${data.checkOutTime} ✓`); },
+    });
   };
 
   const hour = now.getHours();
@@ -319,14 +266,14 @@ export default function StaffDashboard() {
   const dutyLabel = todayAtt?.checkIn && !todayAtt?.checkOut
     ? "You're on duty"
     : todayAtt?.checkOut
-    ? "Shift complete"
-    : "Not checked in";
+      ? "Shift complete"
+      : "Not checked in";
 
   const shiftStatus = todayAtt?.checkIn && !todayAtt?.checkOut
     ? { label: "Active", dot: "bg-emerald-400" }
     : todayAtt?.checkOut
-    ? { label: "Completed", dot: "bg-slate-300" }
-    : { label: "Not Started", dot: "bg-slate-300" };
+      ? { label: "Completed", dot: "bg-slate-300" }
+      : { label: "Not Started", dot: "bg-slate-300" };
 
   return (
     <StaffLayout title={staffName} subtitle="Dashboard">
@@ -342,7 +289,9 @@ export default function StaffDashboard() {
         {/* Greeting row */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">Good morning, {staffName} 👋</h2>
+            <h2 className="text-2xl font-bold text-slate-900">Welcome, {staffName}
+
+            </h2>
             <p className="text-sm text-slate-400 mt-1">Here's what's happening at your property today.</p>
           </div>
           <div className="hidden sm:flex items-center gap-2 bg-white border border-slate-100 shadow-sm rounded-full px-4 py-2 text-xs font-bold text-slate-600 shrink-0">
@@ -352,12 +301,14 @@ export default function StaffDashboard() {
         </div>
 
         {/* Hero on-duty card */}
-        <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-indigo-800 via-blue-700 to-indigo-900 p-10 sm:p-12 text-white shadow-2xl shadow-indigo-900/30">
+        <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-indigo-800 via-blue-700 to-indigo-900 p-6 sm:p-12 text-white shadow-2xl shadow-indigo-900/30">
           <HeroWavePattern className="absolute inset-0 w-full h-full pointer-events-none" />
           <BuildingIllustration className="hidden md:block absolute right-2 top-2 w-72 h-72 lg:w-80 lg:h-80 pointer-events-none" />
 
           <div className="relative z-10 flex flex-wrap items-start gap-x-14 gap-y-8 md:pr-64">
-            <div>
+            {/* Time & date — hidden on phones to keep the card short; the client
+                asked mobile to show only name, staff ID and the check-in buttons */}
+            <div className="hidden sm:block">
               <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest">{dutyLabel}</p>
               <p className="text-5xl sm:text-[52px] font-extrabold mt-4 leading-none">{timeStr}</p>
               <p className="text-indigo-200 text-base font-medium mt-4">{fullDateStr}</p>
@@ -365,14 +316,14 @@ export default function StaffDashboard() {
             <div className="hidden sm:block w-px self-stretch bg-white/20" />
             <div>
               <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest">Warden</p>
-              <p className="text-4xl font-extrabold mt-4 leading-none">{staffName}</p>
-              <p className="text-indigo-200 text-base font-medium mt-4">STAFF ID: {staffLoginId}</p>
+              <p className="text-3xl sm:text-4xl font-extrabold mt-3 sm:mt-4 leading-none">{staffName}</p>
+              <p className="text-indigo-200 text-sm sm:text-base font-medium mt-3 sm:mt-4">STAFF ID: {staffLoginId}</p>
             </div>
           </div>
 
-          <div className="relative z-10 flex flex-col lg:flex-row items-stretch lg:items-center gap-4 mt-12">
-            {/* Minimal status strip — typography-led, no colorful icon circles */}
-            <div className="flex-1 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 px-8 py-6 flex flex-wrap items-center gap-x-12 gap-y-4">
+          <div className="relative z-10 flex flex-col lg:flex-row items-stretch lg:items-center gap-4 mt-6 sm:mt-12">
+            {/* Minimal status strip — hidden on phones (mobile shows only the buttons) */}
+            <div className="hidden sm:flex flex-1 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 px-8 py-6 flex-wrap items-center gap-x-12 gap-y-4">
               <div className="flex items-center gap-3">
                 <Sun size={16} className="text-indigo-200 shrink-0" />
                 <div>
@@ -398,11 +349,11 @@ export default function StaffDashboard() {
               </div>
             </div>
 
-            <div className="flex gap-3 shrink-0">
+            <div className="flex gap-3 shrink-0 w-full lg:w-auto">
               <button
                 onClick={handleCheckIn}
                 disabled={checkInLoading || loading || !!todayAtt?.checkIn}
-                className="h-16 px-10 bg-white text-indigo-700 rounded-2xl font-bold text-base flex items-center justify-center gap-2 hover:bg-indigo-50 transition-all disabled:opacity-50 shadow-lg"
+                className="flex-1 lg:flex-none h-14 sm:h-16 px-4 sm:px-10 bg-white text-indigo-700 rounded-2xl font-bold text-base flex items-center justify-center gap-2 hover:bg-indigo-50 transition-all disabled:opacity-50 shadow-lg"
               >
                 {checkInLoading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
                 {todayAtt?.checkIn ? "Checked In" : "Check In"}
@@ -410,7 +361,7 @@ export default function StaffDashboard() {
               <button
                 onClick={handleCheckOut}
                 disabled={checkOutLoading || loading || !todayAtt?.checkIn || !!todayAtt?.checkOut}
-                className="h-16 px-10 bg-indigo-500 text-white rounded-2xl font-bold text-base flex items-center justify-center gap-2 hover:bg-indigo-400 transition-all disabled:opacity-50 shadow-lg"
+                className="flex-1 lg:flex-none h-14 sm:h-16 px-4 sm:px-10 bg-indigo-500 text-white rounded-2xl font-bold text-base flex items-center justify-center gap-2 hover:bg-indigo-400 transition-all disabled:opacity-50 shadow-lg"
               >
                 {checkOutLoading ? <Loader2 size={18} className="animate-spin" /> : <LogOut size={18} />}
                 {todayAtt?.checkOut ? "Checked Out" : "Check Out"}
@@ -429,7 +380,7 @@ export default function StaffDashboard() {
 
         {/* Bottom Info Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <PanelCard title="Today's Tasks" viewAllLabel="View all" viewAllHref="/staff/tasks">
+          <PanelCard title="Today's Tasks" viewAllLabel="View all" viewAllHref="/propertyowner/my-tasks">
             {recentTasks.length === 0 ? (
               <EmptyPanel icon={ClipboardList} title="No tasks assigned" sub="All clear for today!" />
             ) : (
@@ -454,7 +405,7 @@ export default function StaffDashboard() {
             )}
           </PanelCard>
 
-          <PanelCard title="Scheduled Visitors" viewAllLabel="View log" viewAllHref="/staff/visitors">
+          <PanelCard title="Scheduled Visitors" viewAllLabel="View log" viewAllHref="/propertyowner/visitor-entry">
             {visitorsToday.length === 0 ? (
               <EmptyPanel icon={UsersRound} title="No visitors today" sub="Have a peaceful day!" />
             ) : (
@@ -472,7 +423,7 @@ export default function StaffDashboard() {
             )}
           </PanelCard>
 
-          <PanelCard title="Announcements" viewAllLabel="View all" viewAllHref="/staff/announcements">
+          <PanelCard title="Announcements" viewAllLabel="View all" viewAllHref="/propertyowner/announcements">
             {announcements.length === 0 ? (
               <EmptyPanel icon={Megaphone} title="No announcements" sub="Nothing new right now." />
             ) : (
