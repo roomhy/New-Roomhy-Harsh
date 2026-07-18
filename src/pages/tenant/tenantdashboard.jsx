@@ -5,8 +5,9 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useHtmlPage } from "../../utils/htmlPage";
-import { fetchJson, getApiBase, getAuthHeader } from "../../utils/api";
+import { fetchJson, getApiBase, getAuthHeader, parseApiError } from "../../utils/api";
 import { clearAllAuthKeys } from "../../contexts/AuthContext";
+import { verifyCashOtp as verifyCashOtpRequest } from "../../utils/rentCollectionApi";
 import {
   CheckCircle, Download, Eye, Upload, Star, Clock, XCircle,
   Clock3, AlertTriangle, FileWarning, X, CreditCard, HandCoins,
@@ -99,9 +100,46 @@ const formatDate = (v, withTime = false) => {
   );
 };
 const paymentMethodLabel = (m) =>
-  ({ razorpay: "Online (Razorpay)", cash: "Cash", bank_transfer: "Bank Transfer", other: "Other" }[
-    String(m || "").toLowerCase()
-  ] || "Unknown");
+({ razorpay: "Online (Razorpay)", cash: "Cash", bank_transfer: "Bank Transfer", other: "Other" }[
+  String(m || "").toLowerCase()
+] || "Unknown");
+
+const cashStatusLabel = (status) => {
+  const key = String(status || "").toLowerCase();
+  return {
+    pending_approval: "Pending Approval",
+    requested: "Pending Approval",
+    owner_approved: "Owner Approved",
+    otp_sent: "OTP Sent",
+    verified: "Verified",
+    paid: "Paid",
+    rejected: "Rejected",
+    expired: "Expired",
+  }[key] || key.replaceAll("_", " ") || "Not started";
+};
+
+const humanizeCashError = (err, fallback = "Something went wrong. Please try again later.") => {
+  const { message, status, raw } = parseApiError(err);
+  const normalized = String(message || "").toLowerCase();
+
+  if (status === 0 || status === 408 || normalized.includes("failed to fetch") || normalized.includes("network")) {
+    return "Unable to connect. Please try again.";
+  }
+
+  if (normalized.includes("already exists")) {
+    return "Cash payment request already exists.\nPlease wait for owner approval.";
+  }
+
+  if (normalized.includes("forbidden")) {
+    return "You are not allowed to perform this action.";
+  }
+
+  if (raw && typeof raw === "string" && raw.trim().startsWith("{")) {
+    return fallback;
+  }
+
+  return message || fallback;
+};
 
 // ─── Receipt HTML template (rendered off-screen, captured by html2canvas) ─────
 function ReceiptTemplate({ receiptRef, tenant, tenantUser, rentItem, loginId, propertyName, roomInfo }) {
@@ -267,6 +305,9 @@ export default function Tenantdashboard() {
   const [errorMsg, setErrorMsg] = useState("");
   const [documentViewer, setDocumentViewer] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
+  const cashRequestStatus = rent?.cashRequestStatus || rent?.paymentStatus || "";
+  const normalizedCashStatus = String(cashRequestStatus || "PENDING_APPROVAL").toUpperCase();
+  const showCashOtp = ["OWNER_APPROVED", "OTP_SENT", "VERIFIED"].includes(normalizedCashStatus) || cashPanelOpen;
 
   // Tab State
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -274,11 +315,11 @@ export default function Tenantdashboard() {
   // Gate Management State
   const [visitorModalOpen, setVisitorModalOpen] = useState(false);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
-  
+
   const [visitorGuestName, setVisitorGuestName] = useState("");
   const [visitorGuestPhone, setVisitorGuestPhone] = useState("");
   const [visitorDate, setVisitorDate] = useState("");
-  
+
   const [leaveDepartureDate, setLeaveDepartureDate] = useState("");
   const [leaveReturnDate, setLeaveReturnDate] = useState("");
   const [gateLeaveReason, setGateLeaveReason] = useState("");
@@ -354,9 +395,16 @@ export default function Tenantdashboard() {
   const loginId = String(tenantUser?.loginId || "").toUpperCase();
   const propertyName = tenant?.propertyTitle || tenant?.property?.title || tenant?.property?.name || "Roomhy Property";
   const roomInfo = tenant ? `Room ${tenant.roomNo || "-"}${tenant.bedNo ? ` (${tenant.bedNo})` : ""}` : "Room -";
-  const rentAmount = Number(rent?.totalDue || rent?.rentAmount || tenant?.agreedRent || 0);
+  const roomRent = Number(rent?.rentAmount || tenant?.agreedRent || 0);
+  const totalPenalty = Number(rent?.totalPenalty || 0);
+  const electricityCost = Number(rent?.electricityBill || 0);
+  // Always compute fresh from components — never trust stale rent.totalDue stored in DB,
+  // because electricity gets added to the invoice after the initial totalDue is saved.
+  const totalPayable = roomRent + totalPenalty + electricityCost || Number(rent?.totalDue || 0);
+  const rentAmount = totalPayable;
   const paymentStatus = String(rent?.paymentStatus || "pending").toLowerCase();
   const isPaid = paymentStatus === "paid" || paymentStatus === "completed";
+  const canRequestCash = !isPaid && !["PENDING_APPROVAL", "OWNER_APPROVED", "OTP_SENT", "VERIFIED"].includes(normalizedCashStatus);
   const statusLabel = isPaid ? "Paid" : paymentStatus === "overdue" ? "Overdue" : "Unpaid";
 
   const docs = useMemo(() => {
@@ -658,10 +706,10 @@ export default function Tenantdashboard() {
 
   const loadRents = async () => {
     if (!loginId) return [];
-    const data = await fetchJson(`/api/rents/tenant/${encodeURIComponent(loginId)}?limit=15`);
-    const rents = data?.rents || [];
+    const data = await fetchJson(`/api/rents/tenant/me`);
+    const rents = data?.invoices || [];
     setHistory(rents);
-    setRent(rents[0] || null);
+    setRent(data?.invoice || rents[0] || null);
     return rents;
   };
 
@@ -709,6 +757,30 @@ export default function Tenantdashboard() {
   };
 
   useEffect(() => { refreshDashboard(); }, []);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        refreshDashboard().catch(() => { });
+      }
+    };
+    const onFocus = () => {
+      refreshDashboard().catch(() => { });
+    };
+
+    const intervalId = setInterval(() => {
+      refreshDashboard().catch(() => { });
+    }, 60000);
+
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
 
 
   useEffect(() => {
@@ -1030,6 +1102,12 @@ export default function Tenantdashboard() {
 
   const handleCashRequest = async () => {
     if (!tenant) { setActionMsg("Tenant data not found."); return; }
+    if (isPaid) { setActionMsg("This rent is already marked as paid."); return; }
+    if (["PENDING_APPROVAL", "OWNER_APPROVED", "OTP_SENT", "VERIFIED"].includes(normalizedCashStatus)) {
+      setCashPanelOpen(true);
+      setActionMsg("A cash payment request already exists for this rent.");
+      return;
+    }
     setActionBusy(true);
     setActionMsg("Sending cash request to owner...");
     setCashPanelOpen(true);
@@ -1048,10 +1126,10 @@ export default function Tenantdashboard() {
         }),
       });
       setRent(result?.rent || rent);
-      setActionMsg("Cash request sent. Ask owner to click Received. OTP will come to your email.");
+      setActionMsg("Cash payment request sent. Waiting for owner approval.");
       await syncPaymentState();
     } catch (err) {
-      setActionMsg(err?.body || err?.message || "Cash request failed.");
+      setActionMsg(humanizeCashError(err, "Something went wrong. Please try again later."));
     } finally {
       setActionBusy(false);
     }
@@ -1062,24 +1140,20 @@ export default function Tenantdashboard() {
     setActionBusy(true);
     setActionMsg("Verifying OTP...");
     try {
-      await fetchJson("/api/rents/cash/verify-otp", {
-        method: "POST",
-        body: JSON.stringify({ tenantLoginId: loginId, otp: cashOtp.trim() }),
-      });
+      await verifyCashOtpRequest(loginId, cashOtp.trim());
       await syncPaymentState();
       setPayOpen(false);
       setCashOtp("");
       setCashPanelOpen(false);
-
-      // Build a cash receipt item
+      setActionMsg("Your cash rent payment has been verified successfully.");
       const cashRentItem = history[0] || {
         ...rent,
         paidAmount: rentAmount,
         paymentMethod: "cash",
         paymentStatus: "paid",
+        cashRequestStatus: "PAID",
         paymentDate: new Date().toISOString(),
       };
-
       openGenericModal(
         "Payment Confirmation",
         <div className="text-center">
@@ -1099,10 +1173,15 @@ export default function Tenantdashboard() {
         </div>
       );
     } catch (err) {
-      setActionMsg(err?.body || err?.message || "OTP verification failed.");
+      setActionMsg(humanizeCashError(err, "Something went wrong. Please try again later."));
     } finally {
       setActionBusy(false);
     }
+  };
+
+  const handleCashRequestRetry = async () => {
+    setCashPanelOpen(true);
+    await syncPaymentState();
   };
 
   const activityRows = history.length > 0 ? history : [];
@@ -1254,7 +1333,7 @@ export default function Tenantdashboard() {
   // Parse a display date string like "19 Jun 2026" → ISO "2026-06-19" for comparison.
   const parseDisplayDate = (s) => {
     if (!s) return null;
-    const MONTHS = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+    const MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
     const m = String(s).match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/);
     if (!m) return null;
     const mo = MONTHS[m[2].toLowerCase()];
@@ -1266,13 +1345,13 @@ export default function Tenantdashboard() {
   const dateFilteredRows = useMemo(() => {
     if (!ledgerDateFrom && !ledgerDateTo) return ledgerRows;
     const from = ledgerDateFrom ? new Date(ledgerDateFrom) : null;
-    const to   = ledgerDateTo   ? new Date(ledgerDateTo)   : null;
+    const to = ledgerDateTo ? new Date(ledgerDateTo) : null;
     if (to) to.setHours(23, 59, 59, 999);
     return ledgerRows.filter((r) => {
       const d = parseDisplayDate(r.date);
       if (!d) return true;
       if (from && d < from) return false;
-      if (to   && d > to)   return false;
+      if (to && d > to) return false;
       return true;
     });
   }, [ledgerRows, ledgerDateFrom, ledgerDateTo]);
@@ -1388,7 +1467,16 @@ export default function Tenantdashboard() {
   const leaseDetails = tenant?.digitalCheckin?.agreementDetails || {};
   const leaseStart = leaseDetails.licenseStartDate || tenant?.moveInDate;
   const leaseEnd = leaseDetails.licenseEndDate;
-  const leaseStatus = tenant ? (tenant.moveoutRequest?.status === "approved" ? "Inactive" : "Active") : "—";
+  // Lease is only "Active" once the agreement is actually signed.
+  const agreementSigned = !!(
+    tenant?.agreementSigned ||
+    tenant?.agreementSignedAt ||
+    tenant?.digitalCheckin?.agreement?.pdfUrl ||
+    tenant?.digitalCheckin?.agreement?.signedAt
+  );
+  const leaseStatus = tenant
+    ? (tenant.moveoutRequest?.status === "approved" || !agreementSigned ? "Inactive" : "Active")
+    : "—";
 
   // ─── KYC read-only display data ──────────────────────────────────────────────
   // Same source the owner panel reads (tenant.kyc.*), with digital-check-in
@@ -1451,6 +1539,20 @@ export default function Tenantdashboard() {
     });
   };
 
+  const paymentBreakdown = useMemo(() => {
+    const items = [
+      { label: "Room Rent", value: roomRent, tone: "text-slate-900" },
+      { label: "Total Penalty", value: totalPenalty, tone: totalPenalty > 0 ? "text-amber-700" : "text-slate-900" },
+    ];
+    if (electricityCost > 0) {
+      items.push({ label: "Electricity Bill", value: electricityCost, tone: "text-blue-700" });
+    }
+    return {
+      items,
+      total: totalPayable,
+    };
+  }, [roomRent, totalPenalty, electricityCost, totalPayable]);
+
   const quickActions = [
     { title: "Pay Rent", subtitle: "Settle your monthly rent", color: "purple", icon: QuickActionIcons.CreditCard, onClick: () => setPayOpen(true) },
     { title: "Raise Complaint", subtitle: "Report an issue", color: "orange", icon: QuickActionIcons.Flag, onClick: () => setActiveTab("complaints") },
@@ -1510,7 +1612,7 @@ export default function Tenantdashboard() {
                   {/* LEFT COLUMN */}
                   <div className="lg:col-span-2 space-y-6">
                     <HeroRentCard
-                      amountDue={rentAmount}
+                      amountDue={totalPayable}
                       isPaid={isPaid}
                       statusLabel={statusLabel}
                       dueText="Due on 5th of this month"
@@ -1520,11 +1622,47 @@ export default function Tenantdashboard() {
                       hasReceipt={!!latestPaid}
                     />
 
+                    <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_2px_16px_-8px_rgba(15,23,42,0.08)]">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-base font-bold text-slate-900">Payment Breakdown</h3>
+                          <p className="text-sm text-slate-500 mt-1">Latest invoice values from the backend.</p>
+                        </div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          {rent?.billingMonth || "Current month"}
+                        </div>
+                      </div>
+                      <div className="mt-5 space-y-3">
+                        {paymentBreakdown.items.map((item) => (
+                          <div key={item.label} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
+                            <div>
+                              <p className="text-sm font-medium text-slate-600">{item.label}</p>
+                              <p className="text-[11px] text-slate-400 mt-0.5">
+                                {item.label === "Room Rent" ? "Base rent from invoice" : "Owner-added penalties"}
+                              </p>
+                            </div>
+                            <div className={`text-base font-bold tabular-nums ${item.tone}`}>
+                              {formatCurrency(item.value)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-4 border-t border-slate-100 pt-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-700">Total Payable</p>
+                          <p className="text-xs text-slate-400">Total Rent {electricityCost > 0 ? "+ Electricity " : ""}+ Penalty</p>
+                        </div>
+                        <div className="text-2xl font-black text-blue-600 tabular-nums">
+                          {formatCurrency(paymentBreakdown.total)}
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-5 gap-6">
                       <div className="sm:col-span-2">
                         <UpcomingDuesCard
                           nextDueLabel={dueInfo.label}
-                          amount={rentAmount}
+                          amount={totalPayable}
                           daysRemaining={dueInfo.daysRemaining}
                           progress={dueInfo.progress}
                           onViewAll={() => setActiveTab("ledger")}
@@ -1662,102 +1800,102 @@ export default function Tenantdashboard() {
                 {/* Identity: read-only when submitted/verified, upload form when action needed */}
                 {kycActionRequired ? (
                   <div className={`rounded-[22px] border border-[#eceef3] bg-white p-6 md:p-8 shadow-[0_6px_28px_-16px_rgba(15,23,42,0.16)]`}>
-                  <form onSubmit={handleKycSubmit} className="space-y-6">
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Aadhaar Number *</label>
-                        <input
-                          type="text"
-                          required
-                          maxLength={12}
-                          disabled={tenant?.kycStatus === "verified" || tenant?.kycStatus === "submitted"}
-                          value={aadhaarNumber}
-                          onChange={(e) => setAadhaarNumber(e.target.value.replace(/\D/g, ""))}
-                          placeholder="12-digit Aadhaar Number"
-                          className="w-full h-12 px-4 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-slate-50 disabled:text-slate-500"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">PAN Number (Optional)</label>
-                        <input
-                          type="text"
-                          maxLength={10}
-                          disabled={tenant?.kycStatus === "verified" || tenant?.kycStatus === "submitted"}
-                          value={panNumber}
-                          onChange={(e) => setPanNumber(e.target.value.toUpperCase())}
-                          placeholder="10-digit Alphanumeric PAN"
-                          className="w-full h-12 px-4 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-slate-50 disabled:text-slate-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid md:grid-cols-3 gap-6 pt-4 border-t border-slate-100">
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Aadhaar Front Scan *</label>
-                        {aadhaarFrontUrl && (
-                          <a href={aadhaarFrontUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline mb-2 font-medium">
-                            <Eye className="w-3.5 h-3.5" /> View Uploaded Front
-                          </a>
-                        )}
-                        <input
-                          type="file"
-                          id="kyc-aadhaar-front"
-                          accept="image/*,application/pdf"
-                          disabled={tenant?.kycStatus === "verified" || tenant?.kycStatus === "submitted"}
-                          className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
-                        />
+                    <form onSubmit={handleKycSubmit} className="space-y-6">
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Aadhaar Number *</label>
+                          <input
+                            type="text"
+                            required
+                            maxLength={12}
+                            disabled={tenant?.kycStatus === "verified" || tenant?.kycStatus === "submitted"}
+                            value={aadhaarNumber}
+                            onChange={(e) => setAadhaarNumber(e.target.value.replace(/\D/g, ""))}
+                            placeholder="12-digit Aadhaar Number"
+                            className="w-full h-12 px-4 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-slate-50 disabled:text-slate-500"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">PAN Number (Optional)</label>
+                          <input
+                            type="text"
+                            maxLength={10}
+                            disabled={tenant?.kycStatus === "verified" || tenant?.kycStatus === "submitted"}
+                            value={panNumber}
+                            onChange={(e) => setPanNumber(e.target.value.toUpperCase())}
+                            placeholder="10-digit Alphanumeric PAN"
+                            className="w-full h-12 px-4 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-slate-50 disabled:text-slate-500"
+                          />
+                        </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Aadhaar Back Scan *</label>
-                        {aadhaarBackUrl && (
-                          <a href={aadhaarBackUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline mb-2 font-medium">
-                            <Eye className="w-3.5 h-3.5" /> View Uploaded Back
-                          </a>
-                        )}
-                        <input
-                          type="file"
-                          id="kyc-aadhaar-back"
-                          accept="image/*,application/pdf"
-                          disabled={tenant?.kycStatus === "verified" || tenant?.kycStatus === "submitted"}
-                          className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
-                        />
+                      <div className="grid md:grid-cols-3 gap-6 pt-4 border-t border-slate-100">
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Aadhaar Front Scan *</label>
+                          {aadhaarFrontUrl && (
+                            <a href={aadhaarFrontUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline mb-2 font-medium">
+                              <Eye className="w-3.5 h-3.5" /> View Uploaded Front
+                            </a>
+                          )}
+                          <input
+                            type="file"
+                            id="kyc-aadhaar-front"
+                            accept="image/*,application/pdf"
+                            disabled={tenant?.kycStatus === "verified" || tenant?.kycStatus === "submitted"}
+                            className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Aadhaar Back Scan *</label>
+                          {aadhaarBackUrl && (
+                            <a href={aadhaarBackUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline mb-2 font-medium">
+                              <Eye className="w-3.5 h-3.5" /> View Uploaded Back
+                            </a>
+                          )}
+                          <input
+                            type="file"
+                            id="kyc-aadhaar-back"
+                            accept="image/*,application/pdf"
+                            disabled={tenant?.kycStatus === "verified" || tenant?.kycStatus === "submitted"}
+                            className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Address Proof (Electricity Bill, etc)</label>
+                          {addressProofUrl && (
+                            <a href={addressProofUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline mb-2 font-medium">
+                              <Eye className="w-3.5 h-3.5" /> View Uploaded Proof
+                            </a>
+                          )}
+                          <input
+                            type="file"
+                            id="kyc-address-proof"
+                            accept="image/*,application/pdf"
+                            disabled={tenant?.kycStatus === "verified" || tenant?.kycStatus === "submitted"}
+                            className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                          />
+                        </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Address Proof (Electricity Bill, etc)</label>
-                        {addressProofUrl && (
-                          <a href={addressProofUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline mb-2 font-medium">
-                            <Eye className="w-3.5 h-3.5" /> View Uploaded Proof
-                          </a>
-                        )}
-                        <input
-                          type="file"
-                          id="kyc-address-proof"
-                          accept="image/*,application/pdf"
-                          disabled={tenant?.kycStatus === "verified" || tenant?.kycStatus === "submitted"}
-                          className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
-                        />
-                      </div>
-                    </div>
+                      {kycMsg && (
+                        <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl text-sm text-slate-700">
+                          {kycMsg}
+                        </div>
+                      )}
 
-                    {kycMsg && (
-                      <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl text-sm text-slate-700">
-                        {kycMsg}
-                      </div>
-                    )}
-
-                    {(tenant?.kycStatus !== "verified" && tenant?.kycStatus !== "submitted") && (
-                      <button
-                        type="submit"
-                        disabled={uploadingKyc}
-                        className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        <Upload className="w-5 h-5" />
-                        {uploadingKyc ? "Uploading and submitting..." : "Submit KYC Documents"}
-                      </button>
-                    )}
-                  </form>
+                      {(tenant?.kycStatus !== "verified" && tenant?.kycStatus !== "submitted") && (
+                        <button
+                          type="submit"
+                          disabled={uploadingKyc}
+                          className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          <Upload className="w-5 h-5" />
+                          {uploadingKyc ? "Uploading and submitting..." : "Submit KYC Documents"}
+                        </button>
+                      )}
+                    </form>
                   </div>
                 ) : (
                   <IdentityInformationCard
@@ -1783,15 +1921,14 @@ export default function Tenantdashboard() {
                 </div>
 
                 {/* Status banner */}
-                <div className={`p-5 rounded-2xl border flex items-start gap-4 ${
-                  tenant?.policeVerification?.status === "verified"
-                    ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                    : tenant?.policeVerification?.status === "submitted"
+                <div className={`p-5 rounded-2xl border flex items-start gap-4 ${tenant?.policeVerification?.status === "verified"
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                  : tenant?.policeVerification?.status === "submitted"
                     ? "bg-blue-50 border-blue-200 text-blue-800"
                     : tenant?.policeVerification?.status === "rejected"
-                    ? "bg-rose-50 border-rose-200 text-rose-800"
-                    : "bg-amber-50 border-amber-200 text-amber-800"
-                }`}>
+                      ? "bg-rose-50 border-rose-200 text-rose-800"
+                      : "bg-amber-50 border-amber-200 text-amber-800"
+                  }`}>
                   <div className="pt-0.5">
                     {tenant?.policeVerification?.status === "verified" && <CheckCircle className="w-6 h-6" />}
                     {tenant?.policeVerification?.status === "submitted" && <Clock3 className="w-6 h-6" />}
@@ -1830,7 +1967,7 @@ export default function Tenantdashboard() {
                           <span className="text-xs font-bold text-slate-800 block">{form.city}</span>
                           <span className="text-[10px] text-slate-400">{form.size} • PDF Template</span>
                         </div>
-                        <a 
+                        <a
                           href="#"
                           onClick={(e) => { e.preventDefault(); alert("Template downloading initiated..."); }}
                           className="mt-3 flex items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-1.5 rounded-lg transition"
@@ -1848,7 +1985,7 @@ export default function Tenantdashboard() {
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Police Station Receipt Scan *</label>
                       <p className="text-xs text-slate-500">Provide a high-quality scan/photo of the stamped registration copy.</p>
-                      
+
                       {policeReceiptUrl && (
                         <div className="pt-2">
                           <a href={policeReceiptUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline font-medium">
@@ -1941,10 +2078,9 @@ export default function Tenantdashboard() {
                       <p><strong>Outstanding Dues:</strong> {formatCurrency(tenant.moveoutRequest.duesAtMoveout)}</p>
                       <p><strong>Deposit Refund:</strong> {formatCurrency(tenant.moveoutRequest.refundAmount)}</p>
                       <p className="flex items-center gap-1.5">
-                        <strong>Refund Status:</strong> 
-                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${
-                          tenant.moveoutRequest.refundStatus === "cleared" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                        }`}>
+                        <strong>Refund Status:</strong>
+                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${tenant.moveoutRequest.refundStatus === "cleared" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                          }`}>
                           {tenant.moveoutRequest.refundStatus === "cleared" ? "Refund Handed Over" : "Refund Pending"}
                         </span>
                       </p>
@@ -2105,7 +2241,7 @@ export default function Tenantdashboard() {
               const isApproved = passStatus === "Approved";
               const origin = typeof window !== "undefined" ? window.location.origin : "";
               const verifyUrl = latestPass?.qrToken
-                ? `${origin}/visitor-verify?token=${latestPass.qrToken}`
+                ? `${origin}/visitor-verify/${latestPass.qrToken}`
                 : "";
               const fmtDay = (v) =>
                 v ? new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "";
@@ -2143,6 +2279,7 @@ export default function Tenantdashboard() {
                           passId={latestPass.passId}
                           passDate={fmtDay(latestPass.approvedAt)}
                           approvedBy={latestPass.approvedBy}
+                          approvedByRole={latestPass.approvedByRole}
                           verifyUrl={verifyUrl}
                         />
                       ) : (
@@ -2157,7 +2294,7 @@ export default function Tenantdashboard() {
                 </div>
               );
             })()}
-{/* leave request tenant */}
+            {/* leave request tenant */}
             {/* TAB: LEAVE REQUEST */}
             {activeTab === "leave" && (
               <div className="max-w-5xl mx-auto space-y-9">
@@ -2211,7 +2348,23 @@ export default function Tenantdashboard() {
             </div>
             <div className="text-center mb-8">
               <p className="text-sm text-slate-500 uppercase tracking-wide font-semibold">Total Payable</p>
-              <p className="text-4xl font-bold text-blue-600 mt-2">{formatCurrency(rentAmount)}</p>
+              <p className="text-4xl font-bold text-blue-600 mt-2">{formatCurrency(totalPayable)}</p>
+              <div className="mt-4 grid grid-cols-1 gap-3 text-left">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-600">Room Rent</span>
+                  <span className="text-sm font-bold text-slate-900 tabular-nums">{formatCurrency(roomRent)}</span>
+                </div>
+                {electricityCost > 0 && (
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 flex items-center justify-between">
+                    <span className="text-sm font-medium text-blue-800">Electricity Bill</span>
+                    <span className="text-sm font-bold text-blue-800 tabular-nums">{formatCurrency(electricityCost)}</span>
+                  </div>
+                )}
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center justify-between">
+                  <span className="text-sm font-medium text-amber-800">Total Penalty</span>
+                  <span className="text-sm font-bold text-amber-800 tabular-nums">{formatCurrency(totalPenalty)}</span>
+                </div>
+              </div>
             </div>
             <div className="space-y-3">
               <button
@@ -2226,8 +2379,8 @@ export default function Tenantdashboard() {
                 </div>
               </button>
               <button
-                onClick={handleCashRequest}
-                disabled={actionBusy || isPaid}
+                onClick={() => setCashPanelOpen(true)}
+                disabled={actionBusy || isPaid || (!canRequestCash && !cashPanelOpen)}
                 className="w-full p-4 border border-slate-200 rounded-xl flex items-center hover:border-amber-500 hover:bg-amber-50 transition group disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <HandCoins className="w-5 h-5 mr-4 text-amber-600" />
@@ -2236,13 +2389,49 @@ export default function Tenantdashboard() {
                   <p className="text-xs text-slate-500">Request owner collection and verify OTP</p>
                 </div>
               </button>
-              <div className="p-3 bg-green-50 rounded-lg border border-green-200 text-sm">
-                <p className="font-semibold text-green-800">Secure Payment</p>
-                <p className="text-xs text-green-700">Your payment is encrypted and secure</p>
-              </div>
-              <div className={`${cashPanelOpen ? "" : "hidden"} p-3 bg-amber-50 rounded-lg border border-amber-200 space-y-3`}>
+
+              {(cashPanelOpen || !["NONE", "", "PENDING"].includes(normalizedCashStatus)) && (
+                <div className="p-3 bg-green-50 rounded-lg border border-green-200 text-sm">
+                  <p className="font-semibold text-green-800">Cash workflow</p>
+
+                  {canRequestCash && normalizedCashStatus !== "PENDING_APPROVAL" ? (
+                    <div className="mt-2 text-green-700">
+                      <p className="text-xs mb-2">You are about to request a cash collection. An OTP will be sent to the owner upon approval.</p>
+                      <button
+                        onClick={handleCashRequest}
+                        disabled={actionBusy}
+                        className="w-full bg-green-600 text-white font-semibold py-2 rounded-lg hover:bg-green-700 text-sm disabled:opacity-60"
+                      >
+                        {actionBusy ? "Submitting Request..." : "Submit Cash Request"}
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-xs text-green-700 mt-2">
+                        Status: <span className="font-semibold">{cashStatusLabel(cashRequestStatus || "PENDING_APPROVAL")}</span>
+                      </p>
+                      {normalizedCashStatus === "PENDING_APPROVAL" && (
+                        <p className="text-xs text-green-700 mt-1">Cash payment request sent. Waiting for owner approval.</p>
+                      )}
+                      {["OWNER_APPROVED", "OTP_SENT"].includes(normalizedCashStatus) && (
+                        <p className="text-xs text-green-700 mt-1">Owner approved your cash payment. Enter the OTP to complete verification.</p>
+                      )}
+                      {normalizedCashStatus === "PAID" && (
+                        <p className="text-xs text-green-700 mt-1">Rent payment completed successfully.</p>
+                      )}
+                      {normalizedCashStatus === "REJECTED" && (
+                        <p className="text-xs text-rose-700 mt-1">The owner rejected this request. Please create a new cash request if needed.</p>
+                      )}
+                      {normalizedCashStatus === "EXPIRED" && (
+                        <p className="text-xs text-amber-700 mt-1">The OTP expired. Ask the owner to approve again.</p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+              <div className={`${showCashOtp ? "" : "hidden"} p-3 bg-amber-50 rounded-lg border border-amber-200 space-y-3`}>
                 <p className="text-xs text-amber-800">
-                  Owner should click <strong>Received</strong> in owner payment panel. Then OTP will be sent to your email.
+                  Owner approved the request. Enter the OTP shared by the owner to complete verification.
                 </p>
                 <input
                   value={cashOtp}
@@ -2254,14 +2443,14 @@ export default function Tenantdashboard() {
                 />
                 <button
                   onClick={handleCashOtpVerify}
-                  disabled={actionBusy}
+                  disabled={actionBusy || !cashOtp.trim()}
                   className="w-full bg-amber-600 text-white font-semibold py-2 rounded-lg hover:bg-amber-700 text-sm disabled:opacity-60"
                 >
                   Verify OTP and Mark Paid
                 </button>
-                <p className="text-xs text-amber-900">{actionMsg}</p>
+                <p className="text-xs text-amber-900 whitespace-pre-line">{actionMsg}</p>
               </div>
-              {!cashPanelOpen && actionMsg ? <p className="text-xs text-slate-600">{actionMsg}</p> : null}
+              {!cashPanelOpen && actionMsg ? <p className="text-xs text-slate-600 whitespace-pre-line">{actionMsg}</p> : null}
             </div>
           </div>
         </div>

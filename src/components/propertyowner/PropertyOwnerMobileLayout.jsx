@@ -29,15 +29,21 @@ export default function PropertyOwnerMobileLayout({
   properties: propsProperies = null,
   activePropertyId: propsActivePropertyId = null,
   handlePropertySwitch: propsHandlePropertySwitch = null,
+  allowAllProperties = true,
   // New props for rooms page
   rooms = [],
   loading = false,
+  // Permission-filtered nav for staff members sharing this panel; owners omit it.
+  navItems = null,
 }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  
-  // Navigation lists
-  const CURRENT_NAV = GOLD_NAV;
+
+  // Navigation lists. When `navItems` is supplied this is a permission-filtered
+  // staff member sharing the panel, so the whole mobile chrome (bottom bar, More
+  // drawer, quick actions) must follow that nav instead of the owner defaults.
+  const CURRENT_NAV = navItems || GOLD_NAV;
+  const staffMode = Array.isArray(navItems) && navItems.length > 0;
 
   const activeParent = useMemo(() => {
     return CURRENT_NAV.find(item => 
@@ -230,65 +236,89 @@ export default function PropertyOwnerMobileLayout({
 
       {/* 3. PREMIUM BOTTOM NAVBAR */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 z-40 px-2 py-1 flex items-center justify-around text-slate-500 pb-safe shadow-[0_-2px_10px_rgba(0,0,0,0.03)] shrink-0">
-        
-        {/* Tab 1: Dashboard */}
-        <Link 
-          to="/propertyowner/admin"
-          className={cn(
-            "flex flex-col items-center justify-center w-14 py-1.5 transition-all rounded-xl",
-            isTabActive(["/propertyowner/admin"]) 
-              ? "text-blue-600 scale-105 font-bold" 
-              : "hover:text-slate-800"
-          )}
-        >
-          <Home size={18} />
-          <span className="text-[9px] mt-1 font-bold">Home</span>
-        </Link>
 
-        {/* Tab 2: Properties */}
-        <Link 
-          to="/propertyowner/properties"
-          className={cn(
-            "flex flex-col items-center justify-center w-14 py-1.5 transition-all rounded-xl",
-            isTabActive(["/propertyowner/properties", "/propertyowner/rooms", "/propertyowner/add-property", "/propertyowner/amenities", "/propertyowner/location"]) 
-              ? "text-blue-600 scale-105 font-bold" 
-              : "hover:text-slate-800"
-          )}
-        >
-          <Building2 size={18} />
-          <span className="text-[9px] mt-1 font-bold">Properties</span>
-        </Link>
+        {staffMode ? (
+          /* Staff: first four permitted destinations */
+          CURRENT_NAV.slice(0, 4).map((item) => {
+            const Icon = item.icon || Home;
+            const active = isTabActive([item.href]) ||
+              (item.submenus && item.submenus.some((s) => isTabActive([s.href])));
+            return (
+              <Link
+                key={item.href}
+                to={item.href}
+                className={cn(
+                  "flex flex-col items-center justify-center w-14 py-1.5 transition-all rounded-xl",
+                  active ? "text-blue-600 scale-105 font-bold" : "hover:text-slate-800"
+                )}
+              >
+                <Icon size={18} />
+                <span className="text-[9px] mt-1 font-bold truncate max-w-[52px]">{item.label}</span>
+              </Link>
+            );
+          })
+        ) : (
+          <>
+            {/* Tab 1: Dashboard */}
+            <Link
+              to="/propertyowner/admin"
+              className={cn(
+                "flex flex-col items-center justify-center w-14 py-1.5 transition-all rounded-xl",
+                isTabActive(["/propertyowner/admin"])
+                  ? "text-blue-600 scale-105 font-bold"
+                  : "hover:text-slate-800"
+              )}
+            >
+              <Home size={18} />
+              <span className="text-[9px] mt-1 font-bold">Home</span>
+            </Link>
 
-        {/* Tab 3: Tenants */}
-        <Link 
-          to="/propertyowner/tenants"
-          className={cn(
-            "flex flex-col items-center justify-center w-14 py-1.5 transition-all rounded-xl",
-            isTabActive(["/propertyowner/tenants", "/propertyowner/tenantrec", "/propertyowner/active-tenants", "/propertyowner/upcoming-moveins", "/propertyowner/moveout-requests", "/propertyowner/ex-tenants", "/propertyowner/tenant-docs", "/propertyowner/police-verification", "/propertyowner/review"]) 
-              ? "text-blue-600 scale-105 font-bold" 
-              : "hover:text-slate-800"
-          )}
-        >
-          <Users size={18} />
-          <span className="text-[9px] mt-1 font-bold">Tenants</span>
-        </Link>
+            {/* Tab 2: Properties */}
+            <Link
+              to="/propertyowner/properties"
+              className={cn(
+                "flex flex-col items-center justify-center w-14 py-1.5 transition-all rounded-xl",
+                isTabActive(["/propertyowner/properties", "/propertyowner/rooms", "/propertyowner/add-property", "/propertyowner/amenities", "/propertyowner/location"])
+                  ? "text-blue-600 scale-105 font-bold"
+                  : "hover:text-slate-800"
+              )}
+            >
+              <Building2 size={18} />
+              <span className="text-[9px] mt-1 font-bold">Properties</span>
+            </Link>
 
-        {/* Tab 4: Leads */}
-        <Link 
-          to="/propertyowner/enquiry"
-          className={cn(
-            "flex flex-col items-center justify-center w-14 py-1.5 transition-all rounded-xl",
-            isTabActive(["/propertyowner/booking", "/propertyowner/booking_request", "/propertyowner/enquiry"]) 
-              ? "text-blue-600 scale-105 font-bold" 
-              : "hover:text-slate-800"
-          )}
-        >
-          <CalendarCheck size={18} />
-          <span className="text-[9px] mt-1 font-bold">Leads</span>
-        </Link>
+            {/* Tab 3: Tenants */}
+            <Link
+              to="/propertyowner/tenants"
+              className={cn(
+                "flex flex-col items-center justify-center w-14 py-1.5 transition-all rounded-xl",
+                isTabActive(["/propertyowner/tenants", "/propertyowner/tenantrec", "/propertyowner/active-tenants", "/propertyowner/upcoming-moveins", "/propertyowner/moveout-requests", "/propertyowner/ex-tenants", "/propertyowner/tenant-docs", "/propertyowner/police-verification", "/propertyowner/review"])
+                  ? "text-blue-600 scale-105 font-bold"
+                  : "hover:text-slate-800"
+              )}
+            >
+              <Users size={18} />
+              <span className="text-[9px] mt-1 font-bold">Tenants</span>
+            </Link>
+
+            {/* Tab 4: Leads */}
+            <Link
+              to="/propertyowner/enquiry"
+              className={cn(
+                "flex flex-col items-center justify-center w-14 py-1.5 transition-all rounded-xl",
+                isTabActive(["/propertyowner/booking", "/propertyowner/booking_request", "/propertyowner/enquiry"])
+                  ? "text-blue-600 scale-105 font-bold"
+                  : "hover:text-slate-800"
+              )}
+            >
+              <CalendarCheck size={18} />
+              <span className="text-[9px] mt-1 font-bold">Leads</span>
+            </Link>
+          </>
+        )}
 
         {/* Tab 5: More Trigger */}
-        <button 
+        <button
           onClick={() => setMoreDrawerOpen(true)}
           className={cn(
             "flex flex-col items-center justify-center w-14 py-1.5 transition-all rounded-xl",
@@ -305,13 +335,16 @@ export default function PropertyOwnerMobileLayout({
       {/* ======================================================== */}
       {/* 4. GLOBAL FLOATING ACTION BUTTON (FAB)                    */}
       {/* ======================================================== */}
-      <button 
-        onClick={() => setQuickActionsOpen(true)}
-        className="fixed bottom-[80px] right-4 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-xl flex items-center justify-center z-30 hover:scale-105 active:scale-95 transition-all"
-        aria-label="Add Action"
-      >
-        <Plus size={28} className="stroke-[2.5]" />
-      </button>
+      {/* Owner-only quick actions (Add Property/Tenant/Lead) — hidden for staff */}
+      {!staffMode && (
+        <button
+          onClick={() => setQuickActionsOpen(true)}
+          className="fixed bottom-[80px] right-4 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-xl flex items-center justify-center z-30 hover:scale-105 active:scale-95 transition-all"
+          aria-label="Add Action"
+        >
+          <Plus size={28} className="stroke-[2.5]" />
+        </button>
+      )}
 
       {/* ======================================================== */}
       {/* 5. MODALS & SLIDE-UP DRAWER OVERLAYS (GLASSMORPHISM)      */}
@@ -392,24 +425,26 @@ export default function PropertyOwnerMobileLayout({
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1">
-          {/* All Properties overview */}
-          <button
-            onClick={() => handlePropertySwitch('all')}
-            className={cn(
-              "w-full flex items-center justify-between p-3.5 rounded-2xl text-xs font-bold transition-all border text-left",
-              activePropertyId === 'all' 
-                ? "bg-blue-50 border-blue-200 text-blue-600" 
-                : "border-slate-100 hover:bg-slate-50 text-slate-600"
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
-                <LayoutDashboard size={14} className="text-slate-500" />
+          {/* All Properties overview — owners only; staff are locked to their hostel */}
+          {allowAllProperties && (
+            <button
+              onClick={() => handlePropertySwitch('all')}
+              className={cn(
+                "w-full flex items-center justify-between p-3.5 rounded-2xl text-xs font-bold transition-all border text-left",
+                activePropertyId === 'all'
+                  ? "bg-blue-50 border-blue-200 text-blue-600"
+                  : "border-slate-100 hover:bg-slate-50 text-slate-600"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                  <LayoutDashboard size={14} className="text-slate-500" />
+                </div>
+                <span>All Properties (Overview)</span>
               </div>
-              <span>All Properties (Overview)</span>
-            </div>
-            {activePropertyId === 'all' && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
-          </button>
+              {activePropertyId === 'all' && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
+            </button>
+          )}
 
           {/* Properties loop */}
           {properties.map(p => {
@@ -454,8 +489,9 @@ export default function PropertyOwnerMobileLayout({
             <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Alerts & Logs</h3>
           </div>
           <div className="flex gap-4">
-            {displayNotifications.length > 0 && (
-              <button 
+            {/* Staff must not clear the owner's notification feed */}
+            {!staffMode && displayNotifications.length > 0 && (
+              <button
                 onClick={async () => {
                   setGlobalNotifications([]);
                   if (owner?.loginId) {
@@ -524,14 +560,17 @@ export default function PropertyOwnerMobileLayout({
         </div>
 
         <div className="space-y-2">
-          <Link 
-            to="/propertyowner/ownerprofile"
-            className="w-full py-3 px-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl text-xs font-bold text-center text-slate-700 transition-all flex items-center justify-center gap-2"
-          >
-            <UserCircle size={15} className="text-blue-500" />
-            <span>Profile Settings</span>
-          </Link>
-          <button 
+          {/* Profile Settings is owner-only — hidden for staff */}
+          {!staffMode && (
+            <Link
+              to="/propertyowner/ownerprofile"
+              className="w-full py-3 px-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl text-xs font-bold text-center text-slate-700 transition-all flex items-center justify-center gap-2"
+            >
+              <UserCircle size={15} className="text-blue-500" />
+              <span>Profile Settings</span>
+            </Link>
+          )}
+          <button
             onClick={handleLogout}
             className="w-full py-3 px-4 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 border border-rose-200"
           >
@@ -559,7 +598,22 @@ export default function PropertyOwnerMobileLayout({
 
         {/* GROUPED SERVICES */}
         <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 pb-4 space-y-4">
-          
+
+          {staffMode ? (
+            /* Staff: every permitted destination, permission-filtered */
+            <div className="grid grid-cols-3 gap-3">
+              {CURRENT_NAV.map((item) => (
+                <GridItem
+                  key={item.href}
+                  to={item.href}
+                  icon={item.icon || Home}
+                  label={item.label}
+                  active={pathname === item.href || (item.submenus && item.submenus.some((s) => pathname.startsWith(s.href.split("?")[0])))}
+                />
+              ))}
+            </div>
+          ) : (
+          <>
           {/* TENANTS GROUP */}
           <div>
             <div className="grid grid-cols-3 gap-3">
@@ -613,6 +667,8 @@ export default function PropertyOwnerMobileLayout({
               </button>
             </div>
           </div>
+          </>
+          )}
 
         </div>
 

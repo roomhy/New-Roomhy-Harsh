@@ -19,7 +19,8 @@ const getAuthApiUrl = () =>
 const AUTH_STORAGE_KEYS = [
   "token", "staff_token", "user", "staff_user", "manager_user",
   "website_token", "website_user", "userData", "owner_user",
-  "owner_session", "tenant_user", "accessToken"
+  "owner_session", "tenant_user", "accessToken",
+  "staff_session", "employee_session"
 ];
 
 export const clearAllAuthKeys = () => {
@@ -82,6 +83,7 @@ export const AuthProvider = ({ children }) => {
   const login = (userData, token) => {
     setUser(userData);
     localStorage.setItem('token', token);
+    sessionStorage.setItem('token', token);
     localStorage.setItem('userData', JSON.stringify(userData));
   };
 

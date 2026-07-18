@@ -1,29 +1,24 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import StaffLayout from "../../components/StaffLayout";
 import {
   CheckCircle2, Clock, LogIn, LogOut, Calendar, AlertCircle,
   ChevronLeft, ChevronRight, ChevronDown, Loader2, History, Users, UserCheck, UserX,
-  X, Send, Search, SlidersHorizontal, MoreVertical, Download, Check, Zap
+  X, Send, Search, SlidersHorizontal, Download, Check, Zap
 } from "lucide-react";
-import { getApiBase, getAuthHeader } from "../../utils/api";
-
-const apiBase = getApiBase();
+import { getStaffSession, canManageTenantAttendance } from "../../utils/staffAccess";
+import {
+  useMyAttendance, useCheckIn, useCheckOut, useApplyLeave,
+  useTenantAttendance, useTenantHistory, useMarkTenantAttendance,
+} from "../../hooks/useAttendance";
+import { useOwnerTenants } from "../../hooks/useTenants";
 
 const STATUS_STYLES = {
-  Present:    { bg: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-  Absent:     { bg: "bg-rose-100 text-rose-700 border-rose-200" },
+  Present: { bg: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+  Absent: { bg: "bg-rose-100 text-rose-700 border-rose-200" },
   "Half Day": { bg: "bg-amber-100 text-amber-700 border-amber-200" },
-  Leave:      { bg: "bg-blue-100 text-blue-700 border-blue-200" },
-  Late:       { bg: "bg-orange-100 text-orange-700 border-orange-200" },
+  Leave: { bg: "bg-blue-100 text-blue-700 border-blue-200" },
+  Late: { bg: "bg-orange-100 text-orange-700 border-orange-200" },
 };
-
-function getStaffSession() {
-  try {
-    const raw = sessionStorage.getItem("staff_session") || localStorage.getItem("staff_session");
-    if (raw) return JSON.parse(raw);
-  } catch (_) {}
-  return null;
-}
 
 const DURATIONS = ["Full Day", "Half Day", "Custom"];
 
@@ -173,11 +168,10 @@ function LeaveModal({ form, setForm, onClose, onSubmit, submitting }) {
                   type="button"
                   key={d}
                   onClick={() => setForm(f => ({ ...f, duration: d }))}
-                  className={`h-11 rounded-xl text-sm font-bold border transition-all ${
-                    form.duration === d
+                  className={`h-11 rounded-xl text-sm font-bold border transition-all ${form.duration === d
                       ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/25"
                       : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
-                  }`}
+                    }`}
                 >
                   {d}
                 </button>
@@ -306,28 +300,34 @@ export default function StaffAttendancePage() {
   const staffLoginId = staff?.loginId || "";
   const parentLoginId = staff?.parentLoginId || "";
 
+  // Only wardens (or staff explicitly granted "Tenant Attendance" by the owner)
+  // may mark tenant attendance. Everyone else can only mark their own.
+  const canTenantAttendance = canManageTenantAttendance(staff);
+
   // Tab: "mine" | "tenants"
   const [tab, setTab] = useState("mine");
 
-  // ── MY ATTENDANCE STATE ──
-  const [todayRecord, setTodayRecord] = useState(null);
-  const [history, setHistory]         = useState([]);
-  const [loadingToday, setLoadingToday] = useState(true);
-  const [checkInLoading, setCheckInLoading] = useState(false);
-  const [checkOutLoading, setCheckOutLoading] = useState(false);
+  // Never allow the tenant tab for staff without the permission (e.g. deep link,
+  // stale state, or a permission revoked mid-session).
+  useEffect(() => {
+    if (tab === "tenants" && !canTenantAttendance) setTab("mine");
+  }, [tab, canTenantAttendance]);
+
+  // ══ UI-ONLY LOCAL STATE ══
   const [showLeaveForm, setShowLeaveForm] = useState(false);
-  const [leaveForm, setLeaveForm]     = useState({ leaveType: "Sick Leave", leaveReason: "", date: new Date().toISOString().split("T")[0], duration: "Full Day" });
-  const [leaveSubmitting, setLeaveSubmitting] = useState(false);
+  const [leaveForm, setLeaveForm] = useState({ leaveType: "Sick Leave", leaveReason: "", date: new Date().toISOString().split("T")[0], duration: "Full Day" });
   const [summaryPeriod, setSummaryPeriod] = useState("month"); // "week" | "month"
   const [historyMonth, setHistoryMonth] = useState(new Date().getMonth() + 1);
-  const [historyYear, setHistoryYear]   = useState(new Date().getFullYear());
-
-  // ── TENANT ATTENDANCE STATE ──
-  const [tenants, setTenants] = useState([]);
-  const [loadingTenants, setLoadingTenants] = useState(false);
+  const [historyYear, setHistoryYear] = useState(new Date().getFullYear());
   const [tenantDate, setTenantDate] = useState(new Date().toISOString().split("T")[0]);
-  const [tenantAttMap, setTenantAttMap] = useState({}); // { loginId: "Present"|"Absent" }
+  const [tenantSearch, setTenantSearch] = useState("");
+  const [historyTenant, setHistoryTenant] = useState(null); // tenant object, or null = modal closed
+  const [tenantHistoryMonth, setTenantHistoryMonth] = useState(new Date().getMonth() + 1);
+  const [tenantHistoryYear, setTenantHistoryYear] = useState(new Date().getFullYear());
+
+  // Per-tenant + bulk in-flight indicators (UI feedback only)
   const [markingTenant, setMarkingTenant] = useState({});
+  const [bulkMarking, setBulkMarking] = useState(false);
   const [tenantMsg, setTenantMsg] = useState("");
   const [tenantSearch, setTenantSearch] = useState("");
   const [bulkMarking, setBulkMarking] = useState(false);
@@ -338,100 +338,94 @@ export default function StaffAttendancePage() {
     setTimeout(() => setMsg({ text: "", type: "" }), 3000);
   };
 
-  // ── MY ATTENDANCE FETCHES ──
-  const fetchToday = useCallback(async () => {
-    if (!staffLoginId) return;
-    setLoadingToday(true);
-    try {
-      const res = await fetch(`${apiBase}/api/hr/my-attendance/${staffLoginId}?month=${new Date().getMonth() + 1}&year=${new Date().getFullYear()}`);
-      const data = await res.json();
-      const records = data?.data || [];
-      const toLocalYMD = (d) => {
-        if (!d) return "";
-        const date = new Date(d);
-        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-      };
-      const todayRec = records.find(r => r.date && toLocalYMD(r.date) === toLocalYMD(new Date()));
-      setTodayRecord(todayRec || null);
-      setHistory(records);
-    } catch (_) {}
-    finally { setLoadingToday(false); }
-  }, [staffLoginId]);
+  const toLocalYMD = (d) => {
+    if (!d) return "";
+    const date = new Date(d);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  };
 
-  const fetchHistory = useCallback(async () => {
-    if (!staffLoginId) return;
-    try {
-      const res = await fetch(`${apiBase}/api/hr/my-attendance/${staffLoginId}?month=${historyMonth}&year=${historyYear}`);
-      const data = await res.json();
-      setHistory(data?.data || []);
-    } catch (_) {}
-  }, [staffLoginId, historyMonth, historyYear]);
+  // ══ SERVER STATE via React Query — cached & shared across navigation ══
+  const nowRef = new Date();
+  const curMonth = nowRef.getMonth() + 1;
+  const curYear = nowRef.getFullYear();
 
-  useEffect(() => { fetchToday(); }, [fetchToday]);
-  useEffect(() => { fetchHistory(); }, [fetchHistory]);
+  // Current month → today's record; selected month → history list. Same month
+  // ⇒ both hooks share one query key and dedupe to a single request.
+  const todayQuery = useMyAttendance(staffLoginId, curMonth, curYear);
+  const historyQuery = useMyAttendance(staffLoginId, historyMonth, historyYear);
+  const todayRecord = useMemo(() => {
+    const records = todayQuery.data || [];
+    return records.find(r => r.date && toLocalYMD(r.date) === toLocalYMD(new Date())) || null;
+  }, [todayQuery.data]);
+  const history = historyQuery.data || [];
+  const loadingToday = todayQuery.isLoading;
 
-  // ── TENANT LIST FETCH ──
-  const fetchTenants = useCallback(async () => {
-    if (!parentLoginId) return;
-    setLoadingTenants(true);
-    try {
-      // Use the correct owner-scoped endpoint
-      const res = await fetch(`${apiBase}/api/tenants/owner/${parentLoginId}`, { headers: getAuthHeader() });
-      const data = await res.json();
-      // Response: array or { tenants: [...] } or { data: [...] }
-      const list = Array.isArray(data) ? data : (data?.tenants || data?.data || []);
-      // Only show active (non-deleted) tenants
-      setTenants(list.filter(t => !t.isDeleted && t.status !== 'inactive'));
-    } catch (_) {}
-    finally { setLoadingTenants(false); }
-  }, [parentLoginId]);
+  const checkInMut = useCheckIn(staffLoginId);
+  const checkOutMut = useCheckOut(staffLoginId);
+  const applyLeaveMut = useApplyLeave();
+  const checkInLoading = checkInMut.isPending;
+  const checkOutLoading = checkOutMut.isPending;
+  const leaveSubmitting = applyLeaveMut.isPending;
 
-  // Fetch tenant attendance for selected date
-  const fetchTenantAtt = useCallback(async () => {
-    if (!parentLoginId || !tenantDate) return;
-    try {
-      const res = await fetch(`${apiBase}/api/tenant-attendance?ownerLoginId=${parentLoginId}&date=${tenantDate}`);
-      const data = await res.json();
-      const records = data?.data || data || [];
-      const map = {};
-      records.forEach(r => { if (r.tenantLoginId) map[r.tenantLoginId] = r.status; });
-      setTenantAttMap(map);
-    } catch (_) {}
-  }, [parentLoginId, tenantDate]);
+  // Tenant tab — only fetched when the tab is active and permitted.
+  const tenantsEnabled = tab === "tenants" && canTenantAttendance;
+  const tenantsQuery = useOwnerTenants(parentLoginId, { enabled: tenantsEnabled });
+  const tenants = useMemo(
+    () => (tenantsQuery.data || []).filter(t => !t.isDeleted && t.status !== 'inactive'),
+    [tenantsQuery.data]
+  );
+  const loadingTenants = tenantsQuery.isLoading && tenantsEnabled;
 
-  useEffect(() => {
-    if (tab === "tenants") {
-      fetchTenants();
-      fetchTenantAtt();
-    }
-  }, [tab, fetchTenants, fetchTenantAtt]);
+  const tenantAttQuery = useTenantAttendance(parentLoginId, tenantDate, { enabled: tenantsEnabled });
+  const tenantAttMap = useMemo(() => {
+    const map = {};
+    (tenantAttQuery.data || []).forEach(r => { if (r.tenantId) map[String(r.tenantId)] = r.status; });
+    return map;
+  }, [tenantAttQuery.data]);
+  const markTenantMut = useMarkTenantAttendance(parentLoginId, tenantDate);
 
-  useEffect(() => { if (tab === "tenants") fetchTenantAtt(); }, [tenantDate, fetchTenantAtt]);
+  // Tenant history modal data (server via query)
+  const tenantHistoryQuery = useTenantHistory(
+    parentLoginId,
+    historyTenant?._id || historyTenant?.id,
+    tenantHistoryMonth,
+    tenantHistoryYear,
+    { enabled: !!historyTenant }
+  );
+  const tenantHistoryRecords = tenantHistoryQuery.data || [];
+  const loadingTenantHistory = tenantHistoryQuery.isLoading && !!historyTenant;
+
+  const openTenantHistory = (tenant) => {
+    const n = new Date();
+    setTenantHistoryMonth(n.getMonth() + 1);
+    setTenantHistoryYear(n.getFullYear());
+    setHistoryTenant(tenant);
+  };
 
   const markTenantAttendance = async (tenant, status) => {
-    const loginId = tenant.loginId || tenant._id;
-    setMarkingTenant(m => ({ ...m, [loginId]: true }));
+    const key = String(tenant._id || tenant.loginId);
+    setMarkingTenant(m => ({ ...m, [key]: true }));
     try {
-      const res = await fetch(`${apiBase}/api/tenant-attendance`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tenantLoginId: loginId,
-          tenantName: tenant.name,
-          ownerLoginId: parentLoginId,
-          markedBy: staffLoginId,
-          date: tenantDate,
-          status,
-        }),
+      const data = await markTenantMut.mutateAsync({
+        tenantId: tenant._id,
+        tenantLoginId: tenant.loginId,
+        tenantName: tenant.name,
+        roomNo: tenant.roomNo,
+        ownerLoginId: parentLoginId,
+        markedBy: staffLoginId,
+        date: tenantDate,
+        status,
       });
-      const data = await res.json();
-      if (data.success !== false) {
-        setTenantAttMap(m => ({ ...m, [loginId]: status }));
+      if (data && data.success === false) {
+        showMsg(data.message || data.error || "Failed to mark attendance", "error");
+      } else {
         setTenantMsg(`${tenant.name} — ${status} ✓`);
         setTimeout(() => setTenantMsg(""), 2000);
       }
-    } catch (_) {}
-    finally { setMarkingTenant(m => ({ ...m, [loginId]: false })); }
+    } catch (_) {
+      showMsg("Failed to mark attendance", "error");
+    }
+    finally { setMarkingTenant(m => ({ ...m, [key]: false })); }
   };
 
   // ── QUICK ACTIONS ──
@@ -461,71 +455,51 @@ export default function StaffAttendancePage() {
     URL.revokeObjectURL(url);
   };
 
-  // ── CHECK IN / OUT ──
-  const handleCheckIn = async () => {
+  // ── CHECK IN / OUT (mutations — invalidate attendance cache on success) ──
+  const handleCheckIn = () => {
     if (!staffLoginId) { showMsg("Staff session not found. Please login again.", "error"); return; }
-    setCheckInLoading(true);
-    try {
-      const res = await fetch(`${apiBase}/api/hr/checkin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ staffLoginId }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setTodayRecord(data.data);
-        showMsg(`Checked in at ${data.checkInTime} ✓`);
-      } else {
-        showMsg(data.error || "Check-in failed", "error");
-      }
-    } catch (_) { showMsg("Failed to check in", "error"); }
-    finally { setCheckInLoading(false); }
+    checkInMut.mutate(undefined, {
+      onSuccess: (data) => {
+        if (data?.success) showMsg(`Checked in at ${data.checkInTime} ✓`);
+        else showMsg(data?.error || "Check-in failed", "error");
+      },
+      onError: () => showMsg("Failed to check in", "error"),
+    });
   };
 
-  const handleCheckOut = async () => {
+  const handleCheckOut = () => {
     if (!staffLoginId) return;
-    setCheckOutLoading(true);
-    try {
-      const res = await fetch(`${apiBase}/api/hr/checkout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ staffLoginId }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setTodayRecord(data.data);
-        showMsg(`Checked out at ${data.checkOutTime} ✓`);
-      } else {
-        showMsg(data.error || "Check-out failed", "error");
-      }
-    } catch (_) { showMsg("Failed to check out", "error"); }
-    finally { setCheckOutLoading(false); }
+    checkOutMut.mutate(undefined, {
+      onSuccess: (data) => {
+        if (data?.success) showMsg(`Checked out at ${data.checkOutTime} ✓`);
+        else showMsg(data?.error || "Check-out failed", "error");
+      },
+      onError: () => showMsg("Failed to check out", "error"),
+    });
   };
 
-  const handleLeaveRequest = async (e) => {
+  const handleLeaveRequest = (e) => {
     e.preventDefault();
     if (!staffLoginId) return;
-    setLeaveSubmitting(true);
-    try {
-      await fetch(`${apiBase}/api/hr/attendance`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          employeeLoginId: staffLoginId,
-          ownerLoginId: parentLoginId,
-          date: leaveForm.date,
-          status: "Leave",
-          leaveType: leaveForm.leaveType,
-          leaveReason: leaveForm.leaveReason,
-          leaveDuration: leaveForm.duration,
-        }),
-      });
-      showMsg("Leave request submitted ✓");
-      setShowLeaveForm(false);
-      setLeaveForm(f => ({ ...f, leaveReason: "" }));
-      fetchToday();
-    } catch (_) { showMsg("Failed to submit leave", "error"); }
-    finally { setLeaveSubmitting(false); }
+    applyLeaveMut.mutate(
+      {
+        employeeLoginId: staffLoginId,
+        ownerLoginId: parentLoginId,
+        date: leaveForm.date,
+        status: "Leave",
+        leaveType: leaveForm.leaveType,
+        leaveReason: leaveForm.leaveReason,
+        leaveDuration: leaveForm.duration,
+      },
+      {
+        onSuccess: () => {
+          showMsg("Leave request submitted ✓");
+          setShowLeaveForm(false);
+          setLeaveForm(f => ({ ...f, leaveReason: "" }));
+        },
+        onError: () => showMsg("Failed to submit leave", "error"),
+      }
+    );
   };
 
   const now = new Date();
@@ -535,19 +509,19 @@ export default function StaffAttendancePage() {
   // Attendance Summary card — derived client-side from the already-fetched month `history`
   const summarySource = summaryPeriod === "week"
     ? history.filter(r => {
-        if (!r.date) return false;
-        const d = new Date(r.date);
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 6);
-        return d >= new Date(weekAgo.toDateString()) && d <= now;
-      })
+      if (!r.date) return false;
+      const d = new Date(r.date);
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 6);
+      return d >= new Date(weekAgo.toDateString()) && d <= now;
+    })
     : history;
   const presentDays = summarySource.filter(r => r.status === "Present" || r.status === "Late").length;
-  const absentDays  = summarySource.filter(r => r.status === "Absent").length;
-  const halfDays    = summarySource.filter(r => r.status === "Half Day").length;
-  const leaveDays   = summarySource.filter(r => r.status === "Leave").length;
-  const totalDays   = summarySource.length;
-  const ringPct     = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
+  const absentDays = summarySource.filter(r => r.status === "Absent").length;
+  const halfDays = summarySource.filter(r => r.status === "Half Day").length;
+  const leaveDays = summarySource.filter(r => r.status === "Leave").length;
+  const totalDays = summarySource.length;
+  const ringPct = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
 
   // Recent Activity feed — built from real check-in/out + leave records, most recent first
   const recentActivities = [
@@ -564,7 +538,7 @@ export default function StaffAttendancePage() {
   ].slice(0, 4);
 
   // ── TENANT TAB derived data ──
-  const tenantStatusOf = (t) => tenantAttMap[t.loginId || t._id];
+  const tenantStatusOf = (t) => tenantAttMap[String(t._id || t.loginId)];
   const filteredTenants = tenants.filter(t => {
     const q = tenantSearch.trim().toLowerCase();
     if (!q) return true;
@@ -572,11 +546,11 @@ export default function StaffAttendancePage() {
       (t.roomNo || "").toString().toLowerCase().includes(q) ||
       (t.loginId || t._id || "").toString().toLowerCase().includes(q);
   });
-  const tPresent   = tenants.filter(t => tenantStatusOf(t) === "Present").length;
-  const tAbsent    = tenants.filter(t => tenantStatusOf(t) === "Absent").length;
-  const tLeave     = tenants.filter(t => { const s = tenantStatusOf(t); return s === "Leave" || s === "On Leave"; }).length;
-  const tMarked    = tenants.filter(t => !!tenantStatusOf(t)).length;
-  const tPending   = tenants.length - tMarked;
+  const tPresent = tenants.filter(t => tenantStatusOf(t) === "Present").length;
+  const tAbsent = tenants.filter(t => tenantStatusOf(t) === "Absent").length;
+  const tLeave = tenants.filter(t => { const s = tenantStatusOf(t); return s === "Leave" || s === "On Leave"; }).length;
+  const tMarked = tenants.filter(t => !!tenantStatusOf(t)).length;
+  const tPending = tenants.length - tMarked;
 
   return (
     <StaffLayout title="Attendance" subtitle="Your attendance & tenant check-in management">
@@ -590,18 +564,20 @@ export default function StaffAttendancePage() {
           </div>
         )}
 
-        {/* Tab Switcher */}
-        <div className="flex gap-1 bg-slate-100 rounded-2xl p-1 w-fit">
-          {[
-            { key: "mine", label: "My Attendance", icon: Clock },
-            { key: "tenants", label: "Tenant Attendance", icon: Users },
-          ].map(({ key, label, icon: Icon }) => (
-            <button key={key} onClick={() => setTab(key)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${tab === key ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
-              <Icon size={14} />{label}
-            </button>
-          ))}
-        </div>
+        {/* Tab Switcher — the Tenant Attendance tab appears only when permitted */}
+        {canTenantAttendance && (
+          <div className="flex gap-1 bg-slate-100 rounded-2xl p-1 w-fit">
+            {[
+              { key: "mine", label: "My Attendance", icon: Clock },
+              { key: "tenants", label: "Tenant Attendance", icon: Users },
+            ].map(({ key, label, icon: Icon }) => (
+              <button key={key} onClick={() => setTab(key)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${tab === key ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                <Icon size={14} />{label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* ──────── MY ATTENDANCE TAB ──────── */}
         {tab === "mine" && (
@@ -890,8 +866,9 @@ export default function StaffAttendancePage() {
                   <div className="divide-y divide-slate-50">
                     {filteredTenants.map(tenant => {
                       const loginId = tenant.loginId || tenant._id;
-                      const currentStatus = tenantAttMap[loginId];
-                      const isMarking = markingTenant[loginId];
+                      const key = String(tenant._id || tenant.loginId);
+                      const currentStatus = tenantAttMap[key];
+                      const isMarking = markingTenant[key];
                       const initials = (tenant.name || "T").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 
                       return (
@@ -914,11 +891,10 @@ export default function StaffAttendancePage() {
 
                           {/* Status */}
                           <div className="hidden sm:block shrink-0">
-                            <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${
-                              currentStatus === "Present" ? "bg-emerald-50 text-emerald-600"
-                              : currentStatus === "Absent" ? "bg-rose-50 text-rose-600"
-                              : "bg-slate-100 text-slate-400"
-                            }`}>
+                            <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${currentStatus === "Present" ? "bg-emerald-50 text-emerald-600"
+                                : currentStatus === "Absent" ? "bg-rose-50 text-rose-600"
+                                  : "bg-slate-100 text-slate-400"
+                              }`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${currentStatus === "Present" ? "bg-emerald-500" : currentStatus === "Absent" ? "bg-rose-500" : "bg-slate-300"}`} />
                               {currentStatus || "Not Marked"}
                             </span>
@@ -940,8 +916,11 @@ export default function StaffAttendancePage() {
                               title="Mark Absent">
                               {isMarking ? <Loader2 size={14} className="animate-spin" /> : <UserX size={15} />}
                             </button>
-                            <button className="hidden sm:flex w-8 h-8 rounded-lg items-center justify-center text-slate-400 hover:bg-slate-100 transition-all" title="More">
-                              <MoreVertical size={15} />
+                            <button
+                              onClick={() => openTenantHistory(tenant)}
+                              className="hidden sm:flex w-8 h-8 rounded-lg items-center justify-center text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-all"
+                              title="View attendance history">
+                              <History size={15} />
                             </button>
                           </div>
                         </div>
@@ -960,7 +939,7 @@ export default function StaffAttendancePage() {
                     <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{tPresent} Present</span>
                     <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500"><span className="w-1.5 h-1.5 rounded-full bg-rose-500" />{tAbsent} Absent</span>
                     <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500"><span className="w-1.5 h-1.5 rounded-full bg-slate-300" />{tPending} Pending</span>
-                    <button onClick={() => setTab("mine")} className="ml-auto text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1">
+                    <button onClick={() => openTenantHistory(filteredTenants[0] || tenants[0])} className="ml-auto text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1">
                       <History size={13} /> View History
                     </button>
                   </div>
@@ -1044,6 +1023,66 @@ export default function StaffAttendancePage() {
           </div>
         )}
       </div>
+
+      {/* Tenant Attendance History modal */}
+      {historyTenant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={() => setHistoryTenant(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="font-black text-slate-800 text-sm flex items-center gap-2 truncate">
+                  <History size={16} className="text-indigo-500 shrink-0" /> {historyTenant.name}'s History
+                </h3>
+                {filteredTenants.length > 1 && (
+                  <select
+                    value={String(historyTenant._id || historyTenant.id)}
+                    onChange={e => {
+                      const next = filteredTenants.find(t => String(t._id || t.id) === e.target.value);
+                      if (next) setHistoryTenant(next);
+                    }}
+                    className="mt-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-1 outline-none"
+                  >
+                    {filteredTenants.map(t => (
+                      <option key={t._id || t.id} value={String(t._id || t.id)}>{t.name} — Room {t.roomNo || "—"}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <button onClick={() => setHistoryTenant(null)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 shrink-0">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-5 border-b border-slate-100 flex items-center justify-center gap-2">
+              <button onClick={() => { const d = new Date(tenantHistoryYear, tenantHistoryMonth - 2, 1); setTenantHistoryMonth(d.getMonth() + 1); setTenantHistoryYear(d.getFullYear()); }}
+                className="p-1.5 hover:bg-slate-100 rounded-lg transition-all"><ChevronLeft size={14} className="text-slate-500" /></button>
+              <span className="text-xs font-bold text-slate-600 w-32 text-center">
+                {new Date(tenantHistoryYear, tenantHistoryMonth - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
+              </span>
+              <button onClick={() => { const d = new Date(tenantHistoryYear, tenantHistoryMonth, 1); setTenantHistoryMonth(d.getMonth() + 1); setTenantHistoryYear(d.getFullYear()); }}
+                className="p-1.5 hover:bg-slate-100 rounded-lg transition-all"><ChevronRight size={14} className="text-slate-500" /></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-50">
+              {loadingTenantHistory ? (
+                <div className="py-12 flex justify-center"><Loader2 size={22} className="animate-spin text-indigo-400" /></div>
+              ) : tenantHistoryRecords.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-sm">No records for this month</div>
+              ) : tenantHistoryRecords.map(r => {
+                const sc = STATUS_STYLES[r.status] || { bg: "bg-slate-100 text-slate-400 border-slate-200" };
+                return (
+                  <div key={r._id} className="flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors">
+                    <p className="font-black text-slate-800 text-xs">
+                      {new Date(r.date).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}
+                    </p>
+                    <span className={`text-[9px] font-black px-2.5 py-1 rounded-full border ${sc.bg}`}>{r.status}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </StaffLayout>
   );
 }

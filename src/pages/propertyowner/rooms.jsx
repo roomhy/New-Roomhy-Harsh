@@ -47,7 +47,7 @@ const normalizeRoom = (room, ownerId) => {
 };
 
 const readJson = (k, fb) => { try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : fb; } catch { return fb; } };
-const writeJson = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const writeJson = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } };
 
 const compressImage = (file, maxWidth = 1200, quality = 0.75) =>
   new Promise((resolve) => {
@@ -122,11 +122,11 @@ export default function Rooms() {
 
   const handlePropertyPageChange = async (propTitle, propId, newPage) => {
     setPropPages(prev => ({ ...prev, [propTitle]: newPage }));
-    
+
     const currentPropRoomsCount = rooms.filter(r => r.propertyId === propId).length;
     const expectedRoomsCount = newPage * ROOMS_PER_PAGE;
     const totalPropRooms = propertyTotals[propId] || currentPropRoomsCount;
-    
+
     if (currentPropRoomsCount < expectedRoomsCount && currentPropRoomsCount < totalPropRooms) {
       try {
         const { fetchRoomsByPropertyId } = require("../../utils/propertyowner");
@@ -202,28 +202,28 @@ export default function Rooms() {
     setAssignModalOpen(true);
   };
 
-const handleAddTenant = (room) => {
-  const beds = toLegacyBeds(room);
-  const occupiedBed = beds.find(b => b.status === "occupied" || b.tenantId);
-  const tenantId = occupiedBed?.tenantId || "";
-  setSelectedRoom(room);
-  setSelectedBedIndex(beds.findIndex(b => b.tenantId === tenantId));
-  setSelectedBedOccupied(!!occupiedBed);
-  setSelectedTenantId(tenantId);
-  if (tenantId) {
-    const t = tenants.find(x => (x._id || x.id) === tenantId);
-    if (t) setNewTenantForm({ name: t.name || "", phone: t.phone || "", email: t.email || "" });
-  } else {
-    setNewTenantForm({ name: "", phone: "", email: "" });
-  }
-  setAssignMode("existing");
-  setAssignModalOpen(true);
-};
+  const handleAddTenant = (room) => {
+    const beds = toLegacyBeds(room);
+    const occupiedBed = beds.find(b => b.status === "occupied" || b.tenantId);
+    const tenantId = occupiedBed?.tenantId || "";
+    setSelectedRoom(room);
+    setSelectedBedIndex(beds.findIndex(b => b.tenantId === tenantId));
+    setSelectedBedOccupied(!!occupiedBed);
+    setSelectedTenantId(tenantId);
+    if (tenantId) {
+      const t = tenants.find(x => (x._id || x.id) === tenantId);
+      if (t) setNewTenantForm({ name: t.name || "", phone: t.phone || "", email: t.email || "" });
+    } else {
+      setNewTenantForm({ name: "", phone: "", email: "" });
+    }
+    setAssignMode("existing");
+    setAssignModalOpen(true);
+  };
 
   const handleCreateRoom = async (e) => {
     e.preventDefault();
     if (!owner?.loginId) return;
-    
+
     const propId = currentProperty?._id || "";
     if (!propId && !roomForm._id) {
       setErrorMsg("Please wait for properties to load or add a property first.");
@@ -233,14 +233,14 @@ const handleAddTenant = (room) => {
     try {
       setErrorMsg("");
       const bedCount = Number(roomForm.roomBeds || 1);
-      
+
       const payload = {
         propertyId: propId,
         title: roomForm.roomNo,
         type: roomForm.roomType,
         price: Number(roomForm.roomRent || 0),
         beds: bedCount,
-        gender: roomForm.roomGender, 
+        gender: roomForm.roomGender,
         ownerLoginId: owner.loginId,
         unitType: roomForm.unitType,
         floor: roomForm.floor,
@@ -317,7 +317,7 @@ const handleAddTenant = (room) => {
     e.preventDefault();
     if (!owner?.loginId || !selectedRoom) return;
     if (isAssigning) return;
-    
+
     if (!window.confirm(`Are you sure you want to assign this tenant to Room ${selectedRoom.number || selectedRoom.roomNo}, Bed ${Number(selectedBedIndex) + 1}?`)) {
       return;
     }
@@ -328,28 +328,28 @@ const handleAddTenant = (room) => {
       const roomNo = selectedRoom.number || selectedRoom.roomNo || "";
       const agreedRent = Number(selectedRoom.rent || 0);
       const moveInDate = new Date().toISOString().split("T")[0];
-      
+
       const t = tenants.find(x => (x._id || x.id) === selectedTenantId);
       if (!t) { setErrorMsg("Select a tenant."); setIsAssigning(false); return; }
-      
-      const payload = { 
-        name: t.name, 
-        phone: t.phone, 
-        email: t.email, 
-        propertyId: currentProperty?._id || "", 
-        roomNo, 
-        bedNo: Number(selectedBedIndex) + 1, 
-        moveInDate, 
-        agreedRent, 
-        ownerLoginId: owner.loginId 
+
+      const payload = {
+        name: t.name,
+        phone: t.phone,
+        email: t.email,
+        propertyId: currentProperty?._id || "",
+        roomNo,
+        bedNo: Number(selectedBedIndex) + 1,
+        moveInDate,
+        agreedRent,
+        ownerLoginId: owner.loginId
       };
 
       await assignTenant(payload);
       setAssignModalOpen(false);
       clearOwnerFetchCache(owner.loginId);
       await load(owner);
-    } catch (e) { 
-      setErrorMsg(e?.body || e?.message || "Failed."); 
+    } catch (e) {
+      setErrorMsg(e?.body || e?.message || "Failed.");
     } finally {
       setIsAssigning(false);
     }
@@ -478,7 +478,7 @@ const handleAddTenant = (room) => {
             <span className="text-[12px] font-semibold text-muted-foreground">Floor:</span>
             <select value={floorFilter} onChange={e => setFloorFilter(e.target.value)} className="bg-card border border-border rounded-lg px-2 py-1 text-[12px] outline-none focus:ring-1 focus:ring-primary max-w-[100px]">
               <option value="all">All Floors</option>
-              {floorOptions.map(f=>(
+              {floorOptions.map(f => (
                 <option key={f} value={f}>{f}</option>
               ))}
             </select>
@@ -526,65 +526,65 @@ const handleAddTenant = (room) => {
       {errorMsg && <div className="text-sm text-destructive mb-6 bg-destructive/10 p-4 rounded-xl">{errorMsg}</div>}
 
       <div className="space-y-7">
-      {loading ? (
-        <div className="flex flex-col items-center py-20">
-          <Loader2 className="animate-spin text-primary mb-2" size={48} />
-          <span className="text-sm text-muted-foreground">Loading rooms...</span>
-        </div>
-      ) : properties.length === 0 && rooms.length === 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center py-20">
+            <Loader2 className="animate-spin text-primary mb-2" size={48} />
+            <span className="text-sm text-muted-foreground">Loading rooms...</span>
+          </div>
+        ) : properties.length === 0 && rooms.length === 0 ? (
           <div className="rounded-2xl border border-border bg-card p-16 shadow-soft flex flex-col items-center text-center">
             <div className="w-14 h-14 bg-muted/60 rounded-full flex items-center justify-center mb-3"><Building2 className="size-7 text-muted-foreground" /></div>
             <h3 className="font-serif text-[22px] text-foreground mb-1">No properties or rooms</h3>
             <p className="text-[13.5px] text-muted-foreground mb-4">Add a property first, then you can add rooms to it.</p>
           </div>
-          ) : (
-            <>
-              {Object.entries(grouped).map(([propTitle, allPropRooms]) => {
-                const allBeds = allPropRooms.flatMap(r => toLegacyBeds(r));
-                const pOcc = allBeds.filter(b => b.status==="occupied"||b.tenantId).length;
-                const pTotal = allBeds.length;
-                const pct = pTotal ? Math.round((pOcc/pTotal)*100) : 0;
-                // Per-property pagination
-                const propId = allPropRooms[0]?.propertyId || "";
-                const totalPropRooms = propertyTotals[propId] || allPropRooms.length;
-                const propPage = propPages[propTitle] || 1;
-                const propTotalPages = Math.max(1, Math.ceil(totalPropRooms / ROOMS_PER_PAGE));
-                const safePropPage = Math.min(propPage, propTotalPages);
-                const propRooms = allPropRooms.slice((safePropPage - 1) * ROOMS_PER_PAGE, safePropPage * ROOMS_PER_PAGE);
-                const setPropertyPage = (p) => handlePropertyPageChange(propTitle, propId, p);
-                return (
-                  <section key={propTitle} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    {/* Property Header */}
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h2 className="font-semibold text-[17px] leading-tight text-slate-800">{propTitle}</h2>
-                        <div className="text-[12px] text-slate-400 mt-0.5">
-                          {currentPropertyLocation && `${currentPropertyLocation} · `}
-                          {allPropRooms.length} rooms · {pOcc}/{pTotal} beds occupied
-                        </div>
+        ) : (
+          <>
+            {Object.entries(grouped).map(([propTitle, allPropRooms]) => {
+              const allBeds = allPropRooms.flatMap(r => toLegacyBeds(r));
+              const pOcc = allBeds.filter(b => b.status === "occupied" || b.tenantId).length;
+              const pTotal = allBeds.length;
+              const pct = pTotal ? Math.round((pOcc / pTotal) * 100) : 0;
+              // Per-property pagination
+              const propId = allPropRooms[0]?.propertyId || "";
+              const totalPropRooms = propertyTotals[propId] || allPropRooms.length;
+              const propPage = propPages[propTitle] || 1;
+              const propTotalPages = Math.max(1, Math.ceil(totalPropRooms / ROOMS_PER_PAGE));
+              const safePropPage = Math.min(propPage, propTotalPages);
+              const propRooms = allPropRooms.slice((safePropPage - 1) * ROOMS_PER_PAGE, safePropPage * ROOMS_PER_PAGE);
+              const setPropertyPage = (p) => handlePropertyPageChange(propTitle, propId, p);
+              return (
+                <section key={propTitle} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  {/* Property Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="font-semibold text-[17px] leading-tight text-slate-800">{propTitle}</h2>
+                      <div className="text-[12px] text-slate-400 mt-0.5">
+                        {currentPropertyLocation && `${currentPropertyLocation} · `}
+                        {allPropRooms.length} rooms · {pOcc}/{pTotal} beds occupied
                       </div>
-                      <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold",
-                        pct > 90 ? "bg-blue-50 text-blue-600" : pct > 0 ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"
-                      )}>{pct}% full</span>
                     </div>
+                    <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold",
+                      pct > 90 ? "bg-blue-50 text-blue-600" : pct > 0 ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"
+                    )}>{pct}% full</span>
+                  </div>
 
-                    {/* Room Cards Grid */}
-                    {allPropRooms.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-10 px-4 bg-slate-50/70 rounded-xl border border-dashed border-slate-200 text-center">
-                        <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-100 mb-3">
-                          <LayoutTemplate className="w-6 h-6 text-slate-400" />
-                        </div>
-                        <h3 className="text-[15px] font-semibold text-slate-800 mb-1">No Rooms Added Yet</h3>
-                        <p className="text-[13px] text-slate-500 mb-5 max-w-sm">Manage beds and track tenants easily by adding rooms to {propTitle}.</p>
-                        <button type="button" onClick={() => { 
-                          setRoomForm({...defaultRoomForm, propertyId: propId || (properties.find(p => p.title === propTitle || p.name === propTitle)?._id)}); 
-                          setRoomModalOpen(true); 
-                        }} className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-blue-600 text-white text-[13px] font-bold shadow-sm shadow-blue-600/20 hover:bg-blue-700 transition-colors">
-                          <Plus size={16}/> Add First Room
-                        </button>
+                  {/* Room Cards Grid */}
+                  {allPropRooms.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 px-4 bg-slate-50/70 rounded-xl border border-dashed border-slate-200 text-center">
+                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-100 mb-3">
+                        <LayoutTemplate className="w-6 h-6 text-slate-400" />
                       </div>
-                    ) : (
-                      <div className="flex overflow-x-auto snap-x gap-3 pb-3 no-scrollbar scroll-smooth md:grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                      <h3 className="text-[15px] font-semibold text-slate-800 mb-1">No Rooms Added Yet</h3>
+                      <p className="text-[13px] text-slate-500 mb-5 max-w-sm">Manage beds and track tenants easily by adding rooms to {propTitle}.</p>
+                      <button type="button" onClick={() => {
+                        setRoomForm({ ...defaultRoomForm, propertyId: propId || (properties.find(p => p.title === propTitle || p.name === propTitle)?._id) });
+                        setRoomModalOpen(true);
+                      }} className="inline-flex items-center gap-1.5 h-10 px-5 rounded-xl bg-blue-600 text-white text-[13px] font-bold shadow-sm shadow-blue-600/20 hover:bg-blue-700 transition-colors">
+                        <Plus size={16} /> Add First Room
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex overflow-x-auto snap-x gap-3 pb-3 no-scrollbar scroll-smooth md:grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                       {propRooms.map(room => {
                         const beds = toLegacyBeds(room);
                         const occupiedCount = beds.filter(b => b.status === "occupied" || b.tenantId).length;
@@ -619,25 +619,25 @@ const handleAddTenant = (room) => {
                         }
 
                         return (
-                          <div key={room._id||room.id} className={cn("group rounded-2xl border shadow-sm relative overflow-hidden bg-white hover:shadow-md transition-all w-[85%] md:w-auto shrink-0 snap-start p-4", cardBorderClass)}>
+                          <div key={room._id || room.id} className={cn("group rounded-2xl border shadow-sm relative overflow-hidden bg-white hover:shadow-md transition-all w-[85%] md:w-auto shrink-0 snap-start p-4", cardBorderClass)}>
                             {/* Header Row */}
                             <div className="flex justify-between items-start mb-3">
                               <div className="flex items-center gap-3">
                                 <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-[15px] font-bold shrink-0 border shadow-inner",
                                   occupiedCount === totalBeds ? "bg-rose-100 text-rose-600 border-rose-200" :
-                                  occupiedCount === 0 ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                                  "bg-orange-50 text-orange-600 border-orange-100"
+                                    occupiedCount === 0 ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                                      "bg-orange-50 text-orange-600 border-orange-100"
                                 )}>
                                   <BedDouble className="w-4 h-4" />
                                 </div>
                                 <div>
-                                  <h3 className="text-[14px] font-bold text-slate-900 leading-tight">Room {room.number||room.roomNo||room.title}</h3>
+                                  <h3 className="text-[14px] font-bold text-slate-900 leading-tight">Room {room.number || room.roomNo || room.title}</h3>
                                   <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1 font-medium">
-                                    {room.gender||"Mixed"} • {room.type||"AC"}
+                                    {room.gender || "Mixed"} • {room.type || "AC"}
                                   </p>
                                 </div>
                               </div>
-                              
+
                               <div className="flex flex-col items-end gap-1.5">
                                 <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-bold", badgeClass)}>
                                   <span className={cn("size-1.5 rounded-full", dotColor)} />
@@ -645,8 +645,8 @@ const handleAddTenant = (room) => {
                                 </span>
                                 {/* Edit/Delete visible on hover for desktop */}
                                 <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity hidden md:flex mt-1">
-                                  <button onClick={(e) => { e.stopPropagation(); handleEditRoom(room); }} className="p-1 opacity-60 hover:opacity-100"><Edit2 size={11}/></button>
-                                  <button onClick={(e) => { e.stopPropagation(); handleDeleteRoom(room); }} className="p-1 opacity-60 hover:opacity-100 text-rose-500"><Trash2 size={11}/></button>
+                                  <button onClick={(e) => { e.stopPropagation(); handleEditRoom(room); }} className="p-1 opacity-60 hover:opacity-100"><Edit2 size={11} /></button>
+                                  <button onClick={(e) => { e.stopPropagation(); handleDeleteRoom(room); }} className="p-1 opacity-60 hover:opacity-100 text-rose-500"><Trash2 size={11} /></button>
                                 </div>
                               </div>
                             </div>
@@ -654,7 +654,7 @@ const handleAddTenant = (room) => {
                             {/* Beds Grid */}
                             <div className="flex gap-1.5 py-1 mb-2">
                               {beds.map((bed, i) => {
-                                const isOcc = bed.status==="occupied"||!!bed.tenantId;
+                                const isOcc = bed.status === "occupied" || !!bed.tenantId;
                                 return (
                                   <div key={i}
                                     onClick={() => openAssignModal(room, i)}
@@ -664,98 +664,98 @@ const handleAddTenant = (room) => {
                                         ? cn(badgeClass, "shadow-sm")
                                         : cn(bedVacantClass, "border-dashed"))}
                                   >
-                                    {String.fromCharCode(65+i)}
+                                    {String.fromCharCode(65 + i)}
                                   </div>
                                 );
                               })}
                             </div>
 
                             {/* Footer */}
-                              <div className={cn("flex items-center justify-between pt-2.5 border-t mt-2", footerBorder)}>
-                                <div className="flex gap-4 mb-1">
-                                  <div>
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Rent</p>
-                                    <p className="text-[13.5px] font-black text-slate-800 leading-none">₹{(room.rent||0).toLocaleString("en-IN")}<span className="text-[10px] text-slate-500 font-semibold">/bed</span></p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <button type="button" onClick={() => {
-                                    const firstVacant = beds.findIndex(b => !(b.status==="occupied"||b.tenantId));
-                                    openAssignModal(room, firstVacant !== -1 ? firstVacant : 0);
-                                  }} className={cn("h-7 px-3.5 rounded-full flex items-center gap-1.5 transition-colors text-[11px] font-bold", manageBtnClass)}>
-                                    Manage
-                                  </button>
+                            <div className={cn("flex items-center justify-between pt-2.5 border-t mt-2", footerBorder)}>
+                              <div className="flex gap-4 mb-1">
+                                <div>
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Rent</p>
+                                  <p className="text-[13.5px] font-black text-slate-800 leading-none">₹{(room.rent || 0).toLocaleString("en-IN")}<span className="text-[10px] text-slate-500 font-semibold">/bed</span></p>
                                 </div>
                               </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button type="button" onClick={() => {
+                                  const firstVacant = beds.findIndex(b => !(b.status === "occupied" || b.tenantId));
+                                  openAssignModal(room, firstVacant !== -1 ? firstVacant : 0);
+                                }} className={cn("h-7 px-3.5 rounded-full flex items-center gap-1.5 transition-colors text-[11px] font-bold", manageBtnClass)}>
+                                  Manage
+                                </button>
+                              </div>
                             </div>
+                          </div>
                         );
                       })}
-                      </div>
+                    </div>
                   )}
 
                   {/* Per-Property Pagination */}
                   {propTotalPages > 1 && (
                     <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
-                        <span className="text-[12px] text-slate-400 font-medium">
-                          Showing {(safePropPage-1)*ROOMS_PER_PAGE+1}–{Math.min(safePropPage*ROOMS_PER_PAGE, totalPropRooms)} of {totalPropRooms} rooms
-                        </span>
-                        <div className="flex items-center gap-1.5">
+                      <span className="text-[12px] text-slate-400 font-medium">
+                        Showing {(safePropPage - 1) * ROOMS_PER_PAGE + 1}–{Math.min(safePropPage * ROOMS_PER_PAGE, totalPropRooms)} of {totalPropRooms} rooms
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          disabled={safePropPage <= 1}
+                          onClick={() => setPropertyPage(safePropPage - 1)}
+                          className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 text-[12px] font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        >
+                          ←
+                        </button>
+                        {Array.from({ length: propTotalPages }, (_, i) => i + 1).map(p => (
                           <button
-                            disabled={safePropPage <= 1}
-                            onClick={() => setPropertyPage(safePropPage - 1)}
-                            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 text-[12px] font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                            key={p}
+                            onClick={() => setPropertyPage(p)}
+                            className={cn("w-8 h-8 rounded-lg text-[12px] font-semibold transition-all",
+                              p === safePropPage
+                                ? "bg-blue-600 text-white"
+                                : "bg-white border border-slate-200 text-slate-400 hover:bg-slate-50"
+                            )}
                           >
-                            ←
+                            {p}
                           </button>
-                          {Array.from({ length: propTotalPages }, (_, i) => i + 1).map(p => (
-                            <button
-                              key={p}
-                              onClick={() => setPropertyPage(p)}
-                              className={cn("w-8 h-8 rounded-lg text-[12px] font-semibold transition-all",
-                                p === safePropPage
-                                  ? "bg-blue-600 text-white"
-                                  : "bg-white border border-slate-200 text-slate-400 hover:bg-slate-50"
-                              )}
-                            >
-                              {p}
-                            </button>
-                          ))}
-                          <button
-                            disabled={safePropPage >= propTotalPages}
-                            onClick={() => setPropertyPage(safePropPage + 1)}
-                            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 text-[12px] font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                          >
-                            →
-                          </button>
-                        </div>
+                        ))}
+                        <button
+                          disabled={safePropPage >= propTotalPages}
+                          onClick={() => setPropertyPage(safePropPage + 1)}
+                          className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 text-[12px] font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        >
+                          →
+                        </button>
                       </div>
-                    )}
-                  </section>
-                );
-              })}
-            </>
-          )}
-        </div>
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+          </>
+        )}
+      </div>
 
       {/* Add Room Modal */}
-      <div className={cn("fixed inset-0 z-[100] flex items-center justify-center bg-black/70 transition-all", roomModalOpen?"opacity-100 pointer-events-auto":"opacity-0 pointer-events-none")}>
-        <div className={cn("bg-white dark:bg-card w-full max-w-md rounded-2xl shadow-2xl flex flex-col transition-transform duration-300", roomModalOpen?"scale-100":"scale-95")}>
+      <div className={cn("fixed inset-0 z-[100] flex items-center justify-center bg-black/70 transition-all", roomModalOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none")}>
+        <div className={cn("bg-white dark:bg-card w-full max-w-md rounded-2xl shadow-2xl flex flex-col transition-transform duration-300", roomModalOpen ? "scale-100" : "scale-95")}>
           <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
-            <button type="button" onClick={() => setRoomModalOpen(false)} className="p-1 -ml-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors"><X size={18}/></button>
+            <button type="button" onClick={() => setRoomModalOpen(false)} className="p-1 -ml-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors"><X size={18} /></button>
             <h2 className="text-[18px] font-semibold text-foreground flex-1">{roomForm._id ? 'Edit Room' : 'Add Room Details'}</h2>
           </div>
           <div className="flex-1 overflow-y-auto p-6 max-h-[calc(100vh-180px)]">
             <form id="addRoomForm" onSubmit={handleCreateRoom} className="space-y-6">
-              
+
               <div>
                 <label className="block text-[13px] text-muted-foreground mb-1.5">Room Name <span className="text-destructive">*</span></label>
-                <input required className="w-full bg-card border border-border rounded-lg px-3 py-2 text-[14px] text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/60 transition-colors" placeholder="Ex. Room 001" value={roomForm.roomNo} onChange={e=>setRoomForm(p=>({...p,roomNo:e.target.value}))}/>
+                <input required className="w-full bg-card border border-border rounded-lg px-3 py-2 text-[14px] text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/60 transition-colors" placeholder="Ex. Room 001" value={roomForm.roomNo} onChange={e => setRoomForm(p => ({ ...p, roomNo: e.target.value }))} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[13px] text-muted-foreground mb-1.5">Unit Type</label>
-                  <select className="w-full bg-card border border-border rounded-lg px-3 py-2 text-[14px] text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary appearance-none transition-colors" value={roomForm.unitType} onChange={e=>setRoomForm(p=>({...p,unitType:e.target.value}))}>
+                  <select className="w-full bg-card border border-border rounded-lg px-3 py-2 text-[14px] text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary appearance-none transition-colors" value={roomForm.unitType} onChange={e => setRoomForm(p => ({ ...p, unitType: e.target.value }))}>
                     <option value="">Select Unit Type</option>
                     <option value="Room">Room</option>
                     <option value="Bed">Bed</option>
@@ -773,11 +773,11 @@ const handleAddTenant = (room) => {
                 </div>
                 <div>
                   <label className="block text-[13px] text-muted-foreground mb-1.5">Select Floor</label>
-                  <select className="w-full bg-card border border-border rounded-lg px-3 py-2 text-[14px] text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary appearance-none transition-colors" value={roomForm.floor} onChange={e=>setRoomForm(p=>({...p,floor:e.target.value}))}>
+                  <select className="w-full bg-card border border-border rounded-lg px-3 py-2 text-[14px] text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary appearance-none transition-colors" value={roomForm.floor} onChange={e => setRoomForm(p => ({ ...p, floor: e.target.value }))}>
                     <option value="">Select Floor</option>
                     <option value="Basement">Basement</option>
                     <option value="Ground Floor">Ground Floor</option>
-                    {Array.from({length: 100}, (_, i) => i + 1).map(floor => (
+                    {Array.from({ length: 100 }, (_, i) => i + 1).map(floor => (
                       <option key={floor} value={`${floor}${floor === 1 ? 'st' : floor === 2 ? 'nd' : floor === 3 ? 'rd' : 'th'} Floor`}>
                         {floor}{floor === 1 ? 'st' : floor === 2 ? 'nd' : floor === 3 ? 'rd' : 'th'} Floor
                       </option>
@@ -789,34 +789,49 @@ const handleAddTenant = (room) => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[13px] text-muted-foreground mb-1.5">Sharing Type</label>
-                  <select className="w-full bg-card border border-border rounded-lg px-3 py-2 text-[14px] text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary appearance-none transition-colors" value={roomForm.sharingType} onChange={e=>setRoomForm(p=>({...p,sharingType:e.target.value}))}>
+                  <select className="w-full bg-card border border-border rounded-lg px-3 py-2 text-[14px] text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary appearance-none transition-colors" value={roomForm.sharingType} onChange={e => {
+                    const val = e.target.value;
+                    let beds = roomForm.roomBeds;
+                    if (val === 'Single Sharing' || val === 'Private Room (No Sharing)') beds = 1;
+                    else if (val === 'Double Sharing') beds = 2;
+                    else if (val === 'Triple Sharing') beds = 3;
+                    else if (val === 'Four Sharing') beds = 4;
+                    setRoomForm(p => ({ ...p, sharingType: val, roomBeds: beds }));
+                  }}>
                     <option value="">Select Unit Sharing Type</option>
                     <option value="Single Sharing">Single Sharing</option>
                     <option value="Double Sharing">Double Sharing</option>
                     <option value="Triple Sharing">Triple Sharing</option>
                     <option value="Four Sharing">Four Sharing</option>
                     <option value="Private Room (No Sharing)">Private Room (No Sharing)</option>
+                    <option value="Custom">Custom Sharing</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-[13px] text-muted-foreground mb-1.5">Amount Per Bed</label>
-                  <input type="number" className="w-full bg-card border border-border rounded-lg px-3 py-2 text-[14px] text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" placeholder="0" value={roomForm.roomRent} onChange={e=>setRoomForm(p=>({...p,roomRent:e.target.value}))}/>
+                  <input type="number" className="w-full bg-card border border-border rounded-lg px-3 py-2 text-[14px] text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" placeholder="0" value={roomForm.roomRent} onChange={e => setRoomForm(p => ({ ...p, roomRent: e.target.value }))} />
                 </div>
+                {roomForm.sharingType === 'Custom' && (
+                  <div className="col-span-2">
+                    <label className="block text-[13px] text-muted-foreground mb-1.5">Custom Number of Beds</label>
+                    <input type="number" min="1" max="100" className="w-full bg-card border border-border rounded-lg px-3 py-2 text-[14px] text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" placeholder="Enter number of beds (e.g. 6)" value={roomForm.roomBeds} onChange={e => setRoomForm(p => ({ ...p, roomBeds: Math.max(1, Number(e.target.value) || 1) }))} />
+                  </div>
+                )}
               </div>
 
               <div>
                 <label className="block text-[13px] text-muted-foreground mb-1.5">Room Remarks</label>
-                <textarea className="w-full bg-card border border-border rounded-lg px-3 py-2 text-[14px] text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/60 transition-colors min-h-[80px]" placeholder="Remarks" value={roomForm.remarks} onChange={e=>setRoomForm(p=>({...p,remarks:e.target.value}))}></textarea>
+                <textarea className="w-full bg-card border border-border rounded-lg px-3 py-2 text-[14px] text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/60 transition-colors min-h-[80px]" placeholder="Remarks" value={roomForm.remarks} onChange={e => setRoomForm(p => ({ ...p, remarks: e.target.value }))}></textarea>
               </div>
 
               <div>
                 <label className="block text-[13px] text-muted-foreground mb-2">Is this room available to rent <span className="text-destructive">*</span></label>
                 <div className="flex items-center gap-6">
                   <label className="flex items-center gap-2 text-[14px] text-foreground cursor-pointer">
-                    <input type="radio" name="isAvailable" checked={roomForm.isAvailable} onChange={() => setRoomForm(p=>({...p,isAvailable:true}))} className="w-4 h-4 text-primary focus:ring-primary accent-primary" /> Yes
+                    <input type="radio" name="isAvailable" checked={roomForm.isAvailable} onChange={() => setRoomForm(p => ({ ...p, isAvailable: true }))} className="w-4 h-4 text-primary focus:ring-primary accent-primary" /> Yes
                   </label>
                   <label className="flex items-center gap-2 text-[14px] text-foreground cursor-pointer">
-                    <input type="radio" name="isAvailable" checked={!roomForm.isAvailable} onChange={() => setRoomForm(p=>({...p,isAvailable:false}))} className="w-4 h-4 text-primary focus:ring-primary accent-primary" /> No
+                    <input type="radio" name="isAvailable" checked={!roomForm.isAvailable} onChange={() => setRoomForm(p => ({ ...p, isAvailable: false }))} className="w-4 h-4 text-primary focus:ring-primary accent-primary" /> No
                   </label>
                 </div>
               </div>
@@ -828,10 +843,10 @@ const handleAddTenant = (room) => {
                 </div>
                 <div className="grid grid-cols-4 gap-y-6 gap-x-2">
                   {[
-                    {name: "AC", icon: Wind}, {name: "Table", icon: TableIcon}, {name: "TV", icon: Tv}, {name: "Washroom", icon: Bath},
-                    {name: "Balcony", icon: LayoutTemplate}, {name: "Fridge", icon: Refrigerator}, {name: "Almirah", icon: DoorClosed}, {name: "Chair", icon: Armchair},
-                    {name: "Food", icon: Utensils}, {name: "Microwave", icon: Microwave}, {name: "Geyser", icon: Flame}, {name: "Laundry", icon: Shirt},
-                    {name: "CCTV", icon: Video}, {name: "Toilet", icon: Bath}, {name: "Cooler", icon: Fan}
+                    { name: "AC", icon: Wind }, { name: "Table", icon: TableIcon }, { name: "TV", icon: Tv }, { name: "Washroom", icon: Bath },
+                    { name: "Balcony", icon: LayoutTemplate }, { name: "Fridge", icon: Refrigerator }, { name: "Almirah", icon: DoorClosed }, { name: "Chair", icon: Armchair },
+                    { name: "Food", icon: Utensils }, { name: "Microwave", icon: Microwave }, { name: "Geyser", icon: Flame }, { name: "Laundry", icon: Shirt },
+                    { name: "CCTV", icon: Video }, { name: "Toilet", icon: Bath }, { name: "Cooler", icon: Fan }
                   ].map(fac => {
                     const isSelected = roomForm.facilities.includes(fac.name);
                     return (
@@ -839,7 +854,7 @@ const handleAddTenant = (room) => {
                         <div className="relative">
                           <input type="checkbox" className="peer sr-only" checked={isSelected} onChange={(e) => {
                             setRoomForm(p => ({
-                              ...p, 
+                              ...p,
                               facilities: e.target.checked ? [...p.facilities, fac.name] : p.facilities.filter(f => f !== fac.name)
                             }));
                           }} />
@@ -869,7 +884,7 @@ const handleAddTenant = (room) => {
                         <div className="relative flex items-center mt-0.5">
                           <input type="checkbox" className="peer sr-only" checked={isSelected} onChange={(e) => {
                             setRoomForm(p => ({
-                              ...p, 
+                              ...p,
                               roomTypeFeatures: e.target.checked ? [...p.roomTypeFeatures, rt] : p.roomTypeFeatures.filter(f => f !== rt)
                             }));
                           }} />
@@ -888,7 +903,7 @@ const handleAddTenant = (room) => {
                 <h3 className="text-[14px] font-semibold text-primary mb-4">Electricity Meter</h3>
                 <div>
                   <label className="block text-[13px] text-muted-foreground mb-1.5">Unit Cost (₹/Unit)</label>
-                  <input type="number" step="0.01" className="w-full bg-card border border-border rounded-lg px-3 py-2 text-[14px] text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" placeholder="e.g., 8.50" value={roomForm.electricityUnitCost} onChange={e=>setRoomForm(p=>({...p,electricityUnitCost:Number(e.target.value)}))}/>
+                  <input type="number" step="0.01" className="w-full bg-card border border-border rounded-lg px-3 py-2 text-[14px] text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" placeholder="e.g., 8.50" value={roomForm.electricityUnitCost} onChange={e => setRoomForm(p => ({ ...p, electricityUnitCost: Number(e.target.value) }))} />
                   <p className="text-[11px] text-muted-foreground mt-1">Set the cost per unit. Staff will add readings later.</p>
                 </div>
               </div>
@@ -906,9 +921,7 @@ const handleAddTenant = (room) => {
                     </div>
                   )}
                 </div>
-                <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-xl mb-4 text-[12px] text-amber-700 dark:text-amber-300">
-                  Room images are managed by Super Admin.
-                </div>
+
                 <div className="w-32 h-32 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2 opacity-50 bg-slate-50 cursor-not-allowed text-slate-400">
                   <UploadCloud size={28} />
                   <span className="text-[11px] font-medium text-center px-2">Upload disabled</span>
@@ -917,7 +930,7 @@ const handleAddTenant = (room) => {
 
             </form>
           </div>
-          
+
           <div className="p-4 border-t border-border bg-card">
             {errorMsg && <p className="text-[12px] text-destructive mb-3 px-1">{errorMsg}</p>}
             <button type="submit" form="addRoomForm" className="w-full h-11 rounded-lg bg-primary text-primary-foreground text-[14px] font-medium hover:opacity-90 transition-opacity shadow-sm">
@@ -928,7 +941,7 @@ const handleAddTenant = (room) => {
       </div>
 
       {/* Assign Tenant Modal */}
-      <div className={cn("fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/60 backdrop-blur-sm transition-all", assignModalOpen?"opacity-100 pointer-events-auto":"opacity-0 pointer-events-none")}>
+      <div className={cn("fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/60 backdrop-blur-sm transition-all", assignModalOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none")}>
         <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
           <div className="p-6 border-b border-border flex justify-between items-center">
             <div>
@@ -936,20 +949,20 @@ const handleAddTenant = (room) => {
                 {selectedBedOccupied ? "Bed Info" : "Assign Tenant"}
               </h2>
               <p className="text-[12px] text-muted-foreground mt-0.5">
-                Room {selectedRoom?.number||selectedRoom?.roomNo} · Bed {selectedBedIndex!=null?selectedBedIndex+1:""}
+                Room {selectedRoom?.number || selectedRoom?.roomNo} · Bed {selectedBedIndex != null ? selectedBedIndex + 1 : ""}
                 {selectedBedOccupied && (
                   <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary/15 text-primary">Occupied</span>
                 )}
               </p>
             </div>
-            <button onClick={() => setAssignModalOpen(false)} className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg"><X size={20}/></button>
+            <button onClick={() => setAssignModalOpen(false)} className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg"><X size={20} /></button>
           </div>
 
           {selectedBedOccupied ? (
             // Show occupied bed details — no reassignment allowed
             (() => {
               const bed = selectedRoom ? toLegacyBeds(selectedRoom)[selectedBedIndex] : null;
-              const assignedTenant = tenants.find(t => (t._id||t.id) === bed?.tenantId) || null;
+              const assignedTenant = tenants.find(t => (t._id || t.id) === bed?.tenantId) || null;
               return (
                 <div className="p-6 space-y-4">
                   <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/8 border border-primary/20">
@@ -977,11 +990,11 @@ const handleAddTenant = (room) => {
             <form onSubmit={handleAssignTenant} className="p-6 space-y-4">
               <div>
                 <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Select Existing Tenant</label>
-                <select required className="w-full bg-card border border-border rounded-lg px-4 py-2.5 text-[13.5px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20" value={selectedTenantId} onChange={e=>setSelectedTenantId(e.target.value)}>
+                <select required className="w-full bg-card border border-border rounded-lg px-4 py-2.5 text-[13.5px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20" value={selectedTenantId} onChange={e => setSelectedTenantId(e.target.value)}>
                   <option value="">-- Select Tenant --</option>
                   {tenants
                     .filter(t => !assignedIds.has(t._id || t.id))
-                    .map(t=><option key={t._id||t.id} value={t._id||t.id}>{t.name} ({t.phone})</option>)
+                    .map(t => <option key={t._id || t.id} value={t._id || t.id}>{t.name} ({t.phone})</option>)
                   }
                 </select>
               </div>

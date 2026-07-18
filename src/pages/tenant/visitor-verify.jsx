@@ -9,9 +9,12 @@ import {
 export default function VisitorVerify() {
   const [state, setState] = useState({ loading: true, data: null, error: "" });
 
+  // Prefer the clean path form (/visitor-verify/<token>); fall back to ?token=
   const token =
     typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("token") || ""
+      ? (window.location.pathname.match(/\/visitor-verify\/([^/?#]+)/)?.[1] ||
+         new URLSearchParams(window.location.search).get("token") ||
+         "")
       : "";
 
   useEffect(() => {
@@ -79,13 +82,15 @@ export default function VisitorVerify() {
                 <div style={{ padding: "8px 24px 24px" }}>
                   {[
                     { Icon: ShieldCheck,   label: "Status",        value: "Approved" },
-                    { Icon: User,          label: "Approved By",   value: data.approvedBy || "Owner" },
+                    { Icon: User,          label: data.approverLabel === "Designated Warden" ? "Approved By (Warden)" : "Approved By", value: data.approvedBy || data.approverLabel || "Owner" },
                     { Icon: Hash,          label: "Pass ID",       value: data.passId, mono: true },
                     { Icon: User,          label: "Visitor Name",  value: data.visitorName },
                     { Icon: Building2,     label: "Tenant Name",   value: data.tenantName },
+                    { Icon: Building2,     label: "Property",      value: data.propertyName },
+                    { Icon: User,          label: "Owner",         value: data.ownerName },
                     { Icon: CalendarClock, label: "Approved On",   value: fmt(data.approvedAt) },
                     { Icon: Clock,         label: "Expected Entry", value: fmt(data.expectedEntryTime) },
-                  ].map(({ Icon, label, value, mono }) => (
+                  ].filter((r) => r.value).map(({ Icon, label, value, mono }) => (
                     <div key={label} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 4px", borderBottom: "1px solid #f1f2f6" }}>
                       <Icon style={{ width: "17px", height: "17px", color: "#a39ccb", flexShrink: 0 }} />
                       <span style={{ flex: 1, fontSize: "12.5px", color: "#94a3b8" }}>{label}</span>

@@ -53,17 +53,49 @@ export const getApiBase = () => {
   return "https://roohmy-backend-xwa9.vercel.app";
 };
 
-// Read JWT from localStorage — sent as Authorization: Bearer header on every request.
-// Cookie is also set by the backend for httpOnly support; both mechanisms work simultaneously.
+// Read JWT for the Authorization: Bearer header on every request.
+// sessionStorage is checked FIRST because it is isolated per browser tab: this
+// lets an owner (tab A) and one of their staff (tab B) stay signed in at the
+// same time in the same browser without the shared localStorage `token` from one
+// clobbering the other. Falls back to localStorage for flows that only persist
+// there. Cookie is also set by the backend for httpOnly support.
 export const getAuthHeader = () => {
-  const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+  const token = sessionStorage.getItem("token") || localStorage.getItem("token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
+export function parseApiError(err) {
+  const raw = err?.body;
+  let parsed = null;
+
+  if (typeof raw === "string" && raw.trim()) {
+    try {
+      parsed = JSON.parse(raw);
+    } catch (_) {
+      parsed = null;
+    }
+  }
+
+  const message =
+    parsed?.message ||
+    parsed?.error ||
+    err?.message ||
+    "Something went wrong. Please try again later.";
+
+  return {
+    raw,
+    parsed,
+    message,
+    status: err?.status,
+  };
+}
+
 export const fetchJson = (path, options = {}) => {
+  // `timeout` is a per-call override (ms) — pulled out so it isn't passed to fetch().
+  const { timeout: timeoutMs = 12000, ...fetchOptions } = options;
   const base = getApiBase();
   const url = path.startsWith("http") ? path : `${base}${path}`;
-  const method = (options.method || 'GET').toUpperCase();
+  const method = (fetchOptions.method || 'GET').toUpperCase();
 
   // Return the existing in-flight Promise for identical GET requests
   if (method === 'GET') {
@@ -75,15 +107,15 @@ export const fetchJson = (path, options = {}) => {
     const hasBody = method !== 'GET' && method !== 'HEAD';
     const headers = {
       ...(hasBody ? { "Content-Type": "application/json" } : {}),
-      ...(options.headers || {}),
+      ...(fetchOptions.headers || {}),
       ...getAuthHeader(),
     };
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const res = await fetch(url, {
         credentials: "include",
-        ...options,
+        ...fetchOptions,
         headers,
         signal: controller.signal,
       });

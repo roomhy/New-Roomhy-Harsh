@@ -110,7 +110,7 @@ const routeEntries = [
   ["/superadmin/property-overview", "./pages/superadmin/property-overview.jsx"],
   ["/superadmin/accounting-overview", "./pages/superadmin/accounting-overview.jsx"],
   ["/superadmin/home-overview", "./pages/superadmin/home-overview.jsx"],
-  
+
   // Employee Routes
   ["/employee/superadmin", "./pages/superadmin/superadmin.jsx"],
   ["/employee/areaadmin", "./pages/employee/areaadmin.jsx"],
@@ -146,7 +146,7 @@ const routeEntries = [
   ["/employee/website-db", "./pages/superadmin/website-db.jsx"],
   ["/employee/website", "./pages/superadmin/website.jsx"],
   ["/employee/websiteenq", "./pages/superadmin/websiteenq.jsx"],
-  
+
   // Property Owner Routes
   ["/propertyowner/admin", "./pages/propertyowner/admin.jsx"],
   ["/propertyowner/add-property", "./pages/propertyowner/AddPropertyWizard.jsx"],
@@ -172,17 +172,20 @@ const routeEntries = [
   ["/propertyowner/settings", "./pages/propertyowner/settings.jsx"],
   ["/propertyowner/tenantrec", "./pages/propertyowner/tenantrec.jsx"],
   ["/propertyowner/tenants", "./pages/propertyowner/tenants.jsx"],
-  
-  // New Demo Panels
-  ["/staff/login", "./pages/staff-panel/login.jsx"],
-  ["/staff", "./pages/staff-panel/dashboard.jsx"],
-  ["/staff/tenants", "./pages/staff-panel/tenants.jsx"],
-  ["/staff/rooms", "./pages/staff-panel/rooms.jsx"],
-  ["/staff/complaints", "./pages/staff-panel/complaints.jsx"],
-  ["/staff/tasks", "./pages/staff-panel/tasks.jsx"],
-  ["/staff/visitors", "./pages/staff-panel/visitors.jsx"],
-  ["/staff/attendance", "./pages/staff-panel/attendance.jsx"],
-  ["/staff/electricity", "./pages/staff-panel/electricity.jsx"],
+
+  // Staff self-service screens — re-homed INSIDE the single Property Owner Panel.
+  // (The former standalone /staff/* panel has been removed; see redirects in App.jsx.)
+  ["/propertyowner/staff-home", "./pages/staff-panel/dashboard.jsx"],
+  ["/propertyowner/my-attendance", "./pages/staff-panel/attendance.jsx"],
+  ["/propertyowner/my-tasks", "./pages/staff-panel/tasks.jsx"],
+  // Operational staff screens (staff-designed, simpler than the owner versions),
+  // shown only when the owner grants the matching permission.
+  ["/propertyowner/staff-complaints", "./pages/staff-panel/complaints.jsx"],
+  ["/propertyowner/staff-visitors", "./pages/staff-panel/visitors.jsx"],
+  ["/propertyowner/staff-visitor-passes", "./pages/staff-panel/visitor-passes.jsx"],
+  ["/propertyowner/staff-electricity", "./pages/staff-panel/electricity.jsx"],
+  ["/propertyowner/staff-tenants", "./pages/staff-panel/tenants.jsx"],
+  ["/propertyowner/staff-rooms", "./pages/staff-panel/rooms.jsx"],
 
   ["/hostelowner", "./pages/owner-panel/dashboard.jsx"],
   ["/hostelowner/properties", "./pages/owner-panel/properties.jsx"],
@@ -193,7 +196,7 @@ const routeEntries = [
   ["/hostelowner/complaints", "./pages/owner-panel/complaints.jsx"],
   ["/hostelowner/reviews", "./pages/owner-panel/reviews.jsx"],
   ["/hostelowner/reports", "./pages/owner-panel/reports.jsx"],
-  
+
   // Tenant Routes
   ["/tenant/tenantagreement", "./pages/tenant/tenantagreement.jsx"],
   ["/tenant/tenantchat", "./pages/tenant/tenantchat.jsx"],
@@ -201,7 +204,10 @@ const routeEntries = [
   ["/tenant/tenantdashboard", "./pages/tenant/tenantdashboard.jsx"],
   ["/tenant/tenantlogin", "./pages/tenant/tenantlogin.jsx"],
 
-  // Public visitor pass verification (opened when a pass QR is scanned)
+  // Public visitor pass verification (opened when a pass QR is scanned).
+  // Clean path form `/visitor-verify/<token>`; the bare path keeps the old
+  // `?token=` query form working for any previously generated codes.
+  ["/visitor-verify/:token", "./pages/tenant/visitor-verify.jsx"],
   ["/visitor-verify", "./pages/tenant/visitor-verify.jsx"],
 
   // Digital Checkin Routes
@@ -214,8 +220,8 @@ const routeEntries = [
   ["/digital-checkin/tenantagreement", "./pages/digital-checkin/tenantagreement.jsx"],
   ["/digital-checkin/tenantkyc", "./pages/digital-checkin/tenantkyc.jsx"],
   ["/digital-checkin/tenantprofile", "./pages/digital-checkin/tenantprofile.jsx"],
-  
-    ["/propertyowner/occupancy-overview", "./pages/propertyowner/occupancy-overview.jsx"],
+
+  ["/propertyowner/occupancy-overview", "./pages/propertyowner/occupancy-overview.jsx"],
   ["/propertyowner/revenue-overview", "./pages/propertyowner/revenue-overview.jsx"],
   ["/propertyowner/quick-actions", "./pages/propertyowner/quick-actions.jsx"],
   ["/propertyowner/notifications", "./pages/propertyowner/notifications.jsx"],
@@ -352,7 +358,7 @@ const routeEntries = [
   ["/propertyowner/listing", "./pages/propertyowner/listing.jsx"],
   ["/propertyowner/occupancy-report", "./pages/propertyowner/occupancy-report.jsx"],
   ["/propertyowner/property-managers", "./pages/propertyowner/property-managers.jsx"],
-  
+
   // Property Manager Routes
   ["/manager/login", "./pages/manager/login.jsx"],
   ["/manager/dashboard", "./pages/manager/dashboard.jsx"],

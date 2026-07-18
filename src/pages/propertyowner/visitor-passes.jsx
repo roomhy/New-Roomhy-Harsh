@@ -45,8 +45,9 @@ export default function VisitorPassesPage() {
       const data = await apiFetch(`/api/visitors/${id}/approve`, {
         method: "PATCH",
         body: JSON.stringify({
-          ownerName: owner.name || owner.ownerName || "Property Owner",
-          ownerLoginId: owner.loginId,
+          approverRole: "owner",
+          approverLoginId: owner.loginId,
+          approverName: owner.name || owner.ownerName || "Property Owner",
         }),
       });
       if (data.success && data.visitor) {
@@ -62,7 +63,14 @@ export default function VisitorPassesPage() {
   const handleReject = async (id) => {
     try {
       setBusyId(id);
-      const data = await apiFetch(`/api/visitors/${id}/reject`, { method: "PATCH" });
+      const data = await apiFetch(`/api/visitors/${id}/reject`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          approverRole: "owner",
+          approverLoginId: owner.loginId,
+          approverName: owner.name || owner.ownerName || "Property Owner",
+        }),
+      });
       if (data.success && data.visitor) {
         setPasses((prev) => prev.map((p) => (p._id === id ? data.visitor : p)));
       }

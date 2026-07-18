@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import StaffLayout from "../../components/StaffLayout";
-import { Search, Home, Bed, Loader2, RefreshCw, Users, AlertCircle } from "lucide-react";
-import { getApiBase, getAuthHeader } from "../../utils/api";
+import { Search, Home, Loader2, RefreshCw, Users, AlertCircle } from "lucide-react";
+import { useStaffRooms } from "../../hooks/useStaffLists";
+import { useOwnerTenants } from "../../hooks/useTenants";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -9,55 +10,38 @@ function getStaffSession() {
   try {
     const raw = sessionStorage.getItem("staff_session") || localStorage.getItem("staff_session");
     if (raw) return JSON.parse(raw);
-  } catch (_) {}
+  } catch (_) { }
   return null;
 }
 
 const STATUS_CONFIG = {
-  Occupied:    { cls: "bg-blue-600 text-white", dot: "bg-blue-600" },
-  Available:   { cls: "bg-emerald-500 text-white", dot: "bg-emerald-500" },
+  Occupied: { cls: "bg-blue-600 text-white", dot: "bg-blue-600" },
+  Available: { cls: "bg-emerald-500 text-white", dot: "bg-emerald-500" },
   Maintenance: { cls: "bg-rose-500 text-white", dot: "bg-rose-500" },
-  Vacant:      { cls: "bg-emerald-500 text-white", dot: "bg-emerald-500" },
+  Vacant: { cls: "bg-emerald-500 text-white", dot: "bg-emerald-500" },
 };
 
 export default function StaffRooms() {
   const staff = getStaffSession();
   const parentLoginId = staff?.parentLoginId || "";
 
-  const [allRooms, setAllRooms] = useState([]);
-  const [tenants, setTenants] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [error, setError] = useState("");
 
-  const fetchData = useCallback(async () => {
-    if (!parentLoginId) { setLoading(false); return; }
-    setLoading(true);
-    setError("");
-    try {
-      // Fetch rooms directly for the owner (using ownerLoginId/parentLoginId)
-      const rRes = await fetch(`${getApiBase()}/api/rooms/owner/${parentLoginId}`);
-      const rData = await rRes.json();
-      const rooms = (rData?.rooms || []).map(r => ({
-        ...r,
-        propertyTitle: r.property?.title || "",
-      }));
+  const { data: allRooms = [], isLoading: loading, isError, refetch } = useStaffRooms(parentLoginId, {
+    select: (rooms = []) => rooms.map(r => ({
+      ...r,
+      propertyTitle: r.property?.title || "",
+    })),
+  });
+  const { data: tenants = [] } = useOwnerTenants(parentLoginId, {
+    select: (tenantList = []) => tenantList.filter(t => !t.isDeleted && t.status !== "inactive"),
+  });
 
-      // Also fetch tenants for occupancy info
-      const tRes = await fetch(`${getApiBase()}/api/tenants/owner/${parentLoginId}`, { headers: getAuthHeader() });
-      const tData = await tRes.json();
-      const tenantList = tData?.tenants || tData?.data || (Array.isArray(tData) ? tData : []);
-      setTenants(tenantList.filter(t => !t.isDeleted && t.status !== "inactive"));
-      setAllRooms(rooms);
-    } catch (e) {
-      setError("Failed to load rooms. Please refresh.");
-    } finally {
-      setLoading(false);
-    }
-  }, [parentLoginId]);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    setError(isError ? "Failed to load rooms. Please refresh." : "");
+  }, [isError]);
 
   // Build room → tenant map from bedAssignments + tenants list
   const roomTenantMap = {};
@@ -141,7 +125,7 @@ export default function StaffRooms() {
               <input type="text" placeholder="Search room or tenant..." value={search} onChange={e => setSearch(e.target.value)}
                 className="bg-transparent border-none outline-none text-xs font-bold w-full placeholder:text-slate-400" />
             </div>
-            <button onClick={fetchData} className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl hover:bg-slate-100 transition-all">
+            <button onClick={() => refetch()} className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl hover:bg-slate-100 transition-all">
               <RefreshCw size={14} className="text-slate-500" />
             </button>
           </div>
@@ -198,14 +182,14 @@ export default function StaffRooms() {
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</span>
                       <span className={cn("text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border",
                         room._status === "Occupied" ? "bg-blue-50 text-blue-600 border-blue-100" :
-                        room._status === "Available" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                        "bg-rose-50 text-rose-600 border-rose-100")}>
+                          room._status === "Available" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                            "bg-rose-50 text-rose-600 border-rose-100")}>
                         {room._status}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Rent</span>
-                      <span className="text-[10px] font-black text-slate-700">₹{room.rent || room.monthlyRent || "—"}</span>
+                      <span className="text-[10px] font-black text-slate-700">₹{room.rent || room.price || "—"}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Beds</span>

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import PropertyOwnerLayout from "../../components/propertyowner/PropertyOwnerLayout";
 import { getOwnerRuntimeSession, clearOwnerRuntimeSession } from "../../utils/propertyowner";
-import { 
-  IndianRupee, TrendingUp, TrendingDown, ArrowUpRight, 
+import {
+  IndianRupee, TrendingUp, TrendingDown, ArrowUpRight,
   Calendar, CheckCircle, Clock, AlertTriangle, FileText, Download, Wallet
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
@@ -10,12 +10,35 @@ import { fetchJson } from "../../utils/api";
 
 export default function RevenueOverviewPage() {
   const owner = getOwnerRuntimeSession();
-  if (!owner?.loginId && typeof window !== "undefined") { 
-    window.location.href = "/propertyowner/ownerlogin"; 
-    return null; 
+  if (!owner?.loginId && typeof window !== "undefined") {
+    window.location.href = "/propertyowner/ownerlogin";
+    return null;
   }
 
-  const [dateRange, setDateRange] = useState("This Month");
+  // Helper: compute YYYY-MM for offset from current month (0 = this month, -1 = last month…)
+  const computeMonth = (offset = 0) => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + offset);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+
+  const buildOptions = () => {
+    const opts = [];
+    for (let i = 0; i >= -5; i--) {
+      const d = new Date();
+      d.setDate(1);
+      d.setMonth(d.getMonth() + i);
+      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+      opts.push({ value, label });
+    }
+    return opts;
+  };
+
+  const monthOptions = buildOptions();
+
+  const [selectedMonth, setSelectedMonth] = useState(computeMonth(0));
   const [activeTab, setActiveTab] = useState("tenants");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -28,7 +51,8 @@ export default function RevenueOverviewPage() {
     },
     recentPayments: [],
     recentPayouts: [],
-    revenueChartData: []
+    revenueChartData: [],
+    collectionBreakdown: { rent: { amount: 0, percent: 0 }, penalty: { amount: 0, percent: 0 }, electricity: { amount: 0, percent: 0 } }
   });
 
   useEffect(() => {
@@ -37,13 +61,14 @@ export default function RevenueOverviewPage() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const res = await fetchJson(`/api/owners/${owner.loginId}/revenue-dashboard`);
+        const res = await fetchJson(`/api/owners/${owner.loginId}/revenue-dashboard?month=${selectedMonth}`);
         if (res.success || res.summaryMetrics) {
           setDashboardData({
             summaryMetrics: res.summaryMetrics || { tenantCollected: 0, ownerPayouts: 0, pendingPayouts: 0, tenantDues: 0 },
             recentPayments: res.recentPayments || [],
             recentPayouts: res.recentPayouts || [],
-            revenueChartData: res.revenueChartData || []
+            revenueChartData: res.revenueChartData || [],
+            collectionBreakdown: res.collectionBreakdown || { rent: { amount: 0, percent: 0 }, penalty: { amount: 0, percent: 0 }, electricity: { amount: 0, percent: 0 } }
           });
         } else {
           setError(res.error || "Failed to load dashboard data");
@@ -56,9 +81,9 @@ export default function RevenueOverviewPage() {
     };
 
     loadData();
-  }, [owner?.loginId]);
+  }, [owner?.loginId, selectedMonth]);
 
-  const { summaryMetrics, recentPayments, recentPayouts, revenueChartData } = dashboardData;
+  const { summaryMetrics, recentPayments, recentPayouts, revenueChartData, collectionBreakdown } = dashboardData;
 
   const getStatusStyle = (status) => {
     switch (status) {
@@ -74,9 +99,9 @@ export default function RevenueOverviewPage() {
 
   if (loading) {
     return (
-      <PropertyOwnerLayout 
-        owner={owner} 
-        title="Revenue Overview" 
+      <PropertyOwnerLayout
+        owner={owner}
+        title="Revenue Overview"
         onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
       >
         <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3">
@@ -89,9 +114,9 @@ export default function RevenueOverviewPage() {
 
   if (error) {
     return (
-      <PropertyOwnerLayout 
-        owner={owner} 
-        title="Revenue Overview" 
+      <PropertyOwnerLayout
+        owner={owner}
+        title="Revenue Overview"
         onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
       >
         <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-6">
@@ -106,9 +131,9 @@ export default function RevenueOverviewPage() {
   }
 
   return (
-    <PropertyOwnerLayout 
-      owner={owner} 
-      title="Revenue Overview" 
+    <PropertyOwnerLayout
+      owner={owner}
+      title="Revenue Overview"
       onLogout={() => { clearOwnerRuntimeSession(); window.location.href = "/propertyowner/ownerlogin"; }}
     >
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
@@ -117,14 +142,14 @@ export default function RevenueOverviewPage() {
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">Monitor collections from tenants and payouts settled to your account.</p>
         </div>
         <div className="flex items-center gap-2 md:mt-2">
-          <select 
-            value={dateRange} 
-            onChange={(e) => setDateRange(e.target.value)}
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
             className="h-10 px-3 border border-border bg-card rounded-xl text-xs font-semibold focus:outline-none"
           >
-            <option value="This Month">This Month</option>
-            <option value="Last Month">Last Month</option>
-            <option value="Last 3 Months">Last 3 Months</option>
+            {monthOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
           <button onClick={() => alert(`Downloading Statement for ${dateRange}...`)} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-foreground text-background text-[13px] font-medium hover:opacity-90 transition-opacity">
             <Download className="size-4" /> Download Statement
@@ -190,12 +215,12 @@ export default function RevenueOverviewPage() {
               <AreaChart data={revenueChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorRent" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorPayout" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
@@ -216,28 +241,28 @@ export default function RevenueOverviewPage() {
             <div>
               <div className="flex justify-between text-xs font-semibold mb-1">
                 <span>Rent Collections</span>
-                <span>₹1,59,000 (86%)</span>
+                <span>₹{(collectionBreakdown?.rent?.amount || 0).toLocaleString('en-IN')} ({collectionBreakdown?.rent?.percent || 0}%)</span>
               </div>
               <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                <div className="bg-primary h-full rounded-full" style={{ width: "86%" }} />
+                <div className="bg-primary h-full rounded-full transition-all" style={{ width: `${collectionBreakdown?.rent?.percent || 0}%` }} />
               </div>
             </div>
             <div>
               <div className="flex justify-between text-xs font-semibold mb-1">
-                <span>Food & Kitchen</span>
-                <span>₹18,000 (10%)</span>
+                <span>Electricity</span>
+                <span>₹{(collectionBreakdown?.electricity?.amount || 0).toLocaleString('en-IN')} ({collectionBreakdown?.electricity?.percent || 0}%)</span>
               </div>
               <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                <div className="bg-blue-500 h-full rounded-full" style={{ width: "10%" }} />
+                <div className="bg-blue-500 h-full rounded-full transition-all" style={{ width: `${collectionBreakdown?.electricity?.percent || 0}%` }} />
               </div>
             </div>
             <div>
               <div className="flex justify-between text-xs font-semibold mb-1">
                 <span>Late Fines & Penalties</span>
-                <span>₹8,000 (4%)</span>
+                <span>₹{(collectionBreakdown?.penalty?.amount || 0).toLocaleString('en-IN')} ({collectionBreakdown?.penalty?.percent || 0}%)</span>
               </div>
               <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                <div className="bg-amber-500 h-full rounded-full" style={{ width: "4%" }} />
+                <div className="bg-amber-500 h-full rounded-full transition-all" style={{ width: `${collectionBreakdown?.penalty?.percent || 0}%` }} />
               </div>
             </div>
           </div>
@@ -249,13 +274,13 @@ export default function RevenueOverviewPage() {
         <div className="px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h3 className="font-serif text-[20px] text-foreground">Recent Transactions</h3>
           <div className="flex bg-muted/60 p-1 rounded-xl">
-            <button 
+            <button
               onClick={() => setActiveTab("tenants")}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "tenants" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             >
               Tenant Payments
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab("payouts")}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "payouts" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             >

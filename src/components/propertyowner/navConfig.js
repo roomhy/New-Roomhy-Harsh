@@ -1,5 +1,5 @@
-import { 
-  LayoutDashboard, BedDouble, Users, CalendarCheck, MessageCircle, 
+import {
+  LayoutDashboard, BedDouble, Users, CalendarCheck, MessageCircle,
   User, Settings, MapPin, FileText, Building2, PlusCircle, DoorOpen,
   Image, Globe, QrCode, UserCheck, Bell, CalendarClock, HelpCircle,
   Eye, Wallet, CheckCircle, BellRing, Receipt, Link, Repeat, Calculator,
@@ -131,7 +131,6 @@ export const PROPERTY_OWNER_NAV = [
     href: "/propertyowner/ownerchat",
     submenus: [
       { label: "Chat", href: "/propertyowner/ownerchat", goldOnly: false },
-      { label: "Broadcast Message", href: "/propertyowner/announcements", goldOnly: false },
       { label: "WhatsApp Broadcast", href: "/propertyowner/whatsapp", goldOnly: false },
     ]
   },
