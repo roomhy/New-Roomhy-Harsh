@@ -79,10 +79,11 @@ export function Sidebar({ activeTab, setActiveTab, onLogout }) {
                   <button
                     key={item.id}
                     onClick={() => setActiveTab(item.id)}
-                    className={`group w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all ${active
+                    className={`group w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                      active
                         ? "bg-[#6D3DF5] text-white shadow-lg shadow-[#6D3DF5]/30"
                         : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-                      }`}
+                    }`}
                   >
                     <Icon className="w-[18px] h-[18px]" />
                     {item.label}
@@ -410,8 +411,9 @@ export function HeroRentCard({
               {formatINR(isPaid ? 0 : amountDue)}
             </span>
             <span
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide ${isPaid ? "bg-emerald-50 text-emerald-600" : "bg-orange-100 text-orange-600"
-                }`}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide ${
+                isPaid ? "bg-emerald-50 text-emerald-600" : "bg-orange-100 text-orange-600"
+              }`}
             >
               {statusLabel}
             </span>
@@ -429,10 +431,11 @@ export function HeroRentCard({
               onClick={hasReceipt ? onDownloadReceipt : undefined}
               disabled={!hasReceipt}
               title={hasReceipt ? "Download latest payment receipt" : "No payment made yet"}
-              className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors border ${hasReceipt
+              className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors border ${
+                hasReceipt
                   ? "bg-white border-slate-200 hover:bg-slate-50 text-slate-700 cursor-pointer"
                   : "bg-white/50 border-slate-200/60 text-slate-400 cursor-not-allowed opacity-60"
-                }`}
+              }`}
             >
               <Download className="w-4 h-4" /> Download Receipt
             </button>
@@ -565,8 +568,9 @@ export function PaymentTrendChart({ data, percentChange }) {
       <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span
-            className={`w-7 h-7 rounded-lg flex items-center justify-center ${positive ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-              }`}
+            className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+              positive ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+            }`}
           >
             <TrendingUp className={`w-4 h-4 ${positive ? "" : "rotate-180"}`} />
           </span>
@@ -704,8 +708,9 @@ export function LeaseInformation({ status, property, startDate, endDate, onViewD
       <div className="mt-5 space-y-4">
         <LeaseRow icon={ShieldCheck} label="Lease Status">
           <span
-            className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold ${active ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
-              }`}
+            className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+              active ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
+            }`}
           >
             {status || "—"}
           </span>
@@ -741,8 +746,9 @@ export function QuickActions({ actions }) {
               className="group w-full flex items-center gap-3 rounded-xl px-2 py-2.5 hover:bg-slate-50 transition-colors text-left"
             >
               <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${ACTION_STYLES[a.color] || ACTION_STYLES.purple
-                  }`}
+                className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  ACTION_STYLES[a.color] || ACTION_STYLES.purple
+                }`}
               >
                 <Icon className="w-5 h-5" />
               </div>
@@ -776,22 +782,22 @@ const relativeTime = (dateStr) => {
 };
 
 const COMPLAINT_STATUS = {
-  open: { label: "Open", cls: "bg-orange-50 text-orange-600" },
-  "in progress": { label: "In Progress", cls: "bg-blue-50 text-blue-600" },
-  resolved: { label: "Resolved", cls: "bg-emerald-50 text-emerald-600" },
-  closed: { label: "Closed", cls: "bg-slate-100 text-slate-500" },
+  open:          { label: "Open",        cls: "bg-orange-50 text-orange-600"   },
+  "in progress": { label: "In Progress", cls: "bg-blue-50 text-blue-600"       },
+  resolved:      { label: "Resolved",    cls: "bg-emerald-50 text-emerald-600" },
+  closed:        { label: "Closed",      cls: "bg-slate-100 text-slate-500"    },
 };
 const COMPLAINT_PRIORITY = {
-  high: "bg-red-50 text-red-500",
+  high:   "bg-red-50 text-red-500",
   medium: "bg-amber-50 text-amber-600",
-  low: "bg-slate-100 text-slate-500",
+  low:    "bg-slate-100 text-slate-500",
 };
 
 export function AnnouncementCard({ recentComplaint, onViewAll }) {
   const c = recentComplaint;
-  const statusKey = String(c?.status || "open").toLowerCase();
+  const statusKey   = String(c?.status   || "open").toLowerCase();
   const priorityKey = String(c?.priority || "low").toLowerCase();
-  const statusStyle = COMPLAINT_STATUS[statusKey] || COMPLAINT_STATUS.open;
+  const statusStyle = COMPLAINT_STATUS[statusKey]    || COMPLAINT_STATUS.open;
   const priorityCls = COMPLAINT_PRIORITY[priorityKey] || COMPLAINT_PRIORITY.low;
 
   return (
@@ -949,7 +955,7 @@ function WalletArt() {
 // ─── Date range picker modal ─────────────────────────────────────────────────
 export function DateRangePicker({ isOpen, from, to, onApply, onClear, onClose }) {
   const [tempFrom, setTempFrom] = useState(from);
-  const [tempTo, setTempTo] = useState(to);
+  const [tempTo, setTempTo]     = useState(to);
 
   useEffect(() => {
     if (isOpen) { setTempFrom(from); setTempTo(to); }
@@ -1033,10 +1039,11 @@ export function LedgerHeader({ firstName, dateLabel, isFiltered, onOpenPicker, o
         <button
           type="button"
           onClick={onOpenPicker}
-          className={`inline-flex items-center gap-2 rounded-[14px] border px-4 py-2.5 text-[13px] font-medium transition-colors ${isFiltered
+          className={`inline-flex items-center gap-2 rounded-[14px] border px-4 py-2.5 text-[13px] font-medium transition-colors ${
+            isFiltered
               ? "border-[#6D3DF5] bg-[#6D3DF5]/5 text-[#6D3DF5] hover:bg-[#6D3DF5]/10"
               : "border-[#e7e9ef] bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300"
-            }`}
+          }`}
         >
           <Calendar className={`w-4 h-4 ${isFiltered ? "text-[#6D3DF5]" : "text-slate-400"}`} />
           {dateLabel}
@@ -1320,10 +1327,11 @@ export function LedgerFilters({
       <button
         type="button"
         onClick={onOpenPicker}
-        className={`inline-flex items-center gap-2 rounded-[14px] border px-4 py-2.5 text-[13px] font-medium transition-colors ${isFiltered
+        className={`inline-flex items-center gap-2 rounded-[14px] border px-4 py-2.5 text-[13px] font-medium transition-colors ${
+          isFiltered
             ? "border-[#6D3DF5] bg-[#6D3DF5]/5 text-[#6D3DF5] hover:bg-[#6D3DF5]/10"
             : "border-[#e7e9ef] bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300"
-          }`}
+        }`}
       >
         <Calendar className={`w-4 h-4 ${isFiltered ? "text-[#6D3DF5]" : "text-slate-400"}`} />
         {dateLabel}
@@ -1348,8 +1356,9 @@ const CategoryBadge = ({ kind }) => {
   const isPayment = kind === "Payment";
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${isPayment ? "bg-emerald-50 text-emerald-600" : "bg-[#6D3DF5]/8 text-[#6D3DF5]"
-        }`}
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${
+        isPayment ? "bg-emerald-50 text-emerald-600" : "bg-[#6D3DF5]/8 text-[#6D3DF5]"
+      }`}
     >
       {kind}
     </span>
@@ -1389,8 +1398,9 @@ export function LedgerTable({ rows, loading }) {
                   <td className="px-6 py-[18px] text-[13.5px] font-medium tabular-nums whitespace-nowrap text-emerald-600">
                     {r.credit > 0 ? `- ₹${r.credit.toLocaleString("en-IN")}` : <span className="text-slate-300">—</span>}
                   </td>
-                  <td className={`px-6 py-[18px] text-[13.5px] font-semibold tabular-nums whitespace-nowrap ${r.balance > 0 ? "text-[#f4385a]" : r.balance < 0 ? "text-emerald-600" : "text-slate-600"
-                    }`}>
+                  <td className={`px-6 py-[18px] text-[13.5px] font-semibold tabular-nums whitespace-nowrap ${
+                    r.balance > 0 ? "text-[#f4385a]" : r.balance < 0 ? "text-emerald-600" : "text-slate-600"
+                  }`}>
                     ₹{Math.abs(r.balance).toLocaleString("en-IN")}
                   </td>
                   <td className="px-6 py-[18px] text-right">
@@ -1428,10 +1438,11 @@ export function Pagination({ page, pageCount, total, shown, onPage }) {
           <button
             key={p}
             onClick={() => onPage(p)}
-            className={`w-9 h-9 inline-flex items-center justify-center rounded-[10px] text-[13px] font-medium transition-colors ${p === page
+            className={`w-9 h-9 inline-flex items-center justify-center rounded-[10px] text-[13px] font-medium transition-colors ${
+              p === page
                 ? "bg-[#6D3DF5] text-white shadow-[0_6px_16px_-8px_rgba(109,61,245,0.7)]"
                 : "border border-[#e7e9ef] text-slate-500 hover:bg-slate-50 hover:border-slate-300"
-              }`}
+            }`}
           >
             {p}
           </button>
@@ -1572,10 +1583,11 @@ export function ReadOnlyField({ label, value, required, muted }) {
         {label}{required && " *"}
       </label>
       <div
-        className={`mt-2 h-12 flex items-center rounded-[14px] border px-4 text-[14px] tabular-nums ${muted
+        className={`mt-2 h-12 flex items-center rounded-[14px] border px-4 text-[14px] tabular-nums ${
+          muted
             ? "border-[#eceef3] bg-white text-slate-400 font-normal"
             : "border-[#e0e2e9] bg-[#fafafb] text-slate-700 font-medium"
-          }`}
+        }`}
       >
         {value || "—"}
       </div>
@@ -1623,10 +1635,10 @@ function timelineFor(status, date, digilockerVerified) {
   const submittedLike = status === "submitted" || status === "rejected";
   const states =
     status === "verified" ? ["done", "done", "done", "done"]
-      // DigiLocker e-verified → review & identity verification done, owner sign-off pending
-      : submittedLike && digilockerVerified ? ["done", "done", "done", "active"]
-        : submittedLike ? ["done", "active", "pending", "pending"]
-          : ["active", "pending", "pending", "pending"]; // pending / none
+    // DigiLocker e-verified → review & identity verification done, owner sign-off pending
+    : submittedLike && digilockerVerified ? ["done", "done", "done", "active"]
+    : submittedLike ? ["done", "active", "pending", "pending"]
+    : ["active", "pending", "pending", "pending"]; // pending / none
   return base.map((s, i) => ({
     ...s,
     state: states[i],
@@ -1657,10 +1669,11 @@ export function VerificationTimeline({ status = "submitted", date, digilockerVer
           const rightSolid = step.state === "done";
           const Segment = ({ side, solid }) => (
             <span
-              className={`absolute top-[14px] ${side === "left" ? "left-0" : "right-0"} w-1/2 ${solid
+              className={`absolute top-[14px] ${side === "left" ? "left-0" : "right-0"} w-1/2 ${
+                solid
                   ? "h-[2px] bg-[#6D3DF5]"
                   : "h-0 border-t-2 border-dashed border-slate-200"
-                }`}
+              }`}
             />
           );
           return (
@@ -1909,23 +1922,23 @@ export function ImportantNoteCard() {
 function QrCodeArt({ size = 80 }) {
   const D = 1, _ = 0;
   const g = [
-    [D, D, D, D, D, D, D, _, D, _, D, D, D, D, D, D, D],
-    [D, _, _, _, _, _, D, _, _, _, D, _, _, _, _, _, D],
-    [D, _, D, D, D, _, D, _, D, _, D, _, D, D, D, _, D],
-    [D, _, D, D, D, _, D, _, _, D, D, _, D, D, D, _, D],
-    [D, _, D, D, D, _, D, _, D, _, _, _, D, D, D, _, D],
-    [D, _, _, _, _, _, D, _, D, D, _, _, _, _, _, _, D],
-    [D, D, D, D, D, D, D, _, D, _, D, _, D, D, D, D, D],
-    [_, _, _, _, _, _, _, _, _, D, _, _, _, _, _, _, _],
-    [D, _, D, D, _, D, D, D, D, _, D, D, _, D, _, D, _],
-    [_, _, D, _, _, _, _, _, _, _, _, D, D, _, D, _, _],
-    [D, D, _, D, D, _, D, _, _, _, D, _, _, D, D, _, D],
-    [_, _, _, _, _, _, _, _, D, D, _, D, _, _, D, D, _],
-    [D, D, D, D, D, D, D, _, D, _, D, _, D, _, _, _, D],
-    [D, _, _, _, _, _, D, _, _, D, _, D, _, _, _, D, _],
-    [D, _, D, D, D, _, D, _, D, _, _, _, D, D, _, _, D],
-    [D, _, D, D, D, _, D, _, _, D, D, _, _, _, D, _, _],
-    [D, _, _, _, _, _, D, _, _, _, D, D, _, D, D, _, D],
+    [D,D,D,D,D,D,D,_,D,_,D,D,D,D,D,D,D],
+    [D,_,_,_,_,_,D,_,_,_,D,_,_,_,_,_,D],
+    [D,_,D,D,D,_,D,_,D,_,D,_,D,D,D,_,D],
+    [D,_,D,D,D,_,D,_,_,D,D,_,D,D,D,_,D],
+    [D,_,D,D,D,_,D,_,D,_,_,_,D,D,D,_,D],
+    [D,_,_,_,_,_,D,_,D,D,_,_,_,_,_,_,D],
+    [D,D,D,D,D,D,D,_,D,_,D,_,D,D,D,D,D],
+    [_,_,_,_,_,_,_,_,_,D,_,_,_,_,_,_,_],
+    [D,_,D,D,_,D,D,D,D,_,D,D,_,D,_,D,_],
+    [_,_,D,_,_,_,_,_,_,_,_,D,D,_,D,_,_],
+    [D,D,_,D,D,_,D,_,_,_,D,_,_,D,D,_,D],
+    [_,_,_,_,_,_,_,_,D,D,_,D,_,_,D,D,_],
+    [D,D,D,D,D,D,D,_,D,_,D,_,D,_,_,_,D],
+    [D,_,_,_,_,_,D,_,_,D,_,D,_,_,_,D,_],
+    [D,_,D,D,D,_,D,_,D,_,_,_,D,D,_,_,D],
+    [D,_,D,D,D,_,D,_,_,D,D,_,_,_,D,_,_],
+    [D,_,_,_,_,_,D,_,_,_,D,D,_,D,D,_,D],
   ];
   const N = 17, M = size / N;
   return (
@@ -2187,9 +2200,9 @@ export function VisitorPassCard({ visitorName, visitorPhone, tenantName, expecte
           {/* Detail rows */}
           <div style={{ display: "flex", flexDirection: "column", gap: "18px", position: "relative", zIndex: 2 }}>
             {[
-              { Icon: User, label: "Visitor Name", value: visitorName || "—", badge: null },
-              { Icon: Phone, label: "Phone Number", value: visitorPhone || "—", badge: null },
-              { Icon: User, label: "Tenant Name", value: tenantName || "—", badge: "Resident" },
+              { Icon: User,  label: "Visitor Name",       value: visitorName || "—",    badge: null },
+              { Icon: Phone, label: "Phone Number",        value: visitorPhone || "—",   badge: null },
+              { Icon: User,  label: "Tenant Name",         value: tenantName || "—",     badge: "Resident" },
               { Icon: Clock, label: "Expected Entry Time", value: fmtTime(expectedTime), badge: null },
             ].map(({ Icon, label, value, badge }) => (
               <div key={label} style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
@@ -2564,10 +2577,11 @@ export function LeaveHistory({ leaves }) {
             <div key={l._id} className="p-4 rounded-[16px] border border-[#eef0f4] bg-[#fafafb]">
               <div className="flex justify-between items-start gap-3">
                 <span className="text-[13.5px] font-semibold text-slate-700">{fmt(l.fromDate || l.startDate)} – {fmt(l.toDate || l.endDate)}</span>
-                <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full ${l.status === "Approved" ? "bg-emerald-50 text-emerald-600"
-                    : l.status === "Rejected" ? "bg-rose-50 text-rose-600"
-                      : "bg-amber-50 text-amber-600"
-                  }`}>
+                <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full ${
+                  l.status === "Approved" ? "bg-emerald-50 text-emerald-600"
+                  : l.status === "Rejected" ? "bg-rose-50 text-rose-600"
+                  : "bg-amber-50 text-amber-600"
+                }`}>
                   {l.status || "Pending"}
                 </span>
               </div>
@@ -2818,10 +2832,11 @@ export function ComplaintHistory({ complaints }) {
             <div key={c._id} className="p-4 rounded-[16px] border border-[#eef0f4] bg-[#fafafb]">
               <div className="flex justify-between items-start gap-3">
                 <span className="text-[13.5px] font-semibold text-slate-700">{c.category || "Complaint"}</span>
-                <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full ${c.status === "Resolved" ? "bg-emerald-50 text-emerald-600"
-                    : c.status === "In Progress" ? "bg-blue-50 text-blue-600"
-                      : "bg-amber-50 text-amber-600"
-                  }`}>
+                <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full ${
+                  c.status === "Resolved" ? "bg-emerald-50 text-emerald-600"
+                  : c.status === "In Progress" ? "bg-blue-50 text-blue-600"
+                  : "bg-amber-50 text-amber-600"
+                }`}>
                   {c.status || "Open"}
                 </span>
               </div>

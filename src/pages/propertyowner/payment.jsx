@@ -375,11 +375,36 @@ export default function Payment() {
     return m;
   }, [invoices]);
 
-  // Active tenants with rent > 0 who haven't checked out — only these get invoices
-  const invoiceableTenants = useMemo(
-    () => tenants.filter(t => (t.agreedRent || t.rent || 0) > 0 && !t.checkoutDate),
-    [tenants]
-  );
+  // Active tenants with rent > 0 who haven't checked out — only these get invoices.
+  // Exclude onboarding month tenants from the invoiceable list (skipped on the backend).
+  const invoiceableTenants = useMemo(() => {
+    const month = currentBillingMonth();
+    return tenants.filter(t => {
+      if ((t.agreedRent || t.rent || 0) <= 0 || t.checkoutDate) {
+        return false;
+      }
+      const moveInDateRaw = t.moveInDate || t.createdAt;
+      if (moveInDateRaw) {
+        const d = new Date(moveInDateRaw);
+        if (!isNaN(d.getTime())) {
+          const utcMonth = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+          const localMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          if (utcMonth === month || localMonth === month || String(moveInDateRaw).startsWith(month)) {
+            return false;
+          }
+        }
+      }
+      return true;
+    });
+  }, [tenants]);
+
+  // Filter pending cash requests (PENDING_APPROVAL or REQUESTED) to hide owner-approved/rejected ones.
+  const pendingRequests = useMemo(() => {
+    return cashRequests.filter(request => {
+      const status = String(request.cashRequestStatus || request.status || "PENDING_APPROVAL").toUpperCase();
+      return ["PENDING_APPROVAL", "REQUESTED"].includes(status);
+    });
+  }, [cashRequests]);
   const alreadyInvoicedCount = useMemo(
     () => invoiceableTenants.filter(t => invoiceMap.has(String(t._id || t.id))).length,
     [invoiceableTenants, invoiceMap]
@@ -689,17 +714,17 @@ export default function Payment() {
             </p>
           </div>
           <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-white border border-amber-200 text-amber-700">
-            {cashRequestsLoading ? "Refreshing..." : `${cashRequests.length} request${cashRequests.length === 1 ? "" : "s"}`}
+            {cashRequestsLoading ? "Refreshing..." : `${pendingRequests.length} request${pendingRequests.length === 1 ? "" : "s"}`}
           </span>
         </div>
 
         {cashRequestsLoading ? (
           <div className="text-[13px] text-muted-foreground">Loading cash requests...</div>
-        ) : cashRequests.length === 0 ? (
+        ) : pendingRequests.length === 0 ? (
           <div className="text-[13px] text-muted-foreground">No pending cash requests right now.</div>
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-            {cashRequests.map((request) => {
+            {pendingRequests.map((request) => {
               const requestStatus = String(request.cashRequestStatus || request.status || "PENDING_APPROVAL").toUpperCase();
               const canApprove = ["PENDING_APPROVAL", "REQUESTED"].includes(requestStatus);
               const canReject = ["PENDING_APPROVAL", "REQUESTED", "OWNER_APPROVED"].includes(requestStatus);

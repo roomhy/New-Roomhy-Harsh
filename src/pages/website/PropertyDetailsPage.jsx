@@ -451,6 +451,25 @@ export default function PropertyDetailsPage() {
   const [newRating, setNewRating] = useState(5);
   const [newReviewText, setNewReviewText] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewError, setReviewError] = useState(null);
+
+  // Editing rating state
+  const [isEditingRating, setIsEditingRating] = useState(false);
+  const [editRatingValue, setEditRatingValue] = useState(5);
+  const [editRatingText, setEditRatingText] = useState('');
+  const [updatingRating, setUpdatingRating] = useState(false);
+
+  // Posting comment state
+  const [commentText, setCommentText] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [commentError, setCommentError] = useState(null);
+
+  useEffect(() => {
+    if (userReview) {
+      setEditRatingValue(userReview.rating || 5);
+      setEditRatingText(userReview.review || userReview.reviewText || '');
+    }
+  }, [userReview]);
 
   // Fetch nearby colleges/universities/schools using OpenStreetMap Overpass API and save to database
   const fetchNearbyEducation = async (lat, lng, propertyId) => {
@@ -807,8 +826,8 @@ export default function PropertyDetailsPage() {
     e.preventDefault();
     if (!newReviewText.trim()) return;
     
-    // Use property.id (can be string like DELHI-PG-002)
-    const actualPropertyId = property?.id || rawPropertyId;
+    // Use rawPropertyId (MongoDB ObjectId) instead of property.id (which can be a friendly string)
+    const actualPropertyId = rawPropertyId;
     
     if (!actualPropertyId) {
       alert('Error: Property ID not found');
@@ -816,6 +835,7 @@ export default function PropertyDetailsPage() {
     }
     
     setSubmittingReview(true);
+    setReviewError(null);
     try {
       await submitReview({
         propertyId: actualPropertyId,
@@ -828,9 +848,62 @@ export default function PropertyDetailsPage() {
       setNewReviewText('');
       await loadReviews(); // Reload reviews
     } catch (error) {
-      alert('Failed to submit review: ' + error.message);
+      setReviewError(error.message);
     } finally {
       setSubmittingReview(false);
+    }
+  };
+
+  const handleSubmitComment = async (e) => {
+    e.preventDefault();
+    if (!commentText.trim()) return;
+    
+    const actualPropertyId = rawPropertyId;
+    if (!actualPropertyId) {
+      alert('Error: Property ID not found');
+      return;
+    }
+    
+    setSubmittingComment(true);
+    setCommentError(null);
+    try {
+      await submitReview({
+        propertyId: actualPropertyId,
+        propertyName: property?.name,
+        rating: 0,
+        review: commentText
+      });
+      setCommentText('');
+      await loadReviews(); // Reload reviews
+    } catch (error) {
+      setCommentError(error.message);
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleUpdateRating = async (e) => {
+    e.preventDefault();
+    if (!editRatingText.trim()) return;
+    if (!userReview?._id) return;
+
+    setUpdatingRating(true);
+    try {
+      const res = await fetchJson(`/api/reviews/${userReview._id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          rating: editRatingValue,
+          review: editRatingText
+        })
+      });
+      if (res.success) {
+        setIsEditingRating(false);
+        await loadReviews();
+      }
+    } catch (error) {
+      alert('Error updating rating: ' + error.message);
+    } finally {
+      setUpdatingRating(false);
     }
   };
 
@@ -994,6 +1067,20 @@ export default function PropertyDetailsPage() {
                 setNewReviewText={setNewReviewText}
                 submittingReview={submittingReview}
                 handleSubmitReview={handleSubmitReview}
+                reviewError={reviewError}
+                isEditingRating={isEditingRating}
+                setIsEditingRating={setIsEditingRating}
+                editRatingValue={editRatingValue}
+                setEditRatingValue={setEditRatingValue}
+                editRatingText={editRatingText}
+                setEditRatingText={setEditRatingText}
+                updatingRating={updatingRating}
+                handleUpdateRating={handleUpdateRating}
+                commentText={commentText}
+                setCommentText={setCommentText}
+                submittingComment={submittingComment}
+                handleSubmitComment={handleSubmitComment}
+                commentError={commentError}
               />
 
               {/* 12. Compare with Similar */}

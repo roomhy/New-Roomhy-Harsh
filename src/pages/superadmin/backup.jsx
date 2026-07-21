@@ -12,25 +12,174 @@ import {
   ShieldCheck, Cloud, Server, Archive, History,
   Sparkles, Layers, Box, Globe2
 } from "lucide-react";
-import { PageHeader } from "../../components/dashboard/PageHeader";
-import { DateRangePill } from "../../components/dashboard/DateRangePill";
+import { fetchJson, getApiBase } from "../../utils/api";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
-export default function SuperadminBackup() {
-  const [loading, setLoading] = useState(false);
+const formatBytes = (bytes, decimals = 2) => {
+  if (!bytes) return "0 Bytes";
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
+};
 
-  const stats = useMemo(() => ({
-    total: "1.2k",
-    used: "2.4 GB",
-    health: "99.9%",
-    lastSync: "2h ago",
-    speed: "45MB/s",
-    longevity: "30 Days"
-  }), []);
+const formatDate = (dateString) => {
+  const d = new Date(dateString);
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+};
+
+const formatTime = (dateString) => {
+  const d = new Date(dateString);
+  return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+};
+
+export default function SuperadminBackup() {
+  const [backups, setBackups] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [msg, setMsg] = useState({ text: "", type: "" });
+
+  const showMsg = (text, type = "success") => {
+    setMsg({ text, type });
+    setTimeout(() => setMsg({ text: "", type: "" }), 4000);
+  };
+
+  const fetchBackupsList = async () => {
+    setLoading(true);
+    try {
+      const res = await fetchJson("/api/superadmin/backups");
+      if (res.success) {
+        setBackups(res.backups || []);
+      } else {
+        showMsg(res.error || "Failed to load backups", "error");
+      }
+    } catch (err) {
+      showMsg("Failed to load backups", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchBackupsList();
+  }, []);
+
+  const handleCreateSnapshot = async () => {
+    setCreating(true);
+    try {
+      const res = await fetchJson("/api/superadmin/backups/create", { method: "POST" });
+      if (res.success) {
+        showMsg("Snapshot created successfully!");
+        fetchBackupsList();
+      } else {
+        showMsg(res.error || "Failed to create snapshot", "error");
+      }
+    } catch (err) {
+      showMsg("Failed to create snapshot", "error");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleRestoreSnapshot = async (filename) => {
+    if (!window.confirm(`WARNING: Are you absolutely sure you want to restore from ${filename}? This will overwrite all current database collections. This action CANNOT be undone.`)) {
+      return;
+    }
+    setRestoring(true);
+    try {
+      const res = await fetchJson("/api/superadmin/backups/restore", {
+        method: "POST",
+        body: JSON.stringify({ filename })
+      });
+      if (res.success) {
+        showMsg("Database restored successfully!");
+      } else {
+        showMsg(res.error || "Failed to restore database", "error");
+      }
+    } catch (err) {
+      showMsg("Failed to restore database", "error");
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const handleDeleteSnapshot = async (filename) => {
+    if (!window.confirm(`Are you sure you want to delete backup file ${filename}?`)) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      const res = await fetchJson(`/api/superadmin/backups/${encodeURIComponent(filename)}`, {
+        method: "DELETE"
+      });
+      if (res.success) {
+        showMsg("Backup deleted successfully!");
+        fetchBackupsList();
+      } else {
+        showMsg(res.error || "Failed to delete backup", "error");
+      }
+    } catch (err) {
+      showMsg("Failed to delete backup", "error");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDownloadSnapshot = async (filename) => {
+    try {
+      const token = sessionStorage.getItem("token") || localStorage.getItem("token");
+      const base = getApiBase();
+      const response = await fetch(`${base}/api/superadmin/backups/download/${encodeURIComponent(filename)}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (!response.ok) throw new Error("Download failed");
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (error) {
+      showMsg("Error downloading backup: " + error.message, "error");
+    }
+  };
+
+  const totalVolume = useMemo(() => {
+    const totalBytes = backups.reduce((sum, b) => sum + (b.size || 0), 0);
+    return formatBytes(totalBytes);
+  }, [backups]);
+
+  const lastSyncTime = useMemo(() => {
+    if (backups.length === 0) return "Never";
+    const mostRecent = new Date(backups[0].createdAt);
+    const diffMs = Date.now() - mostRecent.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  }, [backups]);
 
   return (
     <div className="p-8 space-y-10 bg-[#F8FAFC] min-h-full">
+      {/* Toast Alert */}
+      {msg.text && (
+        <div className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-2xl shadow-2xl text-sm font-bold flex items-center gap-2 animate-in slide-in-from-top-2 ${msg.type === "error" ? "bg-rose-600 text-white" : "bg-emerald-600 text-white"}`}>
+          {msg.type === "error" ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
+          {msg.text}
+        </div>
+      )}
+
       {/* Header Area */}
       <div className="flex flex-col gap-2">
          <h1 className="text-4xl font-bold text-slate-800 tracking-tight leading-none">Data Continuity & Vault Hub</h1>
@@ -43,17 +192,22 @@ export default function SuperadminBackup() {
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
          <p className="text-sm font-bold text-slate-400 max-w-2xl">Configure automated data archival strategies, monitor storage vault health and manage critical system recovery points in real-time.</p>
-         <button className="bg-slate-800 text-white px-8 py-4 rounded-2xl text-[10px] font-bold uppercase shadow-xl shadow-slate-800/20 hover:bg-slate-900 transition-all flex items-center gap-2">
-            <Plus className="w-4 h-4" /> Create Snapshot Hub
+         <button 
+           onClick={handleCreateSnapshot}
+           disabled={creating}
+           className="bg-slate-800 text-white px-8 py-4 rounded-2xl text-[10px] font-bold uppercase shadow-xl shadow-slate-800/20 hover:bg-slate-900 transition-all flex items-center gap-2 disabled:opacity-50"
+         >
+            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            Create Snapshot Hub
          </button>
       </div>
 
       {/* Hero Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         <StatCardLarge label="Vault Integrity" value="99.9%" trend="Optimal Health" up icon={ShieldCheck} color="green" />
-        <StatCardLarge label="Archive Volume" value="1.2k" trend="+ 156 Delta" up icon={Archive} color="blue" />
-        <StatCardLarge label="Storage Pulse" value="2.4GB" trend="24% Capacity" up icon={HardDrive} color="indigo" />
-        <StatCardLarge label="Transfer Speed" value="45MB/s" trend="Optimized Flow" up icon={Zap} color="orange" />
+        <StatCardLarge label="Archive Volume" value={backups.length} trend={`${backups.length} Snapshots`} up icon={Archive} color="blue" />
+        <StatCardLarge label="Storage Pulse" value={totalVolume} trend="Safe Storage" up icon={HardDrive} color="indigo" />
+        <StatCardLarge label="Last Snapshot" value={lastSyncTime} trend="Vault Pulse" up icon={Zap} color="orange" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -151,11 +305,22 @@ export default function SuperadminBackup() {
                   </tr>
                </thead>
                <tbody className="divide-y divide-slate-50">
-                  {[
-                    { date: "Oct 24, 2025", time: "02:00 AM", type: "Automated Velocity", size: "128 MB", status: "Optimal", mods: "Payments, Users, Properties Hubs" },
-                    { date: "Oct 17, 2025", time: "02:00 AM", type: "Automated Velocity", size: "125 MB", status: "Optimal", mods: "Payments, Users, Properties Hubs" },
-                    { date: "Oct 15, 2025", time: "04:30 PM", type: "Manual Integrity", size: "124 MB", status: "Optimal", mods: "Full System Infrastructure Snapshot" }
-                  ].map((b, i) => (
+                  {loading ? (
+                    <tr>
+                      <td colSpan="5" className="py-12 text-center text-slate-400 font-bold uppercase text-xs">
+                        <div className="flex items-center justify-center gap-2">
+                          <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                          Scanning Vault Archives...
+                        </div>
+                      </td>
+                    </tr>
+                  ) : backups.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="py-12 text-center text-slate-400 font-bold uppercase text-xs">
+                        No Snapshots Found in secure storage.
+                      </td>
+                    </tr>
+                  ) : backups.map((b, i) => (
                     <tr key={i} className="group hover:bg-slate-50/50 transition-colors cursor-pointer">
                        <td className="py-6">
                           <div className="flex items-center gap-5">
@@ -163,34 +328,50 @@ export default function SuperadminBackup() {
                                 <History className="w-6 h-6" />
                              </div>
                              <div>
-                                <p className="text-sm font-bold text-slate-800">{b.date}</p>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 tracking-widest">{b.time}</p>
+                                <p className="text-sm font-bold text-slate-800">{formatDate(b.createdAt)}</p>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 tracking-widest">{formatTime(b.createdAt)}</p>
                              </div>
                           </div>
                        </td>
                        <td className="py-6">
-                          <p className="text-xs font-bold text-slate-700">{b.type}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mt-1">{b.mods}</p>
+                          <p className="text-xs font-bold text-slate-700">{b.filename}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mt-1">Full System Infrastructure Snapshot</p>
                        </td>
                        <td className="py-6 text-center">
-                          <p className="text-xs font-bold text-slate-800">{b.size}</p>
+                          <p className="text-xs font-bold text-slate-800">{formatBytes(b.size)}</p>
                           <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">Snapshot Yield</p>
                        </td>
                        <td className="py-6 text-center">
                           <span className={cn(
-                             "text-[9px] font-bold px-3.5 py-1.5 rounded-full border shadow-sm uppercase tracking-widest",
-                             "bg-emerald-50 text-emerald-600 border-emerald-100"
+                             "text-[9px] font-bold px-3.5 py-1.5 rounded-full border shadow-sm uppercase tracking-widest bg-emerald-50 text-emerald-600 border-emerald-100"
                           )}>
-                             {b.status} Hub
+                             Optimal Hub
                           </span>
                        </td>
                        <td className="py-6 text-right">
-                          <div className="flex items-center justify-end gap-3">
-                             <button className="p-3 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-md transition-all border border-slate-100 shadow-sm" title="Download">
+                          <div className="flex items-center justify-end gap-3" onClick={(e) => e.stopPropagation()}>
+                             <button 
+                               onClick={() => handleDownloadSnapshot(b.filename)}
+                               className="p-3 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-md transition-all border border-slate-100 shadow-sm" 
+                               title="Download Backup"
+                             >
                                 <Download className="w-4 h-4" />
                              </button>
-                             <button className="p-3 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-md transition-all border border-slate-100 shadow-sm" title="Restore">
-                                <RefreshCw className="w-4 h-4" />
+                             <button 
+                               onClick={() => handleRestoreSnapshot(b.filename)}
+                               disabled={restoring}
+                               className="p-3 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-md transition-all border border-slate-100 shadow-sm disabled:opacity-50" 
+                               title="Restore Database"
+                             >
+                                {restoring ? <Loader2 className="w-4 h-4 animate-spin text-blue-600" /> : <RefreshCw className="w-4 h-4" />}
+                             </button>
+                             <button 
+                               onClick={() => handleDeleteSnapshot(b.filename)}
+                               disabled={deleting}
+                               className="p-3 rounded-xl bg-slate-50 text-slate-400 hover:text-rose-600 hover:bg-white hover:shadow-md transition-all border border-slate-100 shadow-sm disabled:opacity-50" 
+                               title="Delete Snapshot"
+                             >
+                                {deleting ? <Loader2 className="w-4 h-4 animate-spin text-rose-600" /> : <Trash2 className="w-4 h-4" />}
                              </button>
                           </div>
                        </td>

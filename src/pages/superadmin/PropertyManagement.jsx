@@ -191,7 +191,6 @@ export default function PropertyManagement() {
                 { icon: Flag, color: "red", title: "Flagged Listings", sub: "Review flagged properties", badge: "7" },
                 { icon: FolderTree, color: "purple", title: "Manage Categories", sub: "Add or edit categories" },
                 { icon: Sparkles, color: "blue", title: "Manage Amenities", sub: "Add or edit amenities" },
-                { icon: FileText, color: "yellow", title: "Pricing Plans", sub: "Manage pricing & subscription plans" },
               ].map((a, i) => {
                 const Icon = a.icon;
                 const cls = {

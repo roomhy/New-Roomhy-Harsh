@@ -124,7 +124,8 @@ export const fetchJson = (path, options = {}) => {
         let errorMsg = `Request failed: ${res.status} ${res.statusText}`;
         try {
           const parsed = JSON.parse(text);
-          if (parsed.error) errorMsg = parsed.error + (parsed.details ? `: ${parsed.details}` : '');
+          const msg = parsed.message || parsed.error;
+          if (msg) errorMsg = msg + (parsed.details ? `: ${parsed.details}` : '');
         } catch (_) {}
         const err = new Error(errorMsg);
         err.status = res.status;

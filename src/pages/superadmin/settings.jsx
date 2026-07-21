@@ -13,6 +13,7 @@ export default function SuperadminSettings() {
   });
 
   const [commissionPercentage, setCommissionPercentage] = useState(10);
+  const [gstPercentage, setGstPercentage] = useState(18);
   const [loading, setLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
 
@@ -44,6 +45,7 @@ export default function SuperadminSettings() {
 
         if (settingsRes && settingsRes.success && settingsRes.settings) {
           setCommissionPercentage(settingsRes.settings.commission_percentage ?? 10);
+          setGstPercentage(settingsRes.settings.gst_percentage ?? 18);
         }
         if (profileRes && profileRes.success && profileRes.user) {
           setProfile({
@@ -68,12 +70,15 @@ export default function SuperadminSettings() {
       const res = await fetchJson("/api/superadmin/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commission_percentage: Number(commissionPercentage) })
+        body: JSON.stringify({ 
+          commission_percentage: Number(commissionPercentage),
+          gst_percentage: Number(gstPercentage)
+        })
       });
       if (res.success) {
-        showBanner("Commission percentage updated successfully!", "success");
+        showBanner("Platform settings updated successfully!", "success");
       } else {
-        showBanner(res.message || "Failed to update commission settings", "error");
+        showBanner(res.message || "Failed to update settings", "error");
       }
     } catch (err) {
       showBanner("Error saving settings: " + err.message, "error");
@@ -142,7 +147,8 @@ export default function SuperadminSettings() {
   // Helper calculation for illustration
   const mockTenantPayment = 10000;
   const platformEarning = (mockTenantPayment * commissionPercentage) / 100;
-  const ownerPayout = mockTenantPayment - platformEarning;
+  const gstOnCommission = (platformEarning * gstPercentage) / 100;
+  const ownerPayout = mockTenantPayment - platformEarning - gstOnCommission;
 
   if (loading) {
     return (
@@ -223,6 +229,23 @@ export default function SuperadminSettings() {
                 className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
               />
 
+              <div className="border-t border-dashed border-slate-200 my-4" />
+
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-600">GST on Commission %</label>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="number" 
+                    min="0"
+                    max="100"
+                    value={gstPercentage}
+                    onChange={(e) => setGstPercentage(Math.min(100, Math.max(0, Number(e.target.value))))}
+                    className="w-20 bg-white border border-slate-200 rounded-xl py-2 px-3 text-center text-sm font-black text-slate-900 focus:outline-none focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 transition-all"
+                  />
+                  <span className="text-sm font-black text-slate-500">%</span>
+                </div>
+              </div>
+
               {/* Live Calculator Visualizer */}
               <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-inner space-y-3">
                 <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
@@ -235,15 +258,22 @@ export default function SuperadminSettings() {
                 <div className="border-t border-dashed border-slate-100 my-2" />
                 <div className="flex justify-between items-center">
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-purple-600 uppercase tracking-wider">Admin Earnings ({commissionPercentage}%)</span>
-                    <span className="text-[9px] text-slate-400">Admin gets</span>
+                    <span className="text-[10px] font-black text-purple-600 uppercase tracking-wider">Admin Commission ({commissionPercentage}%)</span>
+                    <span className="text-[9px] text-slate-400">Admin gets (before GST)</span>
                   </div>
                   <span className="text-sm font-black text-purple-700">₹{platformEarning.toLocaleString("en-IN")}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-rose-600 uppercase tracking-wider">GST on Commission ({gstPercentage}%)</span>
+                    <span className="text-[9px] text-slate-400">Govt. Tax</span>
+                  </div>
+                  <span className="text-sm font-bold text-rose-700">₹{gstOnCommission.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex flex-col">
                     <span className="text-[10px] font-black text-slate-600 uppercase tracking-wider">Owner Earnings</span>
-                    <span className="text-[9px] text-slate-400">Owner gets</span>
+                    <span className="text-[9px] text-slate-400">Net Owner Payout</span>
                   </div>
                   <span className="text-sm font-bold text-slate-900">₹{ownerPayout.toLocaleString("en-IN")}</span>
                 </div>
@@ -256,7 +286,7 @@ export default function SuperadminSettings() {
                 disabled={savingSettings}
                 className="bg-purple-600 text-white px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-purple-700 transition-all flex items-center gap-2 shadow-lg shadow-purple-600/10 disabled:opacity-50"
               >
-                <Save size={14} /> {savingSettings ? "Saving..." : "Save Commission"}
+                <Save size={14} /> {savingSettings ? "Saving..." : "Save Settings"}
               </button>
             </div>
           </div>

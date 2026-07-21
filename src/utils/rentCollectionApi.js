@@ -51,12 +51,6 @@ export const sendReminder = (invoiceId, tenantEmail, tenantName) =>
     body: JSON.stringify({ tenantEmail, tenantName }),
   });
 
-export const sendBulkReminders = (invoiceIds) =>
-  fetchJson(`${base()}/invoices/remind/bulk`, {
-    method: 'POST',
-    body: JSON.stringify({ invoiceIds }),
-  });
-
 export const waivePenalty = (invoiceId, reason, waivedAmount) =>
   fetchJson(`${rentCollectionBase()}/invoices/${invoiceId}/waive`, {
     method: 'PATCH',
@@ -101,10 +95,10 @@ export const rejectCashRequest = (requestId, ownerLoginId, reason = '') =>
     return data;
   });
 
-export const verifyCashOtp = (tenantLoginId, otp) =>
+export const verifyCashOtp = (tenantLoginId, otp, rentId) =>
   fetchJson(`${cashBase()}/cash/verify-otp`, {
     method: 'POST',
-    body: JSON.stringify({ tenantLoginId, otp }),
+    body: JSON.stringify({ tenantLoginId, otp, rentId }),
   }).then(data => {
     cacheInvalidate('cashRequests:');
     cacheInvalidate('payments:');

@@ -299,6 +299,7 @@ export default function StaffAttendancePage() {
   const staff = getStaffSession();
   const staffLoginId = staff?.loginId || "";
   const parentLoginId = staff?.parentLoginId || "";
+  const isWarden = String(staff?.role || "").trim().toLowerCase() === "warden";
 
   // Only wardens (or staff explicitly granted "Tenant Attendance" by the owner)
   // may mark tenant attendance. Everyone else can only mark their own.
@@ -329,8 +330,6 @@ export default function StaffAttendancePage() {
   const [markingTenant, setMarkingTenant] = useState({});
   const [bulkMarking, setBulkMarking] = useState(false);
   const [tenantMsg, setTenantMsg] = useState("");
-  const [tenantSearch, setTenantSearch] = useState("");
-  const [bulkMarking, setBulkMarking] = useState(false);
 
   const [msg, setMsg] = useState({ text: "", type: "" });
   const showMsg = (text, type = "success") => {
@@ -630,26 +629,41 @@ export default function StaffAttendancePage() {
                   <div>
                     <p className="text-sm font-bold text-slate-800">Attendance Status</p>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      {todayRecord?.checkOut ? "You have checked out for today" : todayRecord?.checkIn ? "You are checked in" : "You have not checked in yet"}
+                      {isWarden 
+                        ? "Warden attendance is not marked."
+                        : todayRecord?.checkOut 
+                          ? "You have checked out for today" 
+                          : todayRecord?.checkIn 
+                            ? "You are checked in" 
+                            : "You have not checked in yet"}
                     </p>
                   </div>
                 </div>
                 <div className="flex gap-3 flex-wrap w-full sm:w-auto">
-                  <button onClick={() => setShowLeaveForm(true)}
-                    className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 text-sm font-bold flex items-center gap-2 hover:bg-slate-100 transition-all">
-                    <Calendar size={15} /> Apply for Leave
-                  </button>
-                  <button onClick={handleCheckIn} disabled={checkInLoading || !!todayRecord?.checkIn}
-                    className="h-11 px-6 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/20 hover:from-blue-500 hover:to-indigo-500 transition-all disabled:opacity-60">
-                    {checkInLoading ? <Loader2 size={15} className="animate-spin" /> : <LogIn size={15} />}
-                    {todayRecord?.checkIn ? "Checked In" : "Check In"}
-                    {!!todayRecord?.checkIn && <CheckCircle2 size={15} />}
-                  </button>
-                  <button onClick={handleCheckOut} disabled={checkOutLoading || !todayRecord?.checkIn || !!todayRecord?.checkOut}
-                    className="h-11 px-6 rounded-xl bg-white border border-slate-200 text-slate-700 text-sm font-bold flex items-center gap-2 hover:bg-slate-100 transition-all disabled:opacity-50">
-                    {checkOutLoading ? <Loader2 size={15} className="animate-spin" /> : <LogOut size={15} />}
-                    {todayRecord?.checkOut ? "Checked Out" : "Check Out"}
-                  </button>
+                  {isWarden ? (
+                    <div className="px-5 py-3 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                      <AlertCircle size={14} className="text-slate-400" />
+                      Warden attendance is not marked.
+                    </div>
+                  ) : (
+                    <>
+                      <button onClick={() => setShowLeaveForm(true)}
+                        className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 text-sm font-bold flex items-center gap-2 hover:bg-slate-100 transition-all">
+                        <Calendar size={15} /> Apply for Leave
+                      </button>
+                      <button onClick={handleCheckIn} disabled={checkInLoading || !!todayRecord?.checkIn}
+                        className="h-11 px-6 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/20 hover:from-blue-500 hover:to-indigo-500 transition-all disabled:opacity-60">
+                        {checkInLoading ? <Loader2 size={15} className="animate-spin" /> : <LogIn size={15} />}
+                        {todayRecord?.checkIn ? "Checked In" : "Check In"}
+                        {!!todayRecord?.checkIn && <CheckCircle2 size={15} />}
+                      </button>
+                      <button onClick={handleCheckOut} disabled={checkOutLoading || !todayRecord?.checkIn || !!todayRecord?.checkOut}
+                        className="h-11 px-6 rounded-xl bg-white border border-slate-200 text-slate-700 text-sm font-bold flex items-center gap-2 hover:bg-slate-100 transition-all disabled:opacity-50">
+                        {checkOutLoading ? <Loader2 size={15} className="animate-spin" /> : <LogOut size={15} />}
+                        {todayRecord?.checkOut ? "Checked Out" : "Check Out"}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

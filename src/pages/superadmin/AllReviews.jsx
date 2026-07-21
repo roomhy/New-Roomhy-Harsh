@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Star, Search, Download, CheckCircle, XCircle, EyeOff, BookOpen, ShieldCheck, Building2 } from "lucide-react";
+import { Star, Search, Download, CheckCircle, XCircle, EyeOff, BookOpen, ShieldCheck, Building2, Eye, MapPin, X, Loader2 } from "lucide-react";
 import { PageHeader } from "../../components/superadmin/PageHeader";
 import { fetchJson } from "../../utils/api";
 
@@ -30,6 +30,39 @@ export default function AllReviews() {
   const [ratingF, setRatingF] = useState("all");
   const [modF, setModF] = useState("all");
   const [verifiedF, setVerifiedF] = useState("all");
+
+  // Property details modal state
+  const [selectedPropId, setSelectedPropId] = useState(null);
+  const [propDetails, setPropDetails] = useState(null);
+  const [propLoading, setPropLoading] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+
+  useEffect(() => {
+    if (!selectedPropId) {
+      setPropDetails(null);
+      setActiveImageIndex(0);
+      return;
+    }
+    const fetchProp = async () => {
+      setPropLoading(true);
+      try {
+        let res = await fetchJson(`/api/approved-properties/${selectedPropId}`);
+        if (res && res.success && res.property) {
+          setPropDetails(res.property);
+        } else {
+          res = await fetchJson(`/api/properties/${selectedPropId}`);
+          if (res && res.success && res.property) {
+            setPropDetails(res.property);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching property:", err);
+      } finally {
+        setPropLoading(false);
+      }
+    };
+    fetchProp();
+  }, [selectedPropId]);
 
   useEffect(() => {
     loadReviews();
@@ -213,6 +246,7 @@ export default function AllReviews() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-1 justify-end">
+                            <button onClick={() => setSelectedPropId(r.propertyId)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="View Property"><Eye size={14} /></button>
                             <button onClick={() => handleAction(r._id, "approve")} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Approve"><CheckCircle size={14} /></button>
                             <button onClick={() => handleAction(r._id, "reject")} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Reject"><XCircle size={14} /></button>
                             <button onClick={() => handleAction(r._id, "hide")} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all" title="Hide"><EyeOff size={14} /></button>
@@ -225,6 +259,162 @@ export default function AllReviews() {
               </table>
             </div>
           </div>
+
+          {/* Property Details Modal */}
+          {selectedPropId && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+              <div className="bg-white w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] relative animate-in fade-in zoom-in duration-200">
+                {/* Modal Header */}
+                <div className="absolute top-4 right-4 z-10">
+                  <button 
+                    onClick={() => setSelectedPropId(null)}
+                    className="w-10 h-10 rounded-full bg-white/80 hover:bg-white text-slate-700 flex items-center justify-center shadow-md transition-all active:scale-95"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {propLoading ? (
+                  <div className="py-24 flex flex-col items-center justify-center gap-3">
+                    <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider animate-pulse">Loading Property details...</p>
+                  </div>
+                ) : !propDetails ? (
+                  <div className="py-20 text-center">
+                    <Building2 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-bold text-slate-700">Property Details Not Found</h3>
+                    <p className="text-xs text-slate-400 mt-1">We couldn't retrieve the details for this property.</p>
+                    <button 
+                      onClick={() => setSelectedPropId(null)} 
+                      className="mt-6 px-5 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md hover:bg-slate-700 transition-all"
+                    >
+                      Close Window
+                    </button>
+                  </div>
+                ) : (() => {
+                  const title = propDetails.title || propDetails.propertyInfo?.name || propDetails.propertyName || "Unnamed Property";
+                  const desc = propDetails.description || propDetails.propertyInfo?.description || "No description available.";
+                  const address = propDetails.address || propDetails.propertyInfo?.address || "";
+                  const area = propDetails.locality || propDetails.propertyInfo?.area || "";
+                  const city = propDetails.city || propDetails.propertyInfo?.city || "";
+                  const state = propDetails.state || propDetails.propertyInfo?.state || "";
+                  const rent = propDetails.monthlyRent || propDetails.propertyInfo?.rent || 0;
+                  const type = propDetails.propertyType || propDetails.propertyInfo?.propertyType || "Co-living";
+                  const gender = propDetails.gender || propDetails.propertyInfo?.genderSuitability || "Any";
+                  
+                  // Extract images
+                  const allImages = [];
+                  if (propDetails.featuredImage) allImages.push(propDetails.featuredImage);
+                  if (propDetails.images && Array.isArray(propDetails.images)) {
+                    propDetails.images.forEach(img => { if (img && !allImages.includes(img)) allImages.push(img); });
+                  }
+                  if (propDetails.propertyInfo?.photos && Array.isArray(propDetails.propertyInfo.photos)) {
+                    propDetails.propertyInfo.photos.forEach(img => { if (img && !allImages.includes(img)) allImages.push(img); });
+                  }
+                  if (propDetails.professionalPhotos && Array.isArray(propDetails.professionalPhotos)) {
+                    propDetails.professionalPhotos.forEach(img => { if (img && !allImages.includes(img)) allImages.push(img); });
+                  }
+
+                  return (
+                    <div className="flex flex-col h-full overflow-y-auto">
+                      {/* Photo Section */}
+                      <div className="relative w-full h-[280px] bg-slate-100 shrink-0">
+                        {allImages.length > 0 ? (
+                          <>
+                            <img 
+                              src={allImages[activeImageIndex]} 
+                              alt={title}
+                              className="w-full h-full object-cover"
+                            />
+                            {allImages.length > 1 && (
+                              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-full">
+                                {allImages.map((_, idx) => (
+                                  <button 
+                                    key={idx}
+                                    onClick={() => setActiveImageIndex(idx)}
+                                    className={cn(
+                                      "w-2 h-2 rounded-full transition-all",
+                                      activeImageIndex === idx ? "bg-white w-4" : "bg-white/50"
+                                    )}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                            <Building2 size={48} className="text-slate-300 mb-2" />
+                            <span className="text-xs font-bold uppercase tracking-wider">No photos uploaded</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info Section */}
+                      <div className="p-6 space-y-6">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="bg-blue-50 text-blue-600 border border-blue-100 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded">
+                              {type}
+                            </span>
+                            <span className={cn(
+                              "border text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded",
+                              gender.toLowerCase().includes("female") ? "bg-rose-50 text-rose-600 border-rose-100" :
+                              gender.toLowerCase().includes("male") ? "bg-indigo-50 text-indigo-600 border-indigo-100" :
+                              "bg-slate-50 text-slate-600 border-slate-100"
+                            )}>
+                              {gender} suitability
+                            </span>
+                          </div>
+                          <h2 className="text-xl font-bold text-slate-800 tracking-tight leading-snug">{title}</h2>
+                          {(address || area || city) && (
+                            <p className="text-xs text-slate-500 font-medium mt-1 flex items-center gap-1">
+                              <MapPin size={12} className="text-slate-400 shrink-0" />
+                              {[address, area, city, state].filter(Boolean).join(", ")}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 border-y border-slate-50 py-4">
+                          <div>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Starting Rent</p>
+                            <p className="text-lg font-black text-slate-800 leading-none">₹{Number(rent).toLocaleString("en-IN")}<span className="text-xs font-bold text-slate-400">/mo</span></p>
+                          </div>
+                          <div>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Location Code</p>
+                            <p className="text-lg font-black text-slate-800 leading-none uppercase">{propDetails.locationCode || "N/A"}</p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">About Property</h4>
+                          <p className="text-xs text-slate-600 leading-relaxed font-medium">{desc}</p>
+                        </div>
+
+                        {propDetails.amenities && propDetails.amenities.length > 0 && (
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Amenities</h4>
+                            <div className="flex flex-wrap gap-1.5">
+                              {propDetails.amenities.map((item, idx) => {
+                                const name = typeof item === 'string' ? item : item.name;
+                                return (
+                                  <span 
+                                    key={idx} 
+                                    className="bg-slate-50 border border-slate-100 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded-lg"
+                                  >
+                                    {name}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

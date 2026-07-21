@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   Users, Search, Download, RotateCcw, IndianRupee, Wallet, 
-  ArrowUpRight, ArrowDownRight, Percentage, ShieldCheck, ChevronRight
+  ArrowUpRight, ArrowDownRight, Percent, ShieldCheck, ChevronRight
 } from "lucide-react";
 import { fetchJson } from "../../utils/api";
 import { PageHeader } from "../../components/superadmin/PageHeader";
@@ -98,7 +98,7 @@ export default function OwnersRevenueReport() {
 
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-start gap-4">
           <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center shrink-0">
-            <Percentage className="w-5 h-5" />
+            <Percent className="w-5 h-5" />
           </div>
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Commissions Deducted</p>

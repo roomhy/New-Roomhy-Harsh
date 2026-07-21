@@ -134,21 +134,43 @@ const humanizeCashError = (err, fallback = "Something went wrong. Please try aga
     return "You are not allowed to perform this action.";
   }
 
-  if (raw && typeof raw === "string" && raw.trim().startsWith("{")) {
-    return fallback;
+  // If the parsed message starts with '{' or is a JSON error serialization, return fallback.
+  // Otherwise, return the specific backend parsed message.
+  if (message && message !== "Something went wrong. Please try again later." && !message.trim().startsWith("{")) {
+    return message;
   }
 
-  return message || fallback;
+  return fallback;
 };
 
 // ─── Receipt HTML template (rendered off-screen, captured by html2canvas) ─────
+import { numberToWords } from "../../components/propertyowner/RentReceiptModal";
+
 function ReceiptTemplate({ receiptRef, tenant, tenantUser, rentItem, loginId, propertyName, roomInfo }) {
+  const originalRent = Number(rentItem?.rentAmount || tenant?.agreedRent || 0);
+  const penalty = Number(rentItem?.totalPenalty || rentItem?.penalty || 0);
+  const electricity = Number(rentItem?.electricityBill || rentItem?.electricity || 0);
+  const totalDue = (originalRent + penalty + electricity) || Number(rentItem?.totalDue || 0);
+
+  const paidAmt = Number(rentItem?.paidAmount ?? rentItem?.paid ?? totalDue); // fallback if fully paid
+  const balance = Math.max(0, totalDue - paidAmt);
   const paid = ["paid", "completed"].includes(String(rentItem?.paymentStatus || "").toLowerCase());
-  const receiptNo = rentItem?._id
-    ? `RMH-${String(rentItem._id).slice(-8).toUpperCase()}`
-    : `RMH-${Date.now()}`;
-  const paidAmount = rentItem?.paidAmount || rentItem?.totalDue || rentItem?.rentAmount || 0;
-  const payDate = rentItem?.paymentDate || rentItem?.updatedAt || rentItem?.createdAt;
+  const isPaid = paid || balance === 0;
+
+  const receiptNo = rentItem?._id ? `RMH-${String(rentItem._id).slice(-8).toUpperCase()}` : `RMH-${Date.now()}`;
+  const payDate = formatDate(rentItem?.paymentDate || rentItem?.updatedAt || rentItem?.createdAt, true);
+
+  const tenantName = tenantUser?.name || tenant?.name || "Tenant";
+  const tenantPhone = tenantUser?.phone || tenant?.phone || "";
+  const tenantEmail = tenantUser?.email || tenant?.email || "";
+  const period = rentItem?.collectionMonth || formatDate(rentItem?.paymentDate || rentItem?.createdAt)?.split(" ").slice(1).join(" ") || "-";
+
+  const S = {
+    label: { fontSize: 11, color: "#555", whiteSpace: "nowrap" },
+    value: { fontSize: 12.5, fontWeight: 600, color: "#000", textAlign: "right" },
+    boxHead: { background: "#f5f5f5", padding: "8px 14px", fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#444", borderBottom: "1px solid #d1d5db" },
+    box: { border: "1px solid #d1d5db", borderRadius: 4, overflow: "hidden", flex: 1 },
+  };
 
   return (
     <div
@@ -160,112 +182,179 @@ function ReceiptTemplate({ receiptRef, tenant, tenantUser, rentItem, loginId, pr
         width: "794px",         // A4 width at 96dpi
         minHeight: "600px",
         background: "#ffffff",
-        fontFamily: "'Segoe UI', Arial, sans-serif",
-        fontSize: "14px",
-        color: "#1e293b",
-        padding: "0",
+        fontFamily: "'Helvetica Neue', Arial, sans-serif",
+        fontSize: "13px",
+        color: "#000",
+        padding: "40px 48px",
         margin: "0",
         zIndex: -1,
+        boxSizing: "border-box"
       }}
     >
-      {/* Header bar */}
-      <div style={{ background: "linear-gradient(135deg,#1d4ed8 0%,#7c3aed 100%)", padding: "32px 40px 24px", color: "#fff" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
-            <div style={{ fontSize: "28px", fontWeight: 800, letterSpacing: "-0.5px" }}>Roomhy</div>
-            <div style={{ fontSize: "13px", opacity: 0.8, marginTop: "4px" }}>Property Management Platform</div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: "13px", opacity: 0.8 }}>Receipt No.</div>
-            <div style={{ fontSize: "18px", fontWeight: 700, fontFamily: "monospace", letterSpacing: "1px" }}>{receiptNo}</div>
-            <div style={{ fontSize: "12px", opacity: 0.7, marginTop: "4px" }}>
-              {formatDate(payDate, true)}
-            </div>
-          </div>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid #ddd" }}>
+        <div style={{ fontFamily: "Georgia, serif", fontSize: 40, fontWeight: 900, letterSpacing: -2, lineHeight: 1, color: "#000" }}>
+          Room<span style={{ fontWeight: 400, fontStyle: "italic" }}>Hy</span>
         </div>
-        <div style={{ marginTop: "20px", display: "inline-block", background: paid ? "#22c55e" : "#f59e0b", color: "#fff", borderRadius: "999px", padding: "4px 18px", fontWeight: 700, fontSize: "13px", letterSpacing: "0.5px" }}>
-          {paid ? "✓ PAID" : "PENDING"}
+        <div style={{ textAlign: "right", fontSize: 11.5, color: "#222", lineHeight: 1.65 }}>
+          <p style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 3 }}>RoomHy Technologies India Pvt. Ltd.</p>
+          <p>CIN: U72000MP2024PTC123456 | GSTIN: 23AABCR1234A1Z5 | PAN: AABCR1234A</p>
+          <p>Sector 7, Civil Lines, Indore, Madhya Pradesh - 452001, India</p>
+          <p>Contact: care@roomhy.com | Web: www.roomhy.com</p>
         </div>
       </div>
 
-      {/* Body */}
-      <div style={{ padding: "32px 40px" }}>
-        {/* Tenant + Property info */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginBottom: "32px" }}>
-          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "20px" }}>
-            <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>Tenant Details</div>
-            <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "4px" }}>{tenantUser?.name || tenant?.name || "Tenant"}</div>
-            <div style={{ color: "#475569", fontSize: "13px" }}>{tenantUser?.email || tenant?.email || "-"}</div>
-            <div style={{ color: "#475569", fontSize: "13px", marginTop: "2px" }}>{tenantUser?.phone || tenant?.phone || "-"}</div>
-            <div style={{ marginTop: "10px", display: "inline-block", background: "#eff6ff", color: "#2563eb", borderRadius: "6px", padding: "2px 10px", fontSize: "12px", fontWeight: 700, fontFamily: "monospace" }}>
-              ID: {loginId}
-            </div>
-          </div>
-          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "20px" }}>
-            <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>Property Details</div>
-            <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "6px" }}>{propertyName}</div>
-            <div style={{ color: "#475569", fontSize: "13px" }}>{roomInfo}</div>
-            {tenant?.moveInDate && (
-              <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "6px" }}>
-                Move-in: {formatDate(tenant.moveInDate)}
-              </div>
-            )}
-          </div>
-        </div>
+      {/* Title band */}
+      <div style={{ textAlign: "center", margin: "0 0 16px", padding: "9px 0", borderTop: "2px solid #000", borderBottom: "2px solid #000" }}>
+        <h2 style={{ fontSize: 14.5, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#000" }}>
+          {(() => {
+            const isPendingPast = rentItem?.collectionMonth && rentItem.collectionMonth !== new Date().toISOString().slice(0, 7);
+            const monthUi = rentItem?.collectionMonth ? new Date(`${rentItem.collectionMonth}-01`).toLocaleString('en-US', { month: 'long', year: 'numeric' }) : "Rent";
+            return isPendingPast ? `Pending Rent Receipt (${monthUi})` : "Rental Payment Receipt";
+          })()}
+        </h2>
+      </div>
 
-        {/* Payment summary table */}
-        <div style={{ border: "1px solid #e2e8f0", borderRadius: "12px", overflow: "hidden", marginBottom: "28px" }}>
-          <div style={{ background: "#1e293b", color: "#fff", padding: "12px 20px", display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: "8px", fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-            <span>Description</span><span style={{ textAlign: "center" }}>Period</span><span style={{ textAlign: "center" }}>Method</span><span style={{ textAlign: "right" }}>Amount</span>
-          </div>
-          <div style={{ padding: "16px 20px", display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: "8px", alignItems: "center" }}>
-            <div>
-              <div style={{ fontWeight: 600 }}>Monthly Rent</div>
-              <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
-                {rentItem?.collectionMonth || formatDate(payDate)?.split(" ").slice(1).join(" ")}
+      {/* Invoice Details + Bill To */}
+      <div style={{ display: "flex", gap: 14, marginBottom: 16 }}>
+        <div style={S.box}>
+          <div style={S.boxHead}>Invoice Details</div>
+          <div style={{ padding: "10px 14px" }}>
+            {[
+              ["Invoice #", receiptNo],
+              ["Invoice Date", payDate],
+              ["Due On", "Due on Receipt"],
+              ["State Code", "MP (23)"]
+            ].map(([lbl, val]) => (
+              <div key={lbl} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "3.5px 0", gap: 8 }}>
+                <span style={S.label}>{lbl}</span><span style={S.value}>{val}</span>
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", gap: 8 }}>
+              <span style={S.label}>Status</span>
+              <div style={{ display: "inline-block", padding: "4px 12px 8px 12px", border: `1.5px solid ${isPaid ? "#16a34a" : "#d97706"}`, borderRadius: 3, fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", color: isPaid ? "#166534" : "#92400e", background: isPaid ? "#f0fdf4" : "#fffbeb", lineHeight: 1 }}>
+                {isPaid ? "✓ PAID" : "PARTIAL"}
               </div>
             </div>
-            <div style={{ textAlign: "center", fontSize: "13px", color: "#64748b" }}>
-              {rentItem?.collectionMonth || "-"}
-            </div>
-            <div style={{ textAlign: "center" }}>
-              <span style={{ background: "#eff6ff", color: "#2563eb", borderRadius: "6px", padding: "2px 8px", fontSize: "12px", fontWeight: 600 }}>
-                {paymentMethodLabel(rentItem?.paymentMethod)}
-              </span>
-            </div>
-            <div style={{ textAlign: "right", fontWeight: 700, fontSize: "16px", color: "#2563eb" }}>
-              {formatCurrency(paidAmount)}
-            </div>
-          </div>
-          {/* Total row */}
-          <div style={{ borderTop: "2px solid #e2e8f0", background: "#f8fafc", padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontWeight: 700, fontSize: "15px" }}>Total Paid</span>
-            <span style={{ fontWeight: 800, fontSize: "22px", color: "#16a34a" }}>{formatCurrency(paidAmount)}</span>
           </div>
         </div>
+        <div style={S.box}>
+          <div style={S.boxHead}>Bill To</div>
+          <div style={{ padding: "10px 14px" }}>
+            <p style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{tenantName}</p>
+            {[
+              ["Room", roomInfo],
+              ...(tenantPhone ? [["Phone", tenantPhone]] : []),
+              ...(tenantEmail ? [["Email", tenantEmail]] : [])
+            ].map(([lbl, val]) => (
+              <div key={lbl} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "3px 0", gap: 8 }}>
+                <span style={S.label}>{lbl}</span><span style={S.value}>{val}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
-        {/* Transaction ID if available */}
-        {(rentItem?.razorpay_payment_id || rentItem?.transactionId) && (
-          <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "12px 20px", marginBottom: "24px", display: "flex", gap: "12px", alignItems: "center" }}>
-            <span style={{ fontSize: "13px", color: "#166534", fontWeight: 600 }}>Transaction ID:</span>
-            <span style={{ fontFamily: "monospace", fontSize: "13px", color: "#166534" }}>
-              {rentItem?.razorpay_payment_id || rentItem?.transactionId}
-            </span>
-          </div>
-        )}
+      {/* Items table */}
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginBottom: 0 }}>
+        <thead>
+          <tr style={{ background: "#f5f5f5" }}>
+            {[["#", "left", 34], ["Item & Description", "left", null], ["Qty", "center", 54], ["Rate", "right", 110], ["Amount", "right", 120]].map(([h, align, w]) => (
+              <th key={h} style={{ padding: "9px 14px", textAlign: align, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#555", border: "1px solid #d1d5db", ...(w ? { width: w } : {}) }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={{ padding: "12px 14px", border: "1px solid #e8e8e8", color: "#666" }}>1</td>
+            <td style={{ padding: "12px 14px", border: "1px solid #e8e8e8" }}>
+              <p style={{ fontWeight: 600 }}>Original Rent</p>
+              <p style={{ fontSize: 11, color: "#666", marginTop: 3 }}>Agreed rent for this duration ({period})</p>
+              <p style={{ fontSize: 11, color: "#666", marginTop: 2 }}>SAC: 997211</p>
+            </td>
+            <td style={{ padding: "12px 14px", textAlign: "center", border: "1px solid #e8e8e8" }}>1</td>
+            <td style={{ padding: "12px 14px", textAlign: "right", fontWeight: 600, border: "1px solid #e8e8e8" }}>₹{originalRent.toLocaleString("en-IN")}.00</td>
+            <td style={{ padding: "12px 14px", textAlign: "right", fontWeight: 600, border: "1px solid #e8e8e8" }}>₹{originalRent.toLocaleString("en-IN")}.00</td>
+          </tr>
+          {penalty > 0 && (
+            <tr>
+              <td style={{ padding: "12px 14px", border: "1px solid #e8e8e8", color: "#666" }}>2</td>
+              <td style={{ padding: "12px 14px", border: "1px solid #e8e8e8" }}>
+                <p style={{ fontWeight: 600, color: "#dc2626" }}>Late Penalty</p>
+                <p style={{ fontSize: 11, color: "#666", marginTop: 3 }}>Accumulated penalty for delayed payment</p>
+              </td>
+              <td style={{ padding: "12px 14px", textAlign: "center", border: "1px solid #e8e8e8" }}>1</td>
+              <td style={{ padding: "12px 14px", textAlign: "right", fontWeight: 600, border: "1px solid #e8e8e8", color: "#dc2626" }}>₹{penalty.toLocaleString("en-IN")}.00</td>
+              <td style={{ padding: "12px 14px", textAlign: "right", fontWeight: 600, border: "1px solid #e8e8e8", color: "#dc2626" }}>₹{penalty.toLocaleString("en-IN")}.00</td>
+            </tr>
+          )}
+          {electricity > 0 && (
+            <tr>
+              <td style={{ padding: "12px 14px", border: "1px solid #e8e8e8", color: "#666" }}>{penalty > 0 ? 3 : 2}</td>
+              <td style={{ padding: "12px 14px", border: "1px solid #e8e8e8" }}>
+                <p style={{ fontWeight: 600 }}>Electricity Bill</p>
+                <p style={{ fontSize: 11, color: "#666", marginTop: 3 }}>Electricity charges for this period</p>
+              </td>
+              <td style={{ padding: "12px 14px", textAlign: "center", border: "1px solid #e8e8e8" }}>1</td>
+              <td style={{ padding: "12px 14px", textAlign: "right", fontWeight: 600, border: "1px solid #e8e8e8" }}>₹{electricity.toLocaleString("en-IN")}.00</td>
+              <td style={{ padding: "12px 14px", textAlign: "right", fontWeight: 600, border: "1px solid #e8e8e8" }}>₹{electricity.toLocaleString("en-IN")}.00</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
 
-        {/* Footer note */}
-        <div style={{ borderTop: "1px dashed #cbd5e1", paddingTop: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontSize: "12px", color: "#94a3b8" }}>
-            This is a computer-generated receipt. No signature required.
+      {/* Payment Breakdown Summary */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14, border: "1px solid #d1d5db", borderTop: "none" }}>
+        <div style={{ width: 340, borderLeft: "1px solid #d1d5db" }}>
+          <div style={{ background: "#f5f5f5", padding: "7px 16px", fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#444", borderBottom: "1px solid #d1d5db" }}>
+            Payment Breakdown Summary
           </div>
-          <div style={{ fontSize: "12px", color: "#94a3b8" }}>
-            Generated: {formatDate(new Date().toISOString(), true)}
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 16px" }}>
+            <span style={{ fontSize: 13 }}>Original Rent</span>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>₹{originalRent.toLocaleString("en-IN")}.00</span>
+          </div>
+          {penalty > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 16px" }}>
+              <span style={{ fontSize: 13 }}>Late Penalty</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#dc2626" }}>₹{penalty.toLocaleString("en-IN")}.00</span>
+            </div>
+          )}
+          {electricity > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 16px" }}>
+              <span style={{ fontSize: 13 }}>Electricity Bill</span>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>₹{electricity.toLocaleString("en-IN")}.00</span>
+            </div>
+          )}
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 16px", borderTop: "1px dashed #ccc", marginTop: 4 }}>
+            <span style={{ fontSize: 13, fontWeight: 700 }}>Total Rent Due</span>
+            <span style={{ fontSize: 13, fontWeight: 700 }}>₹{totalDue.toLocaleString("en-IN")}.00</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 16px" }}>
+            <span style={{ fontSize: 13 }}>Total Rent Paid</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#16a34a" }}>(-) ₹{paidAmt.toLocaleString("en-IN")}.00</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 16px", borderTop: "1.5px solid #000", marginTop: 4 }}>
+            <span style={{ fontSize: 14, fontWeight: 800 }}>Balance Remaining</span>
+            <span style={{ fontSize: 14, fontWeight: 800 }}>₹{balance.toLocaleString("en-IN")}.00</span>
           </div>
         </div>
-        <div style={{ marginTop: "8px", fontSize: "11px", color: "#cbd5e1", textAlign: "center" }}>
-          Roomhy Property Management • support@roomhy.com • www.roomhy.com
-        </div>
+      </div>
+
+      {/* Total in words */}
+      <div style={{ border: "1px solid #d1d5db", padding: "9px 14px", fontSize: 12.5, marginBottom: 16 }}>
+        <strong>Amount Due In Words:</strong> {numberToWords(totalDue)}
+      </div>
+
+      {/* Terms */}
+      <p style={{ fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#444", marginBottom: 6, paddingBottom: 5, borderBottom: "1px solid #e5e5e5" }}>Terms &amp; Notes</p>
+      <ul style={{ fontSize: 11, color: "#444", lineHeight: 1.9, paddingLeft: 16 }}>
+        <li><strong>Tenant App:</strong> Manage Your Stay and Pay your rent through the Tenant App (Available On Android &amp; iOS)</li>
+        <li><strong>Late Fee:</strong> Delay in rent payment will lead to Rs.100 fine per day.</li>
+        <li><strong>Support:</strong> If you have any issues, you can get in touch with our dedicated care desk at care@roomhy.com.</li>
+        <li><strong>T&amp;C:</strong> Payment of the invoice confirms your agreement with the Terms and Conditions mentioned in the agreement and on www.roomhy.com/tnc.</li>
+      </ul>
+      <div style={{ textAlign: "center", fontSize: 10.5, color: "#bbb", marginTop: 20, paddingTop: 12, borderTop: "1px solid #efefef" }}>
+        This is a Computer generated invoice. Signature is not required.
       </div>
     </div>
   );
@@ -297,6 +386,7 @@ export default function Tenantdashboard() {
   const [loading, setLoading] = useState(true);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  const [paymentTarget, setPaymentTarget] = useState("current"); // "current" | "previous"
   const [genericModal, setGenericModal] = useState(null);
   const [cashPanelOpen, setCashPanelOpen] = useState(false);
   const [cashOtp, setCashOtp] = useState("");
@@ -305,9 +395,7 @@ export default function Tenantdashboard() {
   const [errorMsg, setErrorMsg] = useState("");
   const [documentViewer, setDocumentViewer] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
-  const cashRequestStatus = rent?.cashRequestStatus || rent?.paymentStatus || "";
-  const normalizedCashStatus = String(cashRequestStatus || "PENDING_APPROVAL").toUpperCase();
-  const showCashOtp = ["OWNER_APPROVED", "OTP_SENT", "VERIFIED"].includes(normalizedCashStatus) || cashPanelOpen;
+
 
   // Tab State
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -392,6 +480,106 @@ export default function Tenantdashboard() {
   const [activeReceiptItem, setActiveReceiptItem] = useState(null);
   const receiptRef = useRef(null);
 
+  // Previous Month(s) Pending State
+  const prevMonthRef = useRef(null);
+  const [prevMonthDropdownOpen, setPrevMonthDropdownOpen] = useState(false);
+  const [prevMonthObj, setPrevMonthObj] = useState(null);
+  const [prevMonthDetailModal, setPrevMonthDetailModal] = useState(false);
+
+  const targetRentContext = paymentTarget === "current" ? rent : prevMonthObj;
+  const targetCashRequestStatus = targetRentContext?.cashRequestStatus || targetRentContext?.paymentStatus || "";
+  const targetNormalizedCashStatus = String(targetCashRequestStatus || "NONE").toUpperCase();
+  const showCashOtp = ["OWNER_APPROVED", "OTP_SENT", "VERIFIED"].includes(targetNormalizedCashStatus);
+  // Close dropdown on outside click
+  useEffect(() => {
+    const act = (e) => {
+      if (prevMonthDropdownOpen && prevMonthRef.current && !prevMonthRef.current.contains(e.target)) {
+        setPrevMonthDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", act);
+    return () => document.removeEventListener("mousedown", act);
+  }, [prevMonthDropdownOpen]);
+
+  const priorMonthsOptions = useMemo(() => {
+    if (!history) return [];
+    return history.filter(item => {
+      if (rent && item._id === rent._id) return false;
+      const s = String(item.paymentStatus || "").toLowerCase();
+      // Exclude if deeply marked as paid or completed
+      if (s === "paid" || s === "completed") return false;
+
+      // Specifically addressing the user's issue: Only check status, don't math out paidAmt 
+      // because partial payments might throw off the calculation visually.
+      return true;
+    });
+  }, [history, rent]);
+
+  const priorPaidReceipts = useMemo(() => {
+    if (!history) return [];
+    return history.filter(item => {
+      if (rent && item._id === rent._id) return false;
+      const s = String(item.paymentStatus || "").toLowerCase();
+      return s === "paid" || s === "completed";
+    });
+  }, [history, rent]);
+
+  useEffect(() => {
+    if (priorMonthsOptions.length > 0) {
+      if (!prevMonthObj || !priorMonthsOptions.find(o => o._id === prevMonthObj._id)) {
+        setPrevMonthObj(priorMonthsOptions[0]);
+      } else {
+        setPrevMonthObj(priorMonthsOptions.find(o => o._id === prevMonthObj._id));
+      }
+    } else if (priorMonthsOptions.length === 0) {
+      setPrevMonthObj(null);
+    }
+  }, [priorMonthsOptions]);
+
+  // Simple helper to convert "2026-06" to "June 2026"
+  const formatMonthUi = (rawStr) => {
+    if (!rawStr) return "Previous Month";
+    const parts = rawStr.split("-");
+    if (parts.length === 2 && parts[0].length === 4) {
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
+      if (!isNaN(d)) {
+        return d.toLocaleString("en-IN", { month: "long", year: "numeric" });
+      }
+    }
+    return rawStr;
+  };
+
+  const selectedPrevMonthData = useMemo(() => {
+    if (!prevMonthObj) return null;
+    const roomRent = Number(prevMonthObj.rentAmount || 0);
+    const electricity = Number(prevMonthObj.electricityBill || 0);
+
+    // The backend continuously accrues penalty, but for past months, we cap the display at 30 days manually.
+    // 30 days = 5 days Phase 2 (₹100/day = 500) + 19 days Phase 3 (₹400/day = 7600) = ₹8,100 maximum penalty
+    const rawPenalty = Number(prevMonthObj.totalPenalty || prevMonthObj.penalty || 0);
+    const penalty = Math.min(rawPenalty, 8100);
+
+    const totalDue = roomRent + electricity + penalty;
+    const s = String(prevMonthObj.paymentStatus || "pending").toLowerCase();
+
+    // Attempt to stringify month cleanly
+    let monthStr = prevMonthObj.collectionMonth || prevMonthObj.billingMonth;
+    if (!monthStr || monthStr.trim() === "-") {
+      monthStr = formatDate(prevMonthObj.paymentDate || prevMonthObj.updatedAt || prevMonthObj.createdAt).split(" ").slice(1).join(" ");
+    }
+    monthStr = formatMonthUi(monthStr);
+
+    return {
+      monthStr: monthStr || "Previous Month",
+      status: s === "overdue" ? "Overdue" : "Pending",
+      due: totalDue,
+      roomRent,
+      electricity,
+      penalty,
+      item: prevMonthObj
+    };
+  }, [prevMonthObj]);
+
   const loginId = String(tenantUser?.loginId || "").toUpperCase();
   const propertyName = tenant?.propertyTitle || tenant?.property?.title || tenant?.property?.name || "Roomhy Property";
   const roomInfo = tenant ? `Room ${tenant.roomNo || "-"}${tenant.bedNo ? ` (${tenant.bedNo})` : ""}` : "Room -";
@@ -404,7 +592,7 @@ export default function Tenantdashboard() {
   const rentAmount = totalPayable;
   const paymentStatus = String(rent?.paymentStatus || "pending").toLowerCase();
   const isPaid = paymentStatus === "paid" || paymentStatus === "completed";
-  const canRequestCash = !isPaid && !["PENDING_APPROVAL", "OWNER_APPROVED", "OTP_SENT", "VERIFIED"].includes(normalizedCashStatus);
+  const canRequestCash = !isPaid && !["PENDING_APPROVAL", "OWNER_APPROVED", "OTP_SENT", "VERIFIED"].includes(targetNormalizedCashStatus);
   const statusLabel = isPaid ? "Paid" : paymentStatus === "overdue" ? "Overdue" : "Unpaid";
 
   const docs = useMemo(() => {
@@ -866,17 +1054,21 @@ export default function Tenantdashboard() {
 
   // ─── Payment handlers ─────────────────────────────────────────────────────────
   const handleOnlinePayment = async () => {
-    if (!tenantUser || rentAmount <= 0) { setActionMsg("Invalid rent amount."); return; }
+    const isCurrent = paymentTarget === "current";
+    const targetRentObj = isCurrent ? rent : prevMonthObj;
+    const paymentAmount = isCurrent ? rentAmount : (Number(selectedPrevMonthData?.due) || 0);
+
+    if (!tenantUser || paymentAmount <= 0) { setActionMsg("Invalid payment amount."); return; }
     setActionBusy(true);
     setActionMsg("");
     try {
       const orderData = await fetchJson("/api/rents/create-order", {
         method: "POST",
         body: JSON.stringify({
-          amount: rentAmount,
+          amount: paymentAmount,
           tenantId: loginId,
-          rentId: rent?._id,
-          description: "Monthly Rent Payment",
+          ...(isCurrent ? { currentRentId: rent?._id } : { currentRentId: null, previousRentIds: [prevMonthObj?._id] }),
+          description: isCurrent ? "Monthly Rent Payment" : `Pending Due: ${prevMonthObj?.billingMonth}`,
         }),
       });
       if (!orderData?.success)
@@ -885,7 +1077,7 @@ export default function Tenantdashboard() {
       await ensureRazorpayLoaded();
       const razorpay = new window.Razorpay({
         key: orderData.key,
-        amount: rentAmount * 100,
+        amount: orderData.order.amount,
         currency: "INR",
         name: "Roomhy",
         description: "Monthly Rent Payment",
@@ -902,8 +1094,7 @@ export default function Tenantdashboard() {
               method: "POST",
               body: JSON.stringify({
                 tenantId: loginId,
-                rentId: rent?._id,
-                paidAmount: rentAmount,
+                ...(isCurrent ? { currentRentId: rent?._id } : { currentRentId: null, previousRentIds: [prevMonthObj?._id] }),
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
@@ -912,11 +1103,8 @@ export default function Tenantdashboard() {
             await syncPaymentState();
             setPayOpen(false);
 
-            // Get fresh rent item (with payment id) for the receipt
-            const freshRents = await fetchJson(`/api/rents/tenant/${encodeURIComponent(loginId)}?limit=1`).catch(() => null);
-            const freshRentItem = freshRents?.rents?.[0] || {
+            const freshRentItem = verifyResult?.transaction || {
               ...rent,
-              paidAmount: rentAmount,
               paymentMethod: "razorpay",
               razorpay_payment_id: response.razorpay_payment_id,
               paymentStatus: "paid",
@@ -1101,9 +1289,13 @@ export default function Tenantdashboard() {
   }, [activeTab, tenant]);
 
   const handleCashRequest = async () => {
+    const isCurrent = paymentTarget === "current";
+    const targetRentObj = isCurrent ? rent : prevMonthObj;
+    const paymentAmount = isCurrent ? rentAmount : (Number(selectedPrevMonthData?.due) || 0);
+
     if (!tenant) { setActionMsg("Tenant data not found."); return; }
-    if (isPaid) { setActionMsg("This rent is already marked as paid."); return; }
-    if (["PENDING_APPROVAL", "OWNER_APPROVED", "OTP_SENT", "VERIFIED"].includes(normalizedCashStatus)) {
+    if (isPaid && isCurrent) { setActionMsg("This rent is already marked as paid."); return; }
+    if (["PENDING_APPROVAL", "OWNER_APPROVED", "OTP_SENT", "VERIFIED"].includes(targetNormalizedCashStatus) && isCurrent) {
       setCashPanelOpen(true);
       setActionMsg("A cash payment request already exists for this rent.");
       return;
@@ -1117,7 +1309,8 @@ export default function Tenantdashboard() {
         body: JSON.stringify({
           tenantLoginId: loginId,
           ownerLoginId: tenant.ownerLoginId,
-          amount: rentAmount,
+          amount: paymentAmount,
+          rentId: targetRentObj?._id, // Connect to specific rent
           propertyName,
           roomNumber: tenant.roomNo || "",
           tenantName: tenantUser?.name || tenant.name || "",
@@ -1140,7 +1333,7 @@ export default function Tenantdashboard() {
     setActionBusy(true);
     setActionMsg("Verifying OTP...");
     try {
-      await verifyCashOtpRequest(loginId, cashOtp.trim());
+      await verifyCashOtpRequest(loginId, cashOtp.trim(), targetRentContext?._id);
       await syncPaymentState();
       setPayOpen(false);
       setCashOtp("");
@@ -1605,7 +1798,7 @@ export default function Tenantdashboard() {
                 <DashboardHeader
                   firstName={firstName}
                   dateLabel={todayLabel}
-                  onPayRent={() => setPayOpen(true)}
+                  onPayRent={() => { setPaymentTarget("current"); setPayOpen(true); }}
                 />
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1617,43 +1810,157 @@ export default function Tenantdashboard() {
                       statusLabel={statusLabel}
                       dueText="Due on 5th of this month"
                       cal={calInfo}
-                      onPayNow={() => setPayOpen(true)}
+                      onPayNow={() => { setPaymentTarget("current"); setPayOpen(true); }}
                       onDownloadReceipt={downloadLatestReceipt}
                       hasReceipt={!!latestPaid}
                     />
 
-                    <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_2px_16px_-8px_rgba(15,23,42,0.08)]">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-base font-bold text-slate-900">Payment Breakdown</h3>
-                          <p className="text-sm text-slate-500 mt-1">Latest invoice values from the backend.</p>
-                        </div>
-                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                          {rent?.billingMonth || "Current month"}
-                        </div>
-                      </div>
-                      <div className="mt-5 space-y-3">
-                        {paymentBreakdown.items.map((item) => (
-                          <div key={item.label} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                      {/* Current Month Card */}
+                      <div className="flex flex-col h-full rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_2px_16px_-8px_rgba(15,23,42,0.08)]">
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
                             <div>
-                              <p className="text-sm font-medium text-slate-600">{item.label}</p>
-                              <p className="text-[11px] text-slate-400 mt-0.5">
-                                {item.label === "Room Rent" ? "Base rent from invoice" : "Owner-added penalties"}
-                              </p>
+                              <h3 className="text-base font-bold text-slate-900">Payment Breakdown</h3>
+                              <p className="text-sm text-slate-500 mt-1">Latest invoice values from the backend.</p>
                             </div>
-                            <div className={`text-base font-bold tabular-nums ${item.tone}`}>
-                              {formatCurrency(item.value)}
+                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                              {rent?.billingMonth || "Current month"}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                      <div className="mt-4 border-t border-slate-100 pt-4 flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-700">Total Payable</p>
-                          <p className="text-xs text-slate-400">Total Rent {electricityCost > 0 ? "+ Electricity " : ""}+ Penalty</p>
+                          <div className="mt-5 space-y-3">
+                            {paymentBreakdown.items.map((item) => (
+                              <div key={item.label} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
+                                <div>
+                                  <p className="text-sm font-medium text-slate-600">{item.label}</p>
+                                  <p className="text-[11px] text-slate-400 mt-0.5">
+                                    {item.label === "Room Rent" ? "Base rent from invoice" : "Owner-added penalties"}
+                                  </p>
+                                </div>
+                                <div className={`text-base font-bold tabular-nums ${item.tone}`}>
+                                  {formatCurrency(item.value)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-4 border-t border-slate-100 pt-4 flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-semibold text-slate-700">Total Payable</p>
+                              <p className="text-xs text-slate-400">Total Rent {electricityCost > 0 ? "+ Electricity " : ""}+ Penalty</p>
+                            </div>
+                            <div className="text-2xl font-black text-blue-600 tabular-nums">
+                              {formatCurrency(paymentBreakdown.total)}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-2xl font-black text-blue-600 tabular-nums">
-                          {formatCurrency(paymentBreakdown.total)}
+                      </div>
+
+                      {/* Previous Month(s) Pending Card */}
+                      <div className="flex flex-col h-full rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_2px_16px_-8px_rgba(15,23,42,0.08)]">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            </div>
+                            <div>
+                              <h3 className="text-base font-bold text-slate-900">Previous Month(s) Pending</h3>
+                              <p className="text-sm text-slate-500">Check and pay any pending month.</p>
+                            </div>
+                          </div>
+                          <div className={`mt-5 relative z-10 ${priorMonthsOptions.length === 0 ? 'opacity-50 pointer-events-none' : ''}`} ref={prevMonthRef}>
+                            <button onClick={() => setPrevMonthDropdownOpen(!prevMonthDropdownOpen)} className="w-full flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 active:bg-slate-100 transition-colors">
+                              <div className="flex items-center gap-2">
+                                <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                <span>{selectedPrevMonthData ? selectedPrevMonthData.monthStr : "No Unpaid Months"}</span>
+                              </div>
+                              <svg className={`h-4 w-4 text-slate-400 transition-transform ${prevMonthDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </button>
+                            {prevMonthDropdownOpen && (
+                              <div className="absolute top-full left-0 right-0 mt-2 rounded-xl border border-slate-200 bg-white p-2 shadow-lg z-20">
+                                {priorMonthsOptions.map((opt) => {
+                                  let optStr = opt.collectionMonth || opt.billingMonth || formatDate(opt.paymentDate || opt.updatedAt || opt.createdAt).split(" ").slice(1).join(" ");
+                                  optStr = formatMonthUi(optStr);
+                                  return (
+                                    <button key={opt._id} onClick={() => { setPrevMonthObj(opt); setPrevMonthDropdownOpen(false); }} className={`w-full text-left px-3 py-2.5 text-[13px] rounded-lg transition-colors ${(prevMonthObj && prevMonthObj._id === opt._id) ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'}`}>
+                                      {optStr}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
+                          <div className="mt-4">
+                            {/* Summary Card */}
+                            <div className="w-full rounded-2xl bg-white border border-slate-100 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.06)] p-5 flex flex-col justify-center min-h-[220px]">
+                              {selectedPrevMonthData ? (
+                                <>
+                                  <div className="text-center mb-5 mt-2">
+                                    <h4 className="text-[13px] font-bold text-slate-800 mb-2 uppercase tracking-wider">{selectedPrevMonthData.monthStr}</h4>
+                                    <div className="inline-block px-3 py-1 bg-red-50 text-red-600 rounded-full text-[11px] font-bold mb-4 border border-red-100 shadow-sm uppercase tracking-wide">{selectedPrevMonthData.status}</div>
+                                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Due</p>
+                                    <p className="text-2xl font-black text-slate-900 tabular-nums">₹{selectedPrevMonthData.due.toLocaleString("en-IN")}</p>
+                                  </div>
+                                  <div className="space-y-3 mt-auto">
+                                    <button onClick={() => { setPaymentTarget("previous"); setPayOpen(true); }} className="w-full bg-indigo-600 hover:bg-indigo-700 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-bold py-3 rounded-xl shadow-[0_4px_12px_-2px_rgba(79,70,229,0.25)] transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 flex items-center justify-center gap-2 text-sm active:scale-[0.98]">
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2v-4a2 2 0 00-2-2h4z" /></svg>
+                                      Pay Now
+                                    </button>
+                                    <button onClick={() => setPrevMonthDetailModal(true)} className="w-full bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-800 font-bold py-2.5 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-slate-200 focus:ring-offset-2 text-[13px] active:scale-[0.98] shadow-sm">
+                                      View Details
+                                    </button>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="text-center h-full flex flex-col justify-center items-center py-6">
+                                  <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mb-5 text-green-500 shadow-sm border border-green-100">
+                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
+                                  </div>
+                                  <h4 className="text-base font-bold text-slate-800 mb-2">No Pending Payments</h4>
+                                  <p className="text-[13px] text-slate-500 leading-relaxed px-4 text-center">You have already cleared all dues for prior months.</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Prior Month(s) Paid Receipts Section */}
+                        {priorPaidReceipts.length > 0 && (
+                          <div className="mt-5 pt-4 border-t border-slate-100">
+                            <div className="flex items-center gap-2 mb-3">
+                              <svg className="size-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Prior Months' Paid Receipts</h4>
+                            </div>
+                            <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                              {priorPaidReceipts.map((item) => {
+                                const monthUi = formatMonthUi(item.collectionMonth || item.billingMonth);
+                                const paidAmt = item.paidAmount || item.totalDue || item.rentAmount || 0;
+                                return (
+                                  <div key={item._id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                                    <div>
+                                      <p className="text-[13px] font-semibold text-slate-800">{monthUi} Rent</p>
+                                      <p className="text-[11px] text-emerald-600 font-bold">₹{paidAmt.toLocaleString("en-IN")} • Paid</p>
+                                    </div>
+                                    <button
+                                      onClick={() => downloadReceiptPdf(item)}
+                                      title={`Download ${monthUi} receipt`}
+                                      className="h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-indigo-600 hover:border-indigo-200 inline-flex items-center justify-center transition-colors shadow-sm"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="mt-5 flex items-start gap-3 rounded-2xl bg-indigo-50/50 p-4 border border-indigo-100/50">
+                          <div className="flex h-7 w-7 mt-0.5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+                            <span className="text-lg leading-none font-medium pb-0.5">ℹ</span>
+                          </div>
+                          <p className="text-xs font-medium text-indigo-800 leading-snug">
+                            <span className="opacity-80">💡 You can pay previous pending months individually without affecting your current month's payment.</span>
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -2333,11 +2640,11 @@ export default function Tenantdashboard() {
       {/* Pay Modal */}
       {payOpen ? (
         <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm"
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm p-4 sm:p-6"
           onClick={() => setPayOpen(false)}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 mx-4"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 max-h-full overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6">
@@ -2346,246 +2653,346 @@ export default function Tenantdashboard() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="text-center mb-8">
-              <p className="text-sm text-slate-500 uppercase tracking-wide font-semibold">Total Payable</p>
-              <p className="text-4xl font-bold text-blue-600 mt-2">{formatCurrency(totalPayable)}</p>
-              <div className="mt-4 grid grid-cols-1 gap-3 text-left">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-600">Room Rent</span>
-                  <span className="text-sm font-bold text-slate-900 tabular-nums">{formatCurrency(roomRent)}</span>
-                </div>
-                {electricityCost > 0 && (
-                  <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 flex items-center justify-between">
-                    <span className="text-sm font-medium text-blue-800">Electricity Bill</span>
-                    <span className="text-sm font-bold text-blue-800 tabular-nums">{formatCurrency(electricityCost)}</span>
-                  </div>
-                )}
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center justify-between">
-                  <span className="text-sm font-medium text-amber-800">Total Penalty</span>
-                  <span className="text-sm font-bold text-amber-800 tabular-nums">{formatCurrency(totalPenalty)}</span>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <button
-                onClick={handleOnlinePayment}
-                disabled={actionBusy || isPaid}
-                className="w-full p-4 border border-slate-200 rounded-xl flex items-center hover:border-blue-600 hover:bg-blue-50 transition group disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <CreditCard className="w-5 h-5 mr-4 text-blue-600" />
-                <div className="text-left">
-                  <span className="font-semibold text-slate-700">Pay Online</span>
-                  <p className="text-xs text-slate-500">Cards • UPI • Wallets • Netbanking</p>
-                </div>
-              </button>
-              <button
-                onClick={() => setCashPanelOpen(true)}
-                disabled={actionBusy || isPaid || (!canRequestCash && !cashPanelOpen)}
-                className="w-full p-4 border border-slate-200 rounded-xl flex items-center hover:border-amber-500 hover:bg-amber-50 transition group disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <HandCoins className="w-5 h-5 mr-4 text-amber-600" />
-                <div className="text-left">
-                  <span className="font-semibold text-slate-700">Pay by Cash</span>
-                  <p className="text-xs text-slate-500">Request owner collection and verify OTP</p>
-                </div>
-              </button>
 
-              {(cashPanelOpen || !["NONE", "", "PENDING"].includes(normalizedCashStatus)) && (
-                <div className="p-3 bg-green-50 rounded-lg border border-green-200 text-sm">
-                  <p className="font-semibold text-green-800">Cash workflow</p>
+            {(() => {
+              const isCurrent = paymentTarget === "current";
+              const targetRentObj = isCurrent ? rent : prevMonthObj;
+              const displayTotal = isCurrent ? totalPayable : (Number(selectedPrevMonthData?.due) || 0);
+              const displayRoomRent = isCurrent ? roomRent : Number(selectedPrevMonthData?.roomRent || 0);
+              const displayElectricity = isCurrent ? electricityCost : Number(selectedPrevMonthData?.electricity || 0);
+              const displayPenalty = isCurrent ? totalPenalty : Number(selectedPrevMonthData?.penalty || 0);
+              const targetIsPaid = isCurrent ? isPaid : (displayTotal <= 0 && !!targetRentObj);
 
-                  {canRequestCash && normalizedCashStatus !== "PENDING_APPROVAL" ? (
-                    <div className="mt-2 text-green-700">
-                      <p className="text-xs mb-2">You are about to request a cash collection. An OTP will be sent to the owner upon approval.</p>
-                      <button
-                        onClick={handleCashRequest}
-                        disabled={actionBusy}
-                        className="w-full bg-green-600 text-white font-semibold py-2 rounded-lg hover:bg-green-700 text-sm disabled:opacity-60"
-                      >
-                        {actionBusy ? "Submitting Request..." : "Submit Cash Request"}
-                      </button>
+              return (
+                <>
+                  <div className="text-center mb-8">
+                    <p className="text-sm text-slate-500 uppercase tracking-wide font-semibold">
+                      {isCurrent ? "Total Payable (Current)" : `Total Payable (${targetRentObj?.billingMonth || 'Previous'})`}
+                    </p>
+                    <p className="text-4xl font-bold text-blue-600 mt-2">{formatCurrency(displayTotal)}</p>
+                    <div className="mt-4 grid grid-cols-1 gap-3 text-left">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-600">Room Rent</span>
+                        <span className="text-sm font-bold text-slate-900 tabular-nums">{formatCurrency(displayRoomRent)}</span>
+                      </div>
+                      {displayElectricity > 0 && (
+                        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 flex items-center justify-between">
+                          <span className="text-sm font-medium text-blue-800">Electricity Bill</span>
+                          <span className="text-sm font-bold text-blue-800 tabular-nums">{formatCurrency(displayElectricity)}</span>
+                        </div>
+                      )}
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center justify-between">
+                        <span className="text-sm font-medium text-amber-800">Total Penalty</span>
+                        <span className="text-sm font-bold text-amber-800 tabular-nums">{formatCurrency(displayPenalty)}</span>
+                      </div>
                     </div>
-                  ) : (
-                    <>
-                      <p className="text-xs text-green-700 mt-2">
-                        Status: <span className="font-semibold">{cashStatusLabel(cashRequestStatus || "PENDING_APPROVAL")}</span>
+                  </div>
+                  <div className="space-y-3">
+                    <button
+                      onClick={handleOnlinePayment}
+                      disabled={actionBusy || targetIsPaid}
+                      className="w-full p-4 border border-slate-200 rounded-xl flex items-center hover:border-blue-600 hover:bg-blue-50 transition group disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <CreditCard className="w-5 h-5 mr-4 text-blue-600" />
+                      <div className="text-left">
+                        <span className="font-semibold text-slate-700">Pay Online</span>
+                        <p className="text-xs text-slate-500">Cards • UPI • Wallets • Netbanking</p>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => { setCashPanelOpen(true); setActionMsg(""); }}
+                      disabled={actionBusy || targetIsPaid || (!canRequestCash && !cashPanelOpen && isCurrent)}
+                      className="w-full p-4 border border-slate-200 rounded-xl flex items-center hover:border-amber-500 hover:bg-amber-50 transition group disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <HandCoins className="w-5 h-5 mr-4 text-amber-600" />
+                      <div className="text-left">
+                        <span className="font-semibold text-slate-700">Pay by Cash</span>
+                        <p className="text-xs text-slate-500">Request owner collection and verify OTP</p>
+                      </div>
+                    </button>
+
+                    {(cashPanelOpen || !["NONE", "", "PENDING"].includes(targetNormalizedCashStatus)) && (
+                      <div className="p-3 bg-green-50 rounded-lg border border-green-200 text-sm">
+                        <p className="font-semibold text-green-800">Cash workflow</p>
+
+                        {((!targetIsPaid && !["PENDING_APPROVAL", "OWNER_APPROVED", "OTP_SENT", "VERIFIED"].includes(targetNormalizedCashStatus)) && targetNormalizedCashStatus !== "PENDING_APPROVAL") ? (
+                          <div className="mt-2 text-green-700">
+                            <p className="text-xs mb-2">You are about to request a cash collection. An OTP will be sent to the owner upon approval.</p>
+                            <button
+                              onClick={handleCashRequest}
+                              disabled={actionBusy}
+                              className="w-full bg-green-600 text-white font-semibold py-2 rounded-lg hover:bg-green-700 text-sm disabled:opacity-60"
+                            >
+                              {actionBusy ? "Submitting Request..." : "Submit Cash Request"}
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-xs text-green-700 mt-2">
+                              Status: <span className="font-semibold">{cashStatusLabel(targetCashRequestStatus)}</span>
+                            </p>
+                            {targetNormalizedCashStatus === "PENDING_APPROVAL" && (
+                              <p className="text-xs text-green-700 mt-1">Cash payment request sent. Waiting for owner approval.</p>
+                            )}
+                            {["OWNER_APPROVED", "OTP_SENT"].includes(targetNormalizedCashStatus) && (
+                              <p className="text-xs text-green-700 mt-1">Owner approved your cash payment. Enter the OTP to complete verification.</p>
+                            )}
+                            {targetNormalizedCashStatus === "PAID" && (
+                              <p className="text-xs text-green-700 mt-1">Rent payment completed successfully.</p>
+                            )}
+                            {targetNormalizedCashStatus === "REJECTED" && (
+                              <p className="text-xs text-rose-700 mt-1">The owner rejected this request. Please create a new cash request if needed.</p>
+                            )}
+                            {targetNormalizedCashStatus === "EXPIRED" && (
+                              <p className="text-xs text-amber-700 mt-1">The OTP expired. Ask the owner to approve again.</p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                    <div className={`${showCashOtp ? "" : "hidden"} p-3 bg-amber-50 rounded-lg border border-amber-200 space-y-3`}>
+                      <p className="text-xs text-amber-800">
+                        Owner approved the request. Enter the OTP shared by the owner to complete verification.
                       </p>
-                      {normalizedCashStatus === "PENDING_APPROVAL" && (
-                        <p className="text-xs text-green-700 mt-1">Cash payment request sent. Waiting for owner approval.</p>
-                      )}
-                      {["OWNER_APPROVED", "OTP_SENT"].includes(normalizedCashStatus) && (
-                        <p className="text-xs text-green-700 mt-1">Owner approved your cash payment. Enter the OTP to complete verification.</p>
-                      )}
-                      {normalizedCashStatus === "PAID" && (
-                        <p className="text-xs text-green-700 mt-1">Rent payment completed successfully.</p>
-                      )}
-                      {normalizedCashStatus === "REJECTED" && (
-                        <p className="text-xs text-rose-700 mt-1">The owner rejected this request. Please create a new cash request if needed.</p>
-                      )}
-                      {normalizedCashStatus === "EXPIRED" && (
-                        <p className="text-xs text-amber-700 mt-1">The OTP expired. Ask the owner to approve again.</p>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-              <div className={`${showCashOtp ? "" : "hidden"} p-3 bg-amber-50 rounded-lg border border-amber-200 space-y-3`}>
-                <p className="text-xs text-amber-800">
-                  Owner approved the request. Enter the OTP shared by the owner to complete verification.
-                </p>
-                <input
-                  value={cashOtp}
-                  onChange={(e) => setCashOtp(e.target.value)}
-                  type="text"
-                  maxLength={6}
-                  placeholder="Enter 6-digit OTP"
-                  className="w-full p-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"
-                />
-                <button
-                  onClick={handleCashOtpVerify}
-                  disabled={actionBusy || !cashOtp.trim()}
-                  className="w-full bg-amber-600 text-white font-semibold py-2 rounded-lg hover:bg-amber-700 text-sm disabled:opacity-60"
-                >
-                  Verify OTP and Mark Paid
-                </button>
-                <p className="text-xs text-amber-900 whitespace-pre-line">{actionMsg}</p>
-              </div>
-              {!cashPanelOpen && actionMsg ? <p className="text-xs text-slate-600 whitespace-pre-line">{actionMsg}</p> : null}
-            </div>
+                      <input
+                        value={cashOtp}
+                        onChange={(e) => setCashOtp(e.target.value)}
+                        type="text"
+                        maxLength={6}
+                        placeholder="Enter 6-digit OTP"
+                        className="w-full p-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                      />
+                      <button
+                        onClick={handleCashOtpVerify}
+                        disabled={actionBusy || !cashOtp.trim()}
+                        className="w-full bg-amber-600 text-white font-semibold py-2 rounded-lg hover:bg-amber-700 text-sm disabled:opacity-60"
+                      >
+                        Verify OTP and Mark Paid
+                      </button>
+                      <p className="text-xs text-amber-900 whitespace-pre-line">{actionMsg}</p>
+                    </div>
+                    {!cashPanelOpen && actionMsg ? <p className="text-xs text-slate-600 whitespace-pre-line">{actionMsg}</p> : null}
+                  </div >
+                </>
+              );
+            })()}
           </div>
         </div>
-      ) : null}
+      ) : null
+      }
 
       {/* Gate Management Modals */}
-      {visitorModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setVisitorModalOpen(false)}>
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setVisitorModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
-            <h3 className="text-xl font-bold text-slate-900 mb-4">Generate Visitor Pass</h3>
-            <form onSubmit={handleCreateVisitorPass} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Guest Name *</label>
-                <input type="text" value={visitorGuestName} onChange={e => setVisitorGuestName(e.target.value)} required className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g. John Doe" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Guest Phone *</label>
-                <input type="text" value={visitorGuestPhone} onChange={e => setVisitorGuestPhone(e.target.value)} required className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g. 9876543210" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Expected Visit Date *</label>
-                <input type="date" value={visitorDate} onChange={e => setVisitorDate(e.target.value)} required min={new Date().toISOString().split("T")[0]} className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
-              </div>
-              <button type="submit" disabled={actionBusy} className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-xl transition flex justify-center items-center gap-2">
-                {actionBusy ? "Generating..." : "Generate Pass"}
-              </button>
-            </form>
+      {
+        visitorModalOpen && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setVisitorModalOpen(false)}>
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setVisitorModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+              <h3 className="text-xl font-bold text-slate-900 mb-4">Generate Visitor Pass</h3>
+              <form onSubmit={handleCreateVisitorPass} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Guest Name *</label>
+                  <input type="text" value={visitorGuestName} onChange={e => setVisitorGuestName(e.target.value)} required className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g. John Doe" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Guest Phone *</label>
+                  <input type="text" value={visitorGuestPhone} onChange={e => setVisitorGuestPhone(e.target.value)} required className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g. 9876543210" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Expected Visit Date *</label>
+                  <input type="date" value={visitorDate} onChange={e => setVisitorDate(e.target.value)} required min={new Date().toISOString().split("T")[0]} className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                </div>
+                <button type="submit" disabled={actionBusy} className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-xl transition flex justify-center items-center gap-2">
+                  {actionBusy ? "Generating..." : "Generate Pass"}
+                </button>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
-      {leaveModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setLeaveModalOpen(false)}>
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setLeaveModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
-            <h3 className="text-xl font-bold text-slate-900 mb-4">Submit Leave Request</h3>
-            <form onSubmit={handleCreateLeaveRequest} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Departure *</label>
-                  <input type="date" value={leaveDepartureDate} onChange={e => setLeaveDepartureDate(e.target.value)} required min={new Date().toISOString().split("T")[0]} className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      {
+        leaveModalOpen && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setLeaveModalOpen(false)}>
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setLeaveModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+              <h3 className="text-xl font-bold text-slate-900 mb-4">Submit Leave Request</h3>
+              <form onSubmit={handleCreateLeaveRequest} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Departure *</label>
+                    <input type="date" value={leaveDepartureDate} onChange={e => setLeaveDepartureDate(e.target.value)} required min={new Date().toISOString().split("T")[0]} className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Return *</label>
+                    <input type="date" value={leaveReturnDate} onChange={e => setLeaveReturnDate(e.target.value)} required min={leaveDepartureDate || new Date().toISOString().split("T")[0]} className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Return *</label>
-                  <input type="date" value={leaveReturnDate} onChange={e => setLeaveReturnDate(e.target.value)} required min={leaveDepartureDate || new Date().toISOString().split("T")[0]} className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Reason for Leave *</label>
+                  <textarea value={gateLeaveReason} onChange={e => setGateLeaveReason(e.target.value)} required rows="3" placeholder="e.g. Going home for holidays" className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
                 </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Reason for Leave *</label>
-                <textarea value={gateLeaveReason} onChange={e => setGateLeaveReason(e.target.value)} required rows="3" placeholder="e.g. Going home for holidays" className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
-              </div>
-              <button type="submit" disabled={actionBusy} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition flex justify-center items-center gap-2">
-                {actionBusy ? "Submitting..." : "Submit Request"}
-              </button>
-            </form>
+                <button type="submit" disabled={actionBusy} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition flex justify-center items-center gap-2">
+                  {actionBusy ? "Submitting..." : "Submit Request"}
+                </button>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Generic Modal */}
-      {genericModal ? (
-        <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm"
-          onClick={() => setGenericModal(null)}
-        >
+      {
+        genericModal ? (
           <div
-            className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 mx-4"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm"
+            onClick={() => setGenericModal(null)}
           >
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-slate-900">{genericModal.title}</h3>
-              <button onClick={() => setGenericModal(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
+            <div
+              className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-slate-900">{genericModal.title}</h3>
+                <button onClick={() => setGenericModal(null)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div>{genericModal.body}</div>
+              <div className="mt-4 pt-4 border-t border-slate-100 text-right">
+                {genericModal.footer || (
+                  <button onClick={() => setGenericModal(null)} className="text-slate-500 text-sm hover:underline">
+                    Close
+                  </button>
+                )}
+              </div>
             </div>
-            <div>{genericModal.body}</div>
-            <div className="mt-4 pt-4 border-t border-slate-100 text-right">
-              {genericModal.footer || (
-                <button onClick={() => setGenericModal(null)} className="text-slate-500 text-sm hover:underline">
+          </div>
+        ) : null
+      }
+
+      {
+        documentViewer ? (
+          <div
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm"
+            onClick={closeDocumentViewer}
+          >
+            <div
+              className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">{documentViewer.title}</h3>
+                  <p className="text-xs text-slate-500 uppercase tracking-wider mt-1">
+                    {documentViewer.type === "receipt" ? "Bill Preview" : "Agreement Preview"}
+                  </p>
+                </div>
+                <button onClick={closeDocumentViewer} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[calc(85vh-140px)]">
+                {documentViewer.body}
+              </div>
+              <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+                {documentViewer.type === "receipt" ? (
+                  <button
+                    onClick={() => {
+                      const item = docs.find((d) => d.key === "receipt")?.rentItem;
+                      if (item) downloadReceiptPdf(item);
+                    }}
+                    disabled={pdfBusy}
+                    className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg transition disabled:opacity-60"
+                  >
+                    <Download className="w-4 h-4" />
+                    {pdfBusy ? "Generating..." : "Download PDF"}
+                  </button>
+                ) : null}
+                <button
+                  onClick={closeDocumentViewer}
+                  className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2 rounded-lg transition"
+                >
                   Close
                 </button>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {documentViewer ? (
-        <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm"
-          onClick={closeDocumentViewer}
-        >
-          <div
-            className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900">{documentViewer.title}</h3>
-                <p className="text-xs text-slate-500 uppercase tracking-wider mt-1">
-                  {documentViewer.type === "receipt" ? "Bill Preview" : "Agreement Preview"}
-                </p>
               </div>
-              <button onClick={closeDocumentViewer} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 overflow-y-auto max-h-[calc(85vh-140px)]">
-              {documentViewer.body}
-            </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
-              {documentViewer.type === "receipt" ? (
-                <button
-                  onClick={() => {
-                    const item = docs.find((d) => d.key === "receipt")?.rentItem;
-                    if (item) downloadReceiptPdf(item);
-                  }}
-                  disabled={pdfBusy}
-                  className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg transition disabled:opacity-60"
-                >
-                  <Download className="w-4 h-4" />
-                  {pdfBusy ? "Generating..." : "Download PDF"}
-                </button>
-              ) : null}
-              <button
-                onClick={closeDocumentViewer}
-                className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2 rounded-lg transition"
-              >
-                Close
-              </button>
             </div>
           </div>
-        </div>
-      ) : null}
-    </div>
+        ) : null
+      }
+      {/* Previous Month View Details Modal */}
+      {
+        prevMonthDetailModal && selectedPrevMonthData && (
+          <div
+            className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center backdrop-blur-sm"
+            onClick={() => setPrevMonthDetailModal(false)}
+          >
+            <div
+              className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-slate-800">Pending Details</h3>
+                <button onClick={() => setPrevMonthDetailModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="text-center mb-6">
+                <p className="text-xs text-slate-500 uppercase tracking-wide font-bold mb-1">Calculation for</p>
+                <h4 className="text-lg font-black text-slate-900 uppercase tracking-wide">{selectedPrevMonthData.monthStr}</h4>
+              </div>
+
+              <div className="bg-slate-50 rounded-2xl border border-slate-100 p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">Room Rent</p>
+                    <p className="text-[11px] text-slate-400">Base rent charge</p>
+                  </div>
+                  <span className="text-sm font-bold text-slate-900 tabular-nums">{formatCurrency(selectedPrevMonthData.roomRent)}</span>
+                </div>
+
+                <div className="h-px w-full bg-slate-200"></div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">Total Penalty</p>
+                    <p className="text-[11px] text-slate-400">Accrued late fees</p>
+                  </div>
+                  <span className="text-sm font-bold text-amber-700 tabular-nums">{formatCurrency(selectedPrevMonthData.penalty)}</span>
+                </div>
+
+                <div className="h-px w-full bg-slate-200"></div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">Electricity Bill</p>
+                    <p className="text-[11px] text-slate-400">Monthly usage</p>
+                  </div>
+                  <span className="text-sm font-bold text-blue-700 tabular-nums">{formatCurrency(selectedPrevMonthData.electricity)}</span>
+                </div>
+              </div>
+
+              <div className="mt-6 border-t border-slate-200 pt-5 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold text-slate-800">Total Payable</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Please clear to maintain lease.</p>
+                </div>
+                <div className="bg-indigo-50 px-4 py-2 rounded-lg border border-indigo-100">
+                  <span className="text-xl font-black text-indigo-700 tabular-nums">{formatCurrency(selectedPrevMonthData.due)}</span>
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={() => setPrevMonthDetailModal(false)}
+                  className="w-full bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 font-bold py-2.5 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-slate-200 focus:ring-offset-2 text-[14px]"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </div >
   );
 }

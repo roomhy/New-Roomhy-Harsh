@@ -83,13 +83,13 @@ export default function ReviewModeration() {
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-2">Quality Control & Community Guidelines Enforcement Matrix</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex bg-white p-1 rounded-2xl border border-slate-100 shadow-sm">
-            {["Pending", "Active", "Inactive"].map(s => (
+          <div className="flex bg-white p-1 rounded-2xl border border-slate-100 shadow-sm flex-wrap">
+            {["Pending", "Pending Review", "Active", "Inactive"].map(s => (
               <button
                 key={s}
                 onClick={() => setFilter(s)}
                 className={cn(
-                  "px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
+                  "px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
                   filter === s ? "bg-slate-900 text-white shadow-lg" : "text-slate-400 hover:text-slate-600"
                 )}
               >
@@ -97,7 +97,7 @@ export default function ReviewModeration() {
               </button>
             ))}
           </div>
-          <button onClick={loadReviews} className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm text-slate-400 hover:text-blue-600 transition-all">
+          <button onClick={loadReviews} className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm text-slate-400 hover:text-blue-600 transition-all flex-shrink-0">
              <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
           </button>
         </div>
@@ -171,6 +171,16 @@ export default function ReviewModeration() {
                <div className="absolute -top-3 left-4 bg-white px-2 text-[8px] font-black text-slate-300 uppercase tracking-[0.2em]">Message Body</div>
             </div>
 
+            {r.status === "Pending Review" && (
+              <div className="p-4 bg-amber-50/50 border border-amber-200/60 rounded-2xl flex items-start gap-2.5 animate-in fade-in duration-300">
+                <AlertTriangle size={16} className="text-amber-650 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-black text-amber-800 uppercase tracking-wide">Auto-Flagged by Safety Filter</p>
+                  {r.moderationNotes && <p className="text-[10px] text-amber-700 mt-1 font-bold">{r.moderationNotes}</p>}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-50">
               <div className="flex items-center gap-2">
                  <Building2 size={12} className="text-slate-300" />
@@ -178,7 +188,7 @@ export default function ReviewModeration() {
               </div>
               
               <div className="flex items-center gap-3">
-                {filter === "Pending" ? (
+                {filter === "Pending" || filter === "Pending Review" ? (
                   <>
                     <button 
                       onClick={() => updateStatus(r._id, "Inactive")}
@@ -214,15 +224,15 @@ export default function ReviewModeration() {
         ))}
       </div>
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-8 py-4 rounded-3xl border border-slate-800 shadow-2xl flex items-center gap-6 backdrop-blur-md animate-in slide-in-from-bottom-4 duration-300">
-          <div className="flex items-center gap-3 border-r border-slate-850 pr-6">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-8 py-4 rounded-3xl border border-slate-880 shadow-2xl flex items-center gap-6 backdrop-blur-md animate-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-3 border-r border-slate-800 pr-6">
             <span className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[11px] font-black shadow-lg animate-pulse">
               {selectedIds.size}
             </span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Selected</span>
           </div>
           <div className="flex items-center gap-3">
-            {filter === "Pending" ? (
+            {filter === "Pending" || filter === "Pending Review" ? (
               <>
                 <button
                   disabled={isBulkProcessing}

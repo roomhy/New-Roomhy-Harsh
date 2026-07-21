@@ -1,476 +1,703 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { fetchJson } from "../../utils/api";
 import {
-  Ticket, Search, Download, Filter, Eye, UserCheck, MessageSquare,
-  AlertTriangle, CheckCircle, XCircle, Clock, ChevronRight,
-  Building2, CreditCard, Calendar, User, FileText, X, Plus,
-  ExternalLink, AlertCircle
+  Check, X, Eye, UserCheck, Search, Filter, RefreshCw,
+  Building2, Calendar, User, FileText, Image as ImageIcon,
+  MapPin, IndianRupee, Clock, ArrowRight, CheckCircle2,
+  XCircle, AlertCircle, ChevronLeft, ChevronRight, UserPlus, Info
 } from "lucide-react";
 import { PageHeader } from "../../components/superadmin/PageHeader";
+import { toast } from "react-hot-toast";
 
-const cn = (...c) => c.filter(Boolean).join(" ");
+const cn = (...classes) => classes.filter(Boolean).join(" ");
 
-// ─── CONFIG ──────────────────────────────────────────────────────────────────
-const PRIORITY_CFG = {
-  Low:      { cls: "bg-slate-100 text-slate-500",   dot: "bg-slate-400"  },
-  Medium:   { cls: "bg-amber-50 text-amber-600",    dot: "bg-amber-500"  },
-  High:     { cls: "bg-orange-50 text-orange-600",  dot: "bg-orange-500" },
-  Critical: { cls: "bg-red-50 text-red-600",        dot: "bg-red-500"    },
-};
-const STATUS_CFG = {
-  "Open":                  { cls: "bg-blue-50 text-blue-600"    },
-  "Assigned":              { cls: "bg-indigo-50 text-indigo-600"},
-  "In Progress":           { cls: "bg-amber-50 text-amber-600"  },
-  "Waiting For Response":  { cls: "bg-purple-50 text-purple-600"},
-  "Resolved":              { cls: "bg-emerald-50 text-emerald-600"},
-  "Closed":                { cls: "bg-slate-100 text-slate-500" },
-};
+const getApiUrl = () =>
+  import.meta.env?.VITE_API_URL ||
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+    ? "http://localhost:5001" : "https://roohmy-backend-xwa9.vercel.app");
 
-// ─── MOCK DATA ────────────────────────────────────────────────────────────────
-const MOCK_TICKETS = [
-  { _id:"1", ticket_id:"TK-001", ticket_type:"Tenant Complaint",   raised_by_name:"Rahul Sharma",  property_name:"Sunrise PG",       booking_id:"BK-2341", priority:"High",     status:"Open",               assigned_admin_name:"Amit Verma",   created_at:"2024-05-28", updated_at:"2024-05-28", sla_breached:false, subject:"AC not working since 2 days", description:"The air conditioning unit in my room has been non-functional for the past 2 days. Despite multiple requests to the owner, no action has been taken. This is causing severe discomfort.", owner_name:"Vinod Kumar", activity_log:[{action:"Ticket Created", at:"2024-05-28T10:30:00Z"}] },
-  { _id:"2", ticket_id:"TK-002", ticket_type:"Payment Issue",       raised_by_name:"Priya Singh",   property_name:"Green Residency",  booking_id:"BK-2298", priority:"Critical", status:"In Progress",        assigned_admin_name:"Neha Iyer",    created_at:"2024-05-27", updated_at:"2024-05-28", sla_breached:true,  subject:"Extra charges deducted", description:"₹5,000 extra was deducted from my account without any explanation. Need immediate refund.", owner_name:"Suresh Nair",  activity_log:[{action:"Ticket Created", at:"2024-05-27T09:00:00Z"},{action:"Assigned", at:"2024-05-27T10:00:00Z"}] },
-  { _id:"3", ticket_id:"TK-003", ticket_type:"Move-in Issue",       raised_by_name:"Amit Verma",    property_name:"Silver Heights",   booking_id:"BK-2187", priority:"High",     status:"Waiting For Response",assigned_admin_name:"Rohit Patil",  created_at:"2024-05-26", updated_at:"2024-05-27", sla_breached:false, subject:"Room not ready on move-in", description:"When I arrived on my move-in date, the room was not cleaned and the promised furniture was missing.", owner_name:"Deepak Joshi", activity_log:[] },
-  { _id:"4", ticket_id:"TK-004", ticket_type:"Owner Complaint",     raised_by_name:"Vinod Kumar",   property_name:"Sunrise PG",       booking_id:"BK-2100", priority:"Medium",   status:"Resolved",           assigned_admin_name:"Priya Nair",   created_at:"2024-05-25", updated_at:"2024-05-26", sla_breached:false, subject:"Tenant not paying rent", description:"Tenant has not paid rent for 2 months. Need admin assistance to resolve this.", owner_name:"Vinod Kumar",  resolution_notes:"Admin mediated. Tenant has agreed to pay by 5th June.", activity_log:[] },
-  { _id:"5", ticket_id:"TK-005", ticket_type:"Booking Dispute",     raised_by_name:"Sneha Reddy",   property_name:"City View PG",     booking_id:"BK-2044", priority:"High",     status:"Open",               assigned_admin_name:null,           created_at:"2024-05-24", updated_at:"2024-05-24", sla_breached:true,  subject:"Booking cancelled without refund", description:"My booking was cancelled by the owner and I haven't received my refund yet.", owner_name:"Mohan Das",    activity_log:[] },
-  { _id:"6", ticket_id:"TK-006", ticket_type:"Technical Issue",     raised_by_name:"Karan Jain",    property_name:null,               booking_id:null,      priority:"Low",      status:"Closed",             assigned_admin_name:"Amit Verma",   created_at:"2024-05-23", updated_at:"2024-05-24", sla_breached:false, subject:"Cannot login to app", description:"Getting error 500 when trying to login on iOS.", owner_name:null, resolution_notes:"Fixed by clearing cache. Issue was on user device.", activity_log:[] },
-];
-
-const ADMINS = ["Amit Verma", "Neha Iyer", "Rohit Patil", "Priya Nair", "Karan Mehta"];
-
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-function Badge({ label, cfg }) {
-  return <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold", cfg?.cls)}>{label}</span>;
-}
-
-function PriorityDot({ priority }) {
-  return (
-    <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold", PRIORITY_CFG[priority]?.cls)}>
-      <span className={cn("w-1.5 h-1.5 rounded-full", PRIORITY_CFG[priority]?.dot)}/>
-      {priority}
-    </span>
-  );
-}
-
-// ─── TICKET DETAIL PANEL ─────────────────────────────────────────────────────
-function TicketDetailPanel({ ticket, onClose, onUpdate }) {
-  const [note, setNote] = useState("");
-  const [notes, setNotes] = useState([]);
-  const [status, setStatus] = useState(ticket.status);
-  const [resNotes, setResNotes] = useState(ticket.resolution_notes || "");
-
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-start justify-end p-4" onClick={onClose}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl h-[95vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-100 shrink-0">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-mono font-bold text-blue-600">{ticket.ticket_id}</span>
-              {ticket.sla_breached && <span className="text-[9px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">SLA BREACHED</span>}
-            </div>
-            <h3 className="text-base font-black text-slate-900">{ticket.subject}</h3>
-          </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all"><X size={18}/></button>
-        </div>
-
-        {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="grid grid-cols-2 gap-0 divide-x divide-slate-50">
-            {/* LEFT: Info */}
-            <div className="p-6 space-y-6">
-              {/* Status change */}
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Update Status</p>
-                <div className="flex gap-2 flex-wrap">
-                  {Object.keys(STATUS_CFG).map(s => (
-                    <button key={s} onClick={() => setStatus(s)} className={cn("text-[9px] font-bold px-2.5 py-1.5 rounded-lg border transition-all", status === s ? STATUS_CFG[s].cls + " border-current" : "border-slate-100 text-slate-400 hover:bg-slate-50")}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Ticket Info */}
-              <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ticket Information</p>
-                {[
-                  ["Type", ticket.ticket_type],
-                  ["Priority", ticket.priority],
-                  ["Status", status],
-                  ["Created", ticket.created_at ? new Date(ticket.created_at).toLocaleDateString() : "—"],
-                  ["Last Updated", ticket.updated_at ? new Date(ticket.updated_at).toLocaleDateString() : "—"],
-                ].map(([l,v]) => (
-                  <div key={l} className="flex justify-between text-xs">
-                    <span className="text-slate-400 font-bold">{l}</span>
-                    <span className="text-slate-800 font-bold">{v}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Raised By */}
-              <div className="bg-slate-50 rounded-2xl p-4 space-y-2">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Raised By</p>
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center font-black text-xs shrink-0">
-                    {ticket.raised_by_name?.split(" ").map(n=>n[0]).join("")}
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">{ticket.raised_by_name}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Property / Booking Links */}
-              {(ticket.property_name || ticket.booking_id || ticket.owner_name) && (
-                <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Linked Records</p>
-                  {ticket.property_name && (
-                    <button className="flex items-center gap-2 text-xs text-blue-600 font-bold hover:underline w-full text-left">
-                      <Building2 size={12}/> {ticket.property_name} <ExternalLink size={10} className="ml-auto"/>
-                    </button>
-                  )}
-                  {ticket.booking_id && (
-                    <button className="flex items-center gap-2 text-xs text-blue-600 font-bold hover:underline w-full text-left">
-                      <Calendar size={12}/> Booking: {ticket.booking_id} <ExternalLink size={10} className="ml-auto"/>
-                    </button>
-                  )}
-                  {ticket.owner_name && (
-                    <button className="flex items-center gap-2 text-xs text-blue-600 font-bold hover:underline w-full text-left">
-                      <User size={12}/> Owner: {ticket.owner_name} <ExternalLink size={10} className="ml-auto"/>
-                    </button>
-                  )}
-                  <button className="flex items-center gap-2 text-xs text-blue-600 font-bold hover:underline w-full text-left">
-                    <MessageSquare size={12}/> View Chat History <ExternalLink size={10} className="ml-auto"/>
-                  </button>
-                  <button className="flex items-center gap-2 text-xs text-blue-600 font-bold hover:underline w-full text-left">
-                    <CreditCard size={12}/> View Payment Details <ExternalLink size={10} className="ml-auto"/>
-                  </button>
-                </div>
-              )}
-
-              {/* Resolution Input */}
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Resolution Notes</p>
-                <textarea
-                  value={resNotes}
-                  onChange={e => setResNotes(e.target.value)}
-                  placeholder="Enter ticket resolution notes here..."
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-3 text-xs outline-none focus:ring-2 focus:ring-blue-100 min-h-[80px]"
-                />
-              </div>
-            </div>
-
-            {/* RIGHT: Timeline + Notes */}
-            <div className="p-6 flex flex-col space-y-6">
-              {/* Description */}
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Description</p>
-                <p className="text-xs text-slate-600 leading-relaxed">{ticket.description}</p>
-              </div>
-
-              {/* Activity Log */}
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Activity Log</p>
-                <div className="space-y-2">
-                  {ticket.activity_log?.map((a, i) => (
-                    <div key={i} className="flex gap-2 items-start text-xs">
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0 mt-1.5"/>
-                      <div>
-                        <p className="font-bold text-slate-700">{a.action}</p>
-                        <p className="text-slate-400">{new Date(a.at).toLocaleString()}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {(!ticket.activity_log || ticket.activity_log.length === 0) && (
-                    <p className="text-xs text-slate-400">No activity yet.</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Internal Notes */}
-              <div className="flex flex-col flex-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Internal Notes <span className="text-slate-300">(Admin Only)</span></p>
-                <div className="space-y-2 mb-3 flex-1">
-                  {notes.map((n, i) => (
-                    <div key={i} className="bg-amber-50 rounded-xl p-3 text-xs text-amber-800">{n}</div>
-                  ))}
-                  {notes.length === 0 && <p className="text-xs text-slate-400">No internal notes.</p>}
-                </div>
-                <div className="flex gap-2 mt-auto">
-                  <input value={note} onChange={e => setNote(e.target.value)} placeholder="Add an internal note..." className="flex-1 bg-slate-50 rounded-xl px-3 py-2 text-xs outline-none border border-slate-100 focus:ring-2 focus:ring-blue-100"/>
-                  <button onClick={() => { if(note.trim()) { setNotes(p => [...p, note]); setNote(""); }}} className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all">
-                    <Plus size={14}/>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer Actions */}
-        <div className="p-4 border-t border-slate-100 flex gap-3 shrink-0">
-          <button onClick={() => onUpdate(ticket._id, status, resNotes)} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all">
-            Save Changes
-          </button>
-          <button onClick={() => onUpdate(ticket._id, 'Resolved', resNotes)} className="flex-1 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-600 hover:text-white transition-all">
-            Mark Resolved
-          </button>
-          <button onClick={() => onUpdate(ticket._id, 'Closed', resNotes)} className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition-all">
-            Close Ticket
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
-export default function TicketsSystem() {
-  const [tickets, setTickets] = useState([]);
+export default function VerificationCenter() {
+  const [activeTab, setActiveTab] = useState("new_properties"); // "new_properties" | "property_edits" | "room_edits"
+  const [newProperties, setNewProperties] = useState([]);
+  const [propertyEdits, setPropertyEdits] = useState([]);
+  const [roomEdits, setRoomEdits] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState(null);
-  const [search, setSearch] = useState("");
-  const [priorityF, setPriorityF] = useState("All");
-  const [statusF, setStatusF] = useState("All");
-  const [typeF, setTypeF] = useState("All");
-  const [assignModal, setAssignModal] = useState(null);
+  const [selectedItem, setSelectedItem] = useState(null); // { type, data }
+  const [assignModal, setAssignModal] = useState(null); // { type, id }
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const loadTickets = async () => {
+  const loadData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const res = await fetchJson("/api/superadmin/support/tickets");
-      if (res && res.success) {
-        setTickets(res.tickets || []);
+      // 1. Fetch new property requests (status: pending_approval)
+      const newPropsRes = await fetchJson("/api/properties?pendingApproval=true&limit=1000");
+      if (newPropsRes.success) {
+        setNewProperties(newPropsRes.properties || []);
+      }
+
+      // 2. Fetch property edit requests (pendingChanges.status: pending)
+      const propEditsRes = await fetchJson("/api/properties?pendingChanges=true&limit=1000");
+      if (propEditsRes.success) {
+        setPropertyEdits(propEditsRes.properties || []);
+      }
+
+      // 3. Fetch room edit requests (pendingChanges.status: pending)
+      const roomEditsRes = await fetchJson("/api/rooms/all?pendingChanges=true&limit=1000");
+      if (roomEditsRes.success) {
+        setRoomEdits(roomEditsRes.rooms || []);
+      }
+
+      // 4. Fetch employees
+      const empRes = await fetchJson("/api/employees");
+      if (empRes.success) {
+        setEmployees(empRes.data || []);
       }
     } catch (err) {
-      console.error("Failed to load tickets:", err);
+      console.error("Failed to load verification center data:", err);
+      toast.error("Error loading verification requests");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadTickets();
+    loadData();
   }, []);
 
-  const filtered = useMemo(() => tickets.filter(t => {
-    const s = search.toLowerCase();
-    const matchS = !search || 
-      (t.ticket_id && t.ticket_id.toLowerCase().includes(s)) || 
-      (t.raised_by_name && t.raised_by_name.toLowerCase().includes(s)) || 
-      (t.subject && t.subject.toLowerCase().includes(s)) || 
-      (t.property_name && t.property_name.toLowerCase().includes(s));
-    const matchP = priorityF === "All" || t.priority === priorityF;
-    const matchSt = statusF === "All" || t.status === statusF;
-    const matchT = typeF === "All" || t.ticket_type === typeF;
-    return matchS && matchP && matchSt && matchT;
-  }), [tickets, search, priorityF, statusF, typeF]);
-
-  const counts = useMemo(() => {
-    const total = tickets.length;
-    return {
-      total,
-      open: tickets.filter(t => t.status === "Open").length,
-      inProgress: tickets.filter(t => t.status === "In Progress").length,
-      resolved: tickets.filter(t => t.status === "Resolved").length,
-      critical: tickets.filter(t => t.priority === "Critical").length,
-      breached: tickets.filter(t => t.sla_breached).length,
-    };
-  }, [tickets]);
-
-  const handleUpdate = async (id, newStatus, resolutionNotes = "") => {
+  // Quick Action Handlers
+  const handleApproveNewProperty = async (id) => {
     try {
-      const res = await fetchJson(`/api/superadmin/support/tickets/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({ status: newStatus, resolution_notes: resolutionNotes })
+      const res = await fetch(`${getApiUrl()}/api/properties/${id}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
       });
-      if (res && res.success) {
-        setTickets(prev => prev.map(t => t._id === id ? res.ticket : t));
+      const data = await res.json();
+      if (data.success || res.ok) {
+        toast.success("Property approved & published successfully!");
+        setNewProperties(prev => prev.filter(p => p._id !== id));
+        setSelectedItem(null);
+      } else {
+        toast.error(data.message || "Failed to approve property");
       }
-    } catch (err) {
-      console.error(err);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to approve property");
     }
-    setSelected(null);
   };
 
-  const handleAssign = async (id, admin) => {
+  const handleRejectNewProperty = async (id) => {
     try {
-      const res = await fetchJson(`/api/superadmin/support/tickets/${id}`, {
+      const res = await fetch(`${getApiUrl()}/api/properties/${id}`, {
         method: "PUT",
-        body: JSON.stringify({ assigned_admin: admin, assigned_admin_name: admin, status: "Assigned" })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "blocked", isPublished: false, isLiveOnWebsite: false })
       });
-      if (res && res.success) {
-        setTickets(prev => prev.map(t => t._id === id ? res.ticket : t));
+      const data = await res.json();
+      if (data.success || res.ok) {
+        toast.success("Property request rejected");
+        setNewProperties(prev => prev.filter(p => p._id !== id));
+        setSelectedItem(null);
+      } else {
+        toast.error(data.message || "Failed to reject property");
       }
-    } catch (err) {
-      console.error(err);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to reject property");
     }
-    setAssignModal(null);
   };
 
-  const handleExport = () => {
-    const csv = [
-      ["Ticket ID","Type","Raised By","Property","Booking","Priority","Status","Assigned","Created"],
-      ...filtered.map(t => [t.ticket_id, t.ticket_type, t.raised_by_name, t.property_name||"", t.booking_id||"", t.priority, t.status, t.assigned_admin_name||"Unassigned", t.created_at])
-    ].map(r => r.join(",")).join("\n");
-    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download="tickets.csv"; a.click();
+  const handleApprovePropertyEdit = async (id) => {
+    try {
+      const res = await fetch(`${getApiUrl()}/api/properties/${id}/approve-changes`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" }
+      });
+      const data = await res.json();
+      if (data.success || res.ok) {
+        toast.success("Property edits approved & applied live!");
+        setPropertyEdits(prev => prev.filter(p => p._id !== id));
+        setSelectedItem(null);
+      } else {
+        toast.error(data.message || "Failed to approve changes");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to approve changes");
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="p-8 text-center text-xs font-bold text-slate-400 uppercase tracking-widest py-40">
-        Loading support tickets registry...
-      </div>
-    );
-  }
+  const handleRejectPropertyEdit = async (id, reason = "Rejected by admin") => {
+    try {
+      const res = await fetch(`${getApiUrl()}/api/properties/${id}/reject-changes`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rejectReason: reason })
+      });
+      const data = await res.json();
+      if (data.success || res.ok) {
+        toast.success("Property edits rejected");
+        setPropertyEdits(prev => prev.filter(p => p._id !== id));
+        setSelectedItem(null);
+      } else {
+        toast.error(data.message || "Failed to reject changes");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to reject changes");
+    }
+  };
 
-  const isNoData = tickets.length === 0;
+  const handleApproveRoomEdit = async (id) => {
+    try {
+      const res = await fetch(`${getApiUrl()}/api/rooms/${id}/approve-changes`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" }
+      });
+      const data = await res.json();
+      if (data.success || res.ok) {
+        toast.success("Room edits approved & applied live!");
+        setRoomEdits(prev => prev.filter(r => r._id !== id));
+        setSelectedItem(null);
+      } else {
+        toast.error(data.message || "Failed to approve room changes");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to approve room changes");
+    }
+  };
+
+  const handleRejectRoomEdit = async (id) => {
+    try {
+      const res = await fetch(`${getApiUrl()}/api/rooms/${id}/reject-changes`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" }
+      });
+      const data = await res.json();
+      if (data.success || res.ok) {
+        toast.success("Room edits rejected");
+        setRoomEdits(prev => prev.filter(r => r._id !== id));
+        setSelectedItem(null);
+      } else {
+        toast.error(data.message || "Failed to reject room changes");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to reject room changes");
+    }
+  };
+
+  const handleAssignVerification = async (itemId, employeeId, employeeName) => {
+    try {
+      let endpoint = "";
+      if (activeTab === "new_properties" || activeTab === "property_edits") {
+        endpoint = `${getApiUrl()}/api/properties/${itemId}/assign-verification`;
+      } else {
+        endpoint = `${getApiUrl()}/api/rooms/${itemId}/assign-verification`;
+      }
+
+      const res = await fetch(endpoint, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId, employeeName })
+      });
+      const data = await res.json();
+
+      if (data.success || res.ok) {
+        toast.success(`Successfully assigned to ${employeeName}`);
+        
+        // Refresh local lists
+        if (activeTab === "new_properties") {
+          setNewProperties(prev => prev.map(p => p._id === itemId ? { ...p, assignedTo: employeeId, assignedToName: employeeName } : p));
+        } else if (activeTab === "property_edits") {
+          setPropertyEdits(prev => prev.map(p => p._id === itemId ? {
+            ...p,
+            pendingChanges: { ...p.pendingChanges, assignedTo: employeeId, assignedToName: employeeName }
+          } : p));
+        } else {
+          setRoomEdits(prev => prev.map(r => r._id === itemId ? {
+            ...r,
+            pendingChanges: { ...r.pendingChanges, assignedTo: employeeId, assignedToName: employeeName }
+          } : p));
+        }
+
+        setSelectedItem(null);
+        setAssignModal(null);
+        loadData();
+      } else {
+        toast.error(data.message || "Assignment failed");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to assign verification");
+    }
+  };
+
+  // Searching logic
+  const searchFilter = (items, keySelector) => {
+    if (!searchQuery) return items;
+    const query = searchQuery.toLowerCase();
+    return items.filter(item => keySelector(item).toLowerCase().includes(query));
+  };
+
+  const filteredNewProperties = useMemo(() => {
+    return searchFilter(newProperties, p => `${p.title} ${p.ownerName || ""} ${p.ownerLoginId || ""} ${p.city || ""}`);
+  }, [newProperties, searchQuery]);
+
+  const filteredPropertyEdits = useMemo(() => {
+    return searchFilter(propertyEdits, p => `${p.title} ${p.ownerName || ""} ${p.ownerLoginId || ""} ${p.city || ""}`);
+  }, [propertyEdits, searchQuery]);
+
+  const filteredRoomEdits = useMemo(() => {
+    return searchFilter(roomEdits, r => `${r.title} ${r.property?.title || ""} ${r.property?.ownerLoginId || ""}`);
+  }, [roomEdits, searchQuery]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6 min-h-full">
       <PageHeader
-        title="Tickets System"
-        subtitle="Manage all support tickets, complaints, and escalations from one place."
-        breadcrumbs={[{ label: "Support" }, { label: "Tickets System", active: true }]}
+        title="Verification & Approvals Center"
+        subtitle="Manage pending property approvals, and track room/property picture modification requests."
+        breadcrumbs={[{ label: "Support" }, { label: "Verification System", active: true }]}
         actions={
-          <button onClick={handleExport} className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-slate-50 shadow-sm">
-            <Download size={14}/> Export
+          <button onClick={loadData} className="p-2.5 rounded-xl bg-white text-slate-500 hover:text-blue-600 transition-all border border-slate-200 shadow-sm flex items-center gap-2 font-bold text-xs">
+            <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} /> Refresh
           </button>
         }
       />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+      {/* Stats Quick Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { label: "Total Tickets",  val: isNoData ? "No Data Available" : counts.total,     icon: Ticket,        color: "blue"   },
-          { label: "Open",           val: isNoData ? "No Data Available" : counts.open,      icon: AlertCircle,   color: "blue"   },
-          { label: "In Progress",    val: isNoData ? "No Data Available" : counts.inProgress,icon: Clock,         color: "amber"  },
-          { label: "Resolved",       val: isNoData ? "No Data Available" : counts.resolved,  icon: CheckCircle,   color: "emerald"},
-          { label: "Critical",       val: isNoData ? "No Data Available" : counts.critical,  icon: AlertTriangle, color: "red"    },
-          { label: "SLA Breached",   val: isNoData ? "No Data Available" : counts.breached,  icon: XCircle,       color: "rose"   },
-        ].map(c => (
-          <div key={c.label} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between min-h-[120px]">
-            <div>
-              <div className={cn("w-7 h-7 rounded-xl flex items-center justify-center mb-2", `bg-${c.color}-50 text-${c.color}-600`)}>
-                <c.icon size={14}/>
-              </div>
-              <p className="text-base font-black text-slate-900 leading-tight">{c.val}</p>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{c.label}</p>
+          { key: "new_properties", label: "New Property Approvals", count: newProperties.length, color: "blue", icon: Building2 },
+          { key: "property_edits", label: "Property Edit Requests", count: propertyEdits.length, color: "indigo", icon: FileText },
+          { key: "room_edits", label: "Room Edit Requests", count: roomEdits.length, color: "purple", icon: ImageIcon }
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={cn(
+              "p-6 rounded-3xl border text-left transition-all duration-300 relative overflow-hidden group shadow-sm flex items-center justify-between",
+              activeTab === tab.key
+                ? "bg-white border-blue-500 ring-2 ring-blue-500/10"
+                : "bg-white border-slate-100 hover:border-slate-300"
+            )}
+          >
+            <div className="space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">{tab.label}</span>
+              <p className="text-3xl font-black text-slate-900 leading-none">{tab.count}</p>
             </div>
-            <p className="text-[8px] font-bold text-blue-500/80 uppercase tracking-wider mt-2">Source: Support</p>
-          </div>
+            <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border shadow-sm",
+              activeTab === tab.key ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-slate-50 text-slate-400 border-slate-100"
+            )}>
+              <tab.icon className="w-5 h-5" />
+            </div>
+          </button>
         ))}
       </div>
 
-      {/* Filters */}
+      {/* Control Bar */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14}/>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search ticket ID, name, property..." className="w-full bg-slate-50 rounded-xl pl-9 pr-4 py-2.5 text-xs outline-none border-none focus:ring-2 focus:ring-blue-100"/>
+        <div className="relative flex-1 min-w-[280px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+          <input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search by title, owner details, location..."
+            className="w-full bg-slate-50 rounded-xl pl-9 pr-4 py-2.5 text-xs outline-none border-none focus:ring-2 focus:ring-blue-100 transition-all font-medium text-slate-700"
+          />
         </div>
-        <select value={priorityF} onChange={e => setPriorityF(e.target.value)} className="bg-slate-50 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-600 outline-none border-none focus:ring-2 focus:ring-blue-100">
-          <option value="All">All Priority</option>
-          {["Low","Medium","High","Critical"].map(p => <option key={p}>{p}</option>)}
-        </select>
-        <select value={statusF} onChange={e => setStatusF(e.target.value)} className="bg-slate-50 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-600 outline-none border-none focus:ring-2 focus:ring-blue-100">
-          <option value="All">All Status</option>
-          {Object.keys(STATUS_CFG).map(s => <option key={s}>{s}</option>)}
-        </select>
-        <select value={typeF} onChange={e => setTypeF(e.target.value)} className="bg-slate-50 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-600 outline-none border-none focus:ring-2 focus:ring-blue-100">
-          <option value="All">All Types</option>
-          {["Tenant Complaint","Owner Complaint","Booking Dispute","Payment Issue","Property Issue","Move-in Issue","Refund Request","Technical Issue","Other"].map(t => <option key={t}>{t}</option>)}
-        </select>
-        <span className="text-xs font-bold text-slate-400 ml-auto">{filtered.length} tickets</span>
+        <span className="text-xs font-bold text-slate-400 ml-auto">
+          {activeTab === "new_properties" && `${filteredNewProperties.length} pending properties`}
+          {activeTab === "property_edits" && `${filteredPropertyEdits.length} property edits`}
+          {activeTab === "room_edits" && `${filteredRoomEdits.length} room edits`}
+        </span>
       </div>
 
-      {/* Table */}
+      {/* List Ledger */}
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
+            <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
               <tr>
-                <th className="px-5 py-4 text-left">Ticket</th>
-                <th className="px-5 py-4 text-left">Type</th>
-                <th className="px-5 py-4 text-left">Raised By</th>
-                <th className="px-5 py-4 text-left">Property</th>
-                <th className="px-5 py-4 text-left">Priority</th>
-                <th className="px-5 py-4 text-left">Status</th>
-                <th className="px-5 py-4 text-left">Assigned</th>
+                <th className="px-5 py-4 text-left">Property / Room Details</th>
+                <th className="px-5 py-4 text-left">Owner Details</th>
+                <th className="px-5 py-4 text-left">Location</th>
+                <th className="px-5 py-4 text-left">Assigned Employee</th>
+                <th className="px-5 py-4 text-left">Date Requested</th>
                 <th className="px-5 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filtered.length === 0 ? (
-                <tr><td colSpan={8} className="px-6 py-16 text-center text-sm text-slate-400">No Data Available</td></tr>
-              ) : filtered.map(t => (
-                <tr key={t._id} className={cn("hover:bg-slate-50/60 transition-colors", t.sla_breached && "bg-red-50/30")}>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-2">
-                      {t.sla_breached && <AlertTriangle size={12} className="text-red-500 shrink-0"/>}
-                      <div>
-                        <p className="font-mono font-bold text-blue-600 text-xs">{t.ticket_id}</p>
-                        <p className="text-[10px] text-slate-400 truncate max-w-[150px]">{t.subject}</p>
+              {/* Tab 1: New Properties */}
+              {activeTab === "new_properties" && (
+                filteredNewProperties.length === 0 ? (
+                  <tr><td colSpan={6} className="px-6 py-20 text-center text-xs font-bold text-slate-400 uppercase">No property approvals pending</td></tr>
+                ) : filteredNewProperties.map(p => (
+                  <tr key={p._id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                          <Building2 size={16} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-800 text-xs">{p.title || "No Title"}</p>
+                          <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">{p.propertyType || "Property"}</p>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">{t.ticket_type}</span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-[9px] font-black shrink-0">
-                        {t.raised_by_name?.split(" ").map(n=>n[0]).join("")}
-                      </div>
-                      <span className="text-xs font-bold text-slate-800">{t.raised_by_name}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    {t.property_name
-                      ? <span className="text-xs text-slate-600 flex items-center gap-1"><Building2 size={11} className="text-slate-300"/>{t.property_name}</span>
-                      : <span className="text-xs text-slate-300">—</span>
-                    }
-                  </td>
-                  <td className="px-5 py-4"><PriorityDot priority={t.priority}/></td>
-                  <td className="px-5 py-4"><Badge label={t.status} cfg={STATUS_CFG[t.status]}/></td>
-                  <td className="px-5 py-4">
-                    {t.assigned_admin_name
-                      ? <span className="text-xs font-bold text-slate-700 flex items-center gap-1"><UserCheck size={11} className="text-emerald-500"/>{t.assigned_admin_name}</span>
-                      : <button onClick={() => setAssignModal(t._id)} className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1"><Plus size={11}/>Assign</button>
-                    }
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-1 justify-end">
-                      <button onClick={() => setSelected(t)} className="p-1.5 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="View"><Eye size={14}/></button>
-                      {!t.assigned_admin_name && (
-                        <button onClick={() => setAssignModal(t._id)} className="p-1.5 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Assign"><UserCheck size={14}/></button>
+                    </td>
+                    <td className="px-5 py-4">
+                      <p className="text-xs font-bold text-slate-700">{p.ownerName || "Unknown Owner"}</p>
+                      <p className="text-[10px] text-slate-400 font-medium font-mono mt-0.5">{p.ownerLoginId || "N/A"}</p>
+                    </td>
+                    <td className="px-5 py-4">
+                      <p className="text-xs font-semibold text-slate-600 flex items-center gap-1"><MapPin size={11} className="text-slate-400" /> {p.city || "N/A"}</p>
+                    </td>
+                    <td className="px-5 py-4">
+                      {p.assignedToName ? (
+                        <span className="text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5"><User size={11} /> {p.assignedToName}</span>
+                      ) : (
+                        <button onClick={() => setAssignModal({ type: "property", id: p._id })} className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1"><UserPlus size={11} /> Assign Verification</button>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-5 py-4 text-xs text-slate-500 font-semibold">
+                      {new Date(p.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => setSelectedItem({ type: "new_property", data: p })} className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1">
+                          <Eye size={12} /> View
+                        </button>
+                        <button onClick={() => handleApproveNewProperty(p._id)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase transition-all">
+                          Approve
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+
+              {/* Tab 2: Property Edits */}
+              {activeTab === "property_edits" && (
+                filteredPropertyEdits.length === 0 ? (
+                  <tr><td colSpan={6} className="px-6 py-20 text-center text-xs font-bold text-slate-400 uppercase">No property edit requests pending</td></tr>
+                ) : filteredPropertyEdits.map(p => (
+                  <tr key={p._id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
+                          <FileText size={16} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-800 text-xs">{p.title || "No Title"}</p>
+                          <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">Edit Request</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <p className="text-xs font-bold text-slate-700">{p.ownerName || "Unknown Owner"}</p>
+                      <p className="text-[10px] text-slate-400 font-medium font-mono mt-0.5">{p.ownerLoginId || "N/A"}</p>
+                    </td>
+                    <td className="px-5 py-4">
+                      <p className="text-xs font-semibold text-slate-600 flex items-center gap-1"><MapPin size={11} className="text-slate-400" /> {p.city || "N/A"}</p>
+                    </td>
+                    <td className="px-5 py-4">
+                      {p.pendingChanges?.assignedToName ? (
+                        <span className="text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5"><User size={11} /> {p.pendingChanges.assignedToName}</span>
+                      ) : (
+                        <button onClick={() => setAssignModal({ type: "property", id: p._id })} className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1"><UserPlus size={11} /> Assign Verification</button>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-xs text-slate-500 font-semibold">
+                      {p.pendingChanges?.requestedAt ? new Date(p.pendingChanges.requestedAt).toLocaleDateString() : "N/A"}
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => setSelectedItem({ type: "property_edit", data: p })} className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1">
+                          <Eye size={12} /> Compare
+                        </button>
+                        <button onClick={() => handleApprovePropertyEdit(p._id)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase transition-all">
+                          Approve
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+
+              {/* Tab 3: Room Edits */}
+              {activeTab === "room_edits" && (
+                filteredRoomEdits.length === 0 ? (
+                  <tr><td colSpan={6} className="px-6 py-20 text-center text-xs font-bold text-slate-400 uppercase">No room edit requests pending</td></tr>
+                ) : filteredRoomEdits.map(r => (
+                  <tr key={r._id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100">
+                          <ImageIcon size={16} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-800 text-xs">Room: {r.title || "No Title"}</p>
+                          <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">{r.property?.title || "Property"}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <p className="text-xs font-bold text-slate-700">Owner ID</p>
+                      <p className="text-[10px] text-slate-400 font-medium font-mono mt-0.5">{r.property?.ownerLoginId || "N/A"}</p>
+                    </td>
+                    <td className="px-5 py-4">
+                      <p className="text-xs font-semibold text-slate-600 flex items-center gap-1"><MapPin size={11} className="text-slate-400" /> {r.property?.city || "N/A"}</p>
+                    </td>
+                    <td className="px-5 py-4">
+                      {r.pendingChanges?.assignedToName ? (
+                        <span className="text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5"><User size={11} /> {r.pendingChanges.assignedToName}</span>
+                      ) : (
+                        <button onClick={() => setAssignModal({ type: "room", id: r._id })} className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1"><UserPlus size={11} /> Assign Verification</button>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-xs text-slate-500 font-semibold">
+                      {r.pendingChanges?.requestedAt ? new Date(r.pendingChanges.requestedAt).toLocaleDateString() : "N/A"}
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => setSelectedItem({ type: "room_edit", data: r })} className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1">
+                          <Eye size={12} /> Compare
+                        </button>
+                        <button onClick={() => handleApproveRoomEdit(r._id)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase transition-all">
+                          Approve
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Ticket Detail Panel */}
-      {selected && <TicketDetailPanel ticket={selected} onClose={() => setSelected(null)} onUpdate={handleUpdate}/>}
+      {/* Gorgeous Side-by-Side Comparison & View Details Modal */}
+      {selectedItem && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+              <div>
+                <h3 className="text-base font-black text-slate-900">
+                  {selectedItem.type === "new_property" && `Property Verification: ${selectedItem.data.title}`}
+                  {selectedItem.type === "property_edit" && `Modify Request: ${selectedItem.data.title}`}
+                  {selectedItem.type === "room_edit" && `Room Verification: ${selectedItem.data.title}`}
+                </h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">
+                  Requested by: {selectedItem.type === "new_property" ? selectedItem.data.ownerLoginId : selectedItem.data.pendingChanges?.requestedBy}
+                </p>
+              </div>
+              <button onClick={() => setSelectedItem(null)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all"><X size={18} /></button>
+            </div>
 
-      {/* Assign Modal */}
-      {assignModal && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setAssignModal(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl p-6 w-72" onClick={e => e.stopPropagation()}>
-            <h4 className="text-sm font-black text-slate-900 mb-4">Assign Admin</h4>
-            <div className="space-y-2">
-              {ADMINS.map(a => (
-                <button key={a} onClick={() => handleAssign(assignModal, a)} className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-all flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-[9px] font-black shrink-0">
-                    {a.split(" ").map(n=>n[0]).join("")}
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Type 1: New Property Details */}
+              {selectedItem.type === "new_property" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Images & Details */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Property Media</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {selectedItem.data.images?.length > 0 ? (
+                        selectedItem.data.images.map((img, i) => <img key={i} src={img} alt="" className="w-full h-32 object-cover rounded-xl border border-slate-100" />)
+                      ) : (
+                        <div className="col-span-2 py-8 bg-slate-50 rounded-xl text-center text-xs font-bold text-slate-400 uppercase">No images uploaded</div>
+                      )}
+                    </div>
                   </div>
-                  {a}
-                </button>
-              ))}
+
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Details & Credentials</h4>
+                    <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 space-y-3.5">
+                      {[
+                        { label: "Property Name", val: selectedItem.data.title },
+                        { label: "City", val: selectedItem.data.city },
+                        { label: "Locality", val: selectedItem.data.locality },
+                        { label: "Full Address", val: selectedItem.data.address },
+                        { label: "Monthly Rent", val: `₹${selectedItem.data.monthlyRent || 0}` },
+                        { label: "Furnishing status", val: selectedItem.data.propertyDetails?.propertyAge || "Standard" }
+                      ].map(f => (
+                        <div key={f.label} className="flex justify-between text-xs items-start">
+                          <span className="text-slate-400 font-bold shrink-0">{f.label}:</span>
+                          <span className="text-slate-800 font-bold text-right ml-4">{f.val}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Type 2: Property Changes (Side-by-Side comparison) */}
+              {selectedItem.type === "property_edit" && (
+                <div className="space-y-6">
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5"><Info size={14} className="text-indigo-500" /> Requested Modifications (Old vs New)</h4>
+                  
+                  <div className="border border-slate-100 rounded-2xl overflow-hidden shadow-inner">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 font-bold text-slate-400 uppercase tracking-wider text-[9px] border-b border-slate-100">
+                        <tr>
+                          <th className="px-4 py-3 text-left">Field</th>
+                          <th className="px-4 py-3 text-left">Current Live Value</th>
+                          <th className="px-4 py-3 text-left bg-blue-50/30 text-blue-600">Requested Edit Value</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {Object.keys(selectedItem.data.pendingChanges?.data || {}).map(field => {
+                          const liveVal = selectedItem.data[field];
+                          const requestedVal = selectedItem.data.pendingChanges.data[field];
+                          
+                          if (field === 'images') {
+                            return (
+                              <tr key={field}>
+                                <td className="px-4 py-4 font-bold text-slate-400 uppercase tracking-wider text-[9px]">Gallery Images</td>
+                                <td className="px-4 py-4">
+                                  <div className="flex gap-1.5 overflow-x-auto max-w-[260px] pb-1">
+                                    {(liveVal || []).map((img, i) => <img key={i} src={img} className="w-12 h-10 object-cover rounded-lg" />)}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4 bg-blue-50/10">
+                                  <div className="flex gap-1.5 overflow-x-auto max-w-[260px] pb-1">
+                                    {(requestedVal || []).map((img, i) => <img key={i} src={img} className="w-12 h-10 object-cover rounded-lg border border-blue-200" />)}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return (
+                            <tr key={field}>
+                              <td className="px-4 py-3 font-bold text-slate-400 uppercase tracking-wider text-[9px]">{field}</td>
+                              <td className="px-4 py-3 font-semibold text-slate-500">{typeof liveVal === 'object' ? JSON.stringify(liveVal) : String(liveVal || '—')}</td>
+                              <td className="px-4 py-3 font-black text-blue-600 bg-blue-50/10">{typeof requestedVal === 'object' ? JSON.stringify(requestedVal) : String(requestedVal || '—')}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Type 3: Room Changes (Side-by-Side comparison) */}
+              {selectedItem.type === "room_edit" && (
+                <div className="space-y-6">
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5"><Info size={14} className="text-purple-500" /> Requested Room Modifications (Old vs New)</h4>
+
+                  <div className="border border-slate-100 rounded-2xl overflow-hidden shadow-inner">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 font-bold text-slate-400 uppercase tracking-wider text-[9px] border-b border-slate-100">
+                        <tr>
+                          <th className="px-4 py-3 text-left">Field</th>
+                          <th className="px-4 py-3 text-left">Current Live Value</th>
+                          <th className="px-4 py-3 text-left bg-blue-50/30 text-blue-600">Requested Edit Value</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {Object.keys(selectedItem.data.pendingChanges?.data || {}).map(field => {
+                          const liveVal = selectedItem.data[field];
+                          const requestedVal = selectedItem.data.pendingChanges.data[field];
+
+                          if (field === 'media' || field === 'images') {
+                            return (
+                              <tr key={field}>
+                                <td className="px-4 py-4 font-bold text-slate-400 uppercase tracking-wider text-[9px]">Room Media</td>
+                                <td className="px-4 py-4">
+                                  <div className="flex gap-1.5 overflow-x-auto max-w-[260px] pb-1">
+                                    {(liveVal || []).map((img, i) => <img key={i} src={typeof img === 'object' ? img.url : img} className="w-12 h-10 object-cover rounded-lg" />)}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4 bg-blue-50/10">
+                                  <div className="flex gap-1.5 overflow-x-auto max-w-[260px] pb-1">
+                                    {(requestedVal || []).map((img, i) => <img key={i} src={typeof img === 'object' ? img.url : img} className="w-12 h-10 object-cover rounded-lg border border-blue-200" />)}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return (
+                            <tr key={field}>
+                              <td className="px-4 py-3 font-bold text-slate-400 uppercase tracking-wider text-[9px]">{field}</td>
+                              <td className="px-4 py-3 font-semibold text-slate-500">{typeof liveVal === 'object' ? JSON.stringify(liveVal) : String(liveVal || '—')}</td>
+                              <td className="px-4 py-3 font-black text-blue-600 bg-blue-50/10">{typeof requestedVal === 'object' ? JSON.stringify(requestedVal) : String(requestedVal || '—')}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex gap-3 justify-end shrink-0">
+              <button onClick={() => setSelectedItem(null)} className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all">Cancel</button>
+              
+              {selectedItem.type === "new_property" && (
+                <>
+                  <button onClick={() => setAssignModal({ type: "property", id: selectedItem.data._id })} className="px-4 py-2 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-all flex items-center gap-1.5"><UserPlus size={14} /> Assign Verification</button>
+                  <button onClick={() => handleRejectNewProperty(selectedItem.data._id)} className="px-4 py-2 bg-rose-50 border border-rose-100 text-rose-700 rounded-xl text-xs font-bold hover:bg-rose-100 transition-all">Reject</button>
+                  <button onClick={() => handleApproveNewProperty(selectedItem.data._id)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all flex items-center gap-1.5"><Check size={14} /> Approve</button>
+                </>
+              )}
+
+              {selectedItem.type === "property_edit" && (
+                <>
+                  <button onClick={() => setAssignModal({ type: "property", id: selectedItem.data._id })} className="px-4 py-2 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-all flex items-center gap-1.5"><UserPlus size={14} /> Assign Verification</button>
+                  <button onClick={() => handleRejectPropertyEdit(selectedItem.data._id)} className="px-4 py-2 bg-rose-50 border border-rose-100 text-rose-700 rounded-xl text-xs font-bold hover:bg-rose-100 transition-all">Reject Changes</button>
+                  <button onClick={() => handleApprovePropertyEdit(selectedItem.data._id)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all flex items-center gap-1.5"><Check size={14} /> Approve Changes</button>
+                </>
+              )}
+
+              {selectedItem.type === "room_edit" && (
+                <>
+                  <button onClick={() => setAssignModal({ type: "room", id: selectedItem.data._id })} className="px-4 py-2 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-all flex items-center gap-1.5"><UserPlus size={14} /> Assign Verification</button>
+                  <button onClick={() => handleRejectRoomEdit(selectedItem.data._id)} className="px-4 py-2 bg-rose-50 border border-rose-100 text-rose-700 rounded-xl text-xs font-bold hover:bg-rose-100 transition-all">Reject Changes</button>
+                  <button onClick={() => handleApproveRoomEdit(selectedItem.data._id)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all flex items-center gap-1.5"><Check size={14} /> Approve Changes</button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Employee Popup Modal */}
+      {assignModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <h4 className="text-sm font-black text-slate-800">Assign Verification Task</h4>
+              <button onClick={() => setAssignModal(null)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg"><X size={16} /></button>
+            </div>
+            
+            <div className="p-4 overflow-y-auto space-y-2 flex-1">
+              {employees.length === 0 ? (
+                <p className="text-xs font-bold text-slate-400 text-center py-6">No active employees found.</p>
+              ) : (
+                employees.map(emp => (
+                  <button
+                    key={emp._id}
+                    onClick={() => handleAssignVerification(assignModal.id, emp._id, emp.name)}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-blue-500 hover:bg-blue-50/40 transition-all text-left group"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-blue-600 flex items-center justify-center text-[10px] font-black shrink-0">
+                      {emp.name?.split(" ").map(n=>n[0]).join("")}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">{emp.name}</p>
+                      <p className="text-[10px] text-slate-400 font-mono mt-0.5">{emp.loginId} • {emp.role}</p>
+                    </div>
+                  </button>
+                ))
+              )}
             </div>
           </div>
         </div>

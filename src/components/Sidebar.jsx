@@ -110,12 +110,7 @@ const NAV = [
             { label: "Payment Tracking", path: "/superadmin/accounting/tracking" },
           ]
         },
-        { 
-          label: "Owner Accounts", 
-          children: [
-            { label: "Payment History", path: "/superadmin/accounting/transactions" },
-          ]
-        },
+
         { 
           label: "Owner Payout", 
           children: [
@@ -216,12 +211,11 @@ const NAV = [
         { label: "Overview", path: "/superadmin/complaint-history" },
         { label: "Tenants Complaints", path: "/superadmin/complaints/tenants" },
         { label: "Owners Complaints", path: "/superadmin/complaints/owners" },
-        { label: "Tickets System", path: "/superadmin/support/tickets" },
         { label: "Website Queries", path: "/superadmin/support/website-queries" },
+        { label: "Verification System", path: "/superadmin/support/tickets" },
         { label: "Issues Resolution Tracking", path: "/superadmin/support/resolution" },
     ]
   },
-  { label: "Pricing & Plans", id: "subscription_control", icon: ShieldCheck, path: "/superadmin/pricing" },
   { label: "Settings", id: "settings", icon: Settings, path: "/superadmin/settings" },
 ];
 

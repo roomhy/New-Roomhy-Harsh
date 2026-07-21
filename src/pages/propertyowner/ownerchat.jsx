@@ -57,6 +57,17 @@ export default function OwnerChat() {
           const isGenMatch = genUserId && String(genUserId).toLowerCase() === targetClean;
           return isEmailMatch || isUserIdMatch || isGenMatch;
         });
+
+        if (match) {
+          try {
+            const propRes = await apiFetch(`/api/properties/${match.property_id}`);
+            if (propRes && propRes.success && propRes.property) {
+              match.securityDepositAmount = parseFloat(propRes.property.pricing?.securityDeposit || "0") || 0;
+            }
+          } catch (propErr) {
+            console.error("Failed to fetch property details for security deposit", propErr);
+          }
+        }
         setAssociatedBooking(match || null);
       } else {
         setAssociatedBooking(null);
@@ -69,12 +80,20 @@ export default function OwnerChat() {
 
   const handleSendPaymentLink = async () => {
     if (!associatedBooking || !activeChat) return;
-    const amount = associatedBooking.rent_amount || associatedBooking.bid_amount || 0;
+    const rentAmount = associatedBooking.rent_amount || associatedBooking.bid_amount || 0;
+    const depositAmount = associatedBooking.securityDepositAmount || 0;
+    const amount = rentAmount + depositAmount;
     const propertyName = associatedBooking.property_name || "property";
     const tenantName = associatedBooking.name || activeChat.participant_name || "Tenant";
     const bookingId = associatedBooking._id;
     const paymentUrl = `${window.location.origin}/website/pay?bookingId=${bookingId}&amount=${amount}`;
-    const paymentMessage = `Dear ${tenantName}, please complete the payment of ₹${amount} to secure your booking for "${propertyName}". 💳 You can pay securely via Razorpay here: ${paymentUrl}`;
+    
+    let paymentMessage = "";
+    if (depositAmount > 0) {
+      paymentMessage = `Dear ${tenantName}, please complete the onboarding payment of ₹${amount} (includes First Month Rent ₹${rentAmount} + Security Deposit ₹${depositAmount}) to secure your booking for "${propertyName}". 💳 You can pay securely via Razorpay here: ${paymentUrl}`;
+    } else {
+      paymentMessage = `Dear ${tenantName}, please complete the payment of ₹${amount} to secure your booking for "${propertyName}". 💳 You can pay securely via Razorpay here: ${paymentUrl}`;
+    }
 
     setIsSending(true);
 

@@ -23,6 +23,7 @@ export default function BookingRequestPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRequestForView, setSelectedRequestForView] = useState(null);
+  const [activeTab, setActiveTab] = useState("direct");
 
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [approvingItem, setApprovingItem] = useState(null);
@@ -97,10 +98,17 @@ export default function BookingRequestPage() {
     }
   };
 
-  const filteredRequests = requests.filter(r => 
-    (r.name || "").toLowerCase().includes(search.toLowerCase()) ||
-    (r.property_name || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredRequests = requests.filter(r => {
+    const matchesSearch = (r.name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (r.property_name || "").toLowerCase().includes(search.toLowerCase());
+    if (!matchesSearch) return false;
+    
+    if (activeTab === "bid") {
+      return r.request_type === "bid";
+    } else {
+      return r.request_type !== "bid";
+    }
+  });
 
   return (
     <PropertyOwnerLayout 
@@ -122,8 +130,7 @@ export default function BookingRequestPage() {
           Refresh
         </button>
       </div>
-
-      {/* Toolbar */}
+      {/* Toolbar & Search */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -134,6 +141,26 @@ export default function BookingRequestPage() {
             className="w-full h-10 pl-9 pr-3 rounded-xl bg-card border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground"
           />
         </div>
+      </div>
+
+      {/* Tab Switcher */}
+      <div className="flex gap-1 bg-slate-100 dark:bg-slate-900 rounded-2xl p-1 w-fit mb-6">
+        <button
+          onClick={() => setActiveTab("direct")}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${
+            activeTab === "direct" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          Direct Bookings ({requests.filter(r => r.request_type !== 'bid').length})
+        </button>
+        <button
+          onClick={() => setActiveTab("bid")}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${
+            activeTab === "bid" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          Bidding ({requests.filter(r => r.request_type === 'bid').length})
+        </button>
       </div>
 
       {loading ? (

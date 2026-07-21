@@ -191,22 +191,16 @@ export default function NewEnquiriesPage() {
 
               <div className="border-t border-border/60 mt-6 pt-4 flex gap-2">
                 <button 
-                  onClick={() => handleAction(item._id, "followup")}
-                  className="flex-1 h-10 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all"
-                >
-                  Mark Follow-up
-                </button>
-                <button 
                   onClick={() => setSelectedEnquiry(item)}
-                  className="h-10 px-3 border border-border rounded-xl text-xs font-bold text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition"
+                  className="flex-1 h-10 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold inline-flex items-center justify-center transition"
                 >
-                  <Calendar size={14} className="mr-1" /> Visit
+                  <Calendar size={14} className="mr-1" /> Schedule Visit
                 </button>
                 <button 
                   onClick={() => handleAction(item._id, "reject")}
-                  className="size-10 border border-border rounded-xl text-rose-600 hover:bg-rose-50 inline-flex items-center justify-center transition"
+                  className="px-4 h-10 border border-border rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 inline-flex items-center justify-center transition gap-1"
                 >
-                  <XCircle size={15} />
+                  <XCircle size={15} /> Reject
                 </button>
               </div>
             </div>

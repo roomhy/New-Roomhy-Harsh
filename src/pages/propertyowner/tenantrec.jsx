@@ -679,6 +679,17 @@ export default function TenantRec() {
         console.log("DEBUG loadRooms: final roomList =", roomList);
         setRooms(roomList);
 
+        const selectedPropObj = properties.find(p => p._id === roomAssignment.propertyId || p.visitId === roomAssignment.propertyId || p.propertyId === roomAssignment.propertyId);
+        if (selectedPropObj) {
+          const propDeposit = selectedPropObj.pricing?.securityDeposit || selectedPropObj.securityDeposit || "";
+          if (propDeposit) {
+            setTenancyDetails(prev => ({
+              ...prev,
+              depositAmount: prev.depositAmount || String(propDeposit)
+            }));
+          }
+        }
+
         // Auto-fill logic if a room is already selected via URL
         if (roomAssignment.roomUnit) {
           const selectedRoom = roomList.find(r => r.title === roomAssignment.roomUnit);

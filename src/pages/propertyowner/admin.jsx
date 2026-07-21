@@ -345,8 +345,8 @@ export default function Admin() {
 
   // Sum of agreedRent from all active tenants — this is the true "expected" monthly figure
   const monthlyRentExpected = useMemo(
-    () => tenants.reduce((sum, t) => sum + (Number(t.agreedRent) || 0), 0),
-    [tenants]
+    () => tenants.reduce((sum, t) => sum + (Number(t.agreedRent) || 0), 0) + (collectionStats?.totalPenalty || 0),
+    [tenants, collectionStats]
   );
 
   // Total actually collected in the last 7 days (from chart API data)

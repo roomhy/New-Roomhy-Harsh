@@ -133,7 +133,9 @@ export const useTenantProfile = () => {
         roomNo:             tenant.roomNo           || profile.roomNo          || "",
         accommodationType:  details.accommodationType|| profile.accommodationType|| tenant.roomType || "",
         agreedRent:         rentDisplay,
-        securityDeposit:    details.securityDeposit != null ? String(details.securityDeposit) : (tenant.securityDepositTotal ? String(tenant.securityDepositTotal) : ""),
+        securityDeposit:    (details.securityDeposit != null && details.securityDeposit !== "" && details.securityDeposit !== "0")
+          ? String(details.securityDeposit)
+          : (tenant.securityDepositTotal ? String(tenant.securityDepositTotal) : (tenant.property?.pricing?.securityDeposit || tenant.property?.securityDeposit || "")),
         moveInDate:         tenant.moveInDate ? String(tenant.moveInDate).slice(0, 10) : (profile.moveInDate || ""),
         licenseDuration:    details.licenseDuration || "",
         licenseEndDate:     details.licenseEndDate  || "",
