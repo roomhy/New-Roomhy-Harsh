@@ -34,7 +34,17 @@ export default function NewEnquiriesPage() {
           const s = status.toLowerCase();
           return s === "new" || s === "pending" || s === "request to connect" || s === "";
         };
-        setEnquiries(data.filter(e => isNew(e.status)));
+        const isBookingOrBidding = (item) => {
+          const type = String(item.type || item.enquiryType || item.source || item.category || "").toLowerCase();
+          const notes = String(item.notes || "").toLowerCase();
+          const interest = String(item.interest || "").toLowerCase();
+          
+          const isBid = type.includes("bid") || notes.includes("bid") || item.bidAmount != null || item.isBid;
+          const isBooking = type.includes("book") || notes.includes("book") || interest.includes("book") || item.bookingAmount != null || item.isBooking;
+          
+          return isBid || isBooking;
+        };
+        setEnquiries(data.filter(e => isNew(e.status) && isBookingOrBidding(e)));
       }
     } catch (err) {
       console.error("Error fetching enquiries:", err);

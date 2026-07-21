@@ -73,7 +73,6 @@ export const PROPERTY_OWNER_NAV = [
       { label: "Electricity Readings", href: "/propertyowner/electricity-readings", goldOnly: false },
       { label: "Security Deposits", href: "/propertyowner/security-deposits", goldOnly: false },
       { label: "Refunds", href: "/propertyowner/refunds", goldOnly: false },
-      { label: "Discounts & Offers", href: "/propertyowner/discounts-offers", goldOnly: false },
       { label: "Penalty Settings", href: "/propertyowner/penalty-config", goldOnly: false },
     ]
   },
@@ -127,16 +126,6 @@ export const PROPERTY_OWNER_NAV = [
     submenus: [
       { label: "Chat", href: "/propertyowner/ownerchat", goldOnly: false },
       { label: "WhatsApp Broadcast", href: "/propertyowner/whatsapp", goldOnly: false },
-    ]
-  },
-  {
-    label: "Marketing",
-    icon: Globe,
-    href: "/propertyowner/vacancy-promotion",
-    submenus: [
-      { label: "Vacancy Promotion", href: "/propertyowner/vacancy-promotion", goldOnly: false },
-      { label: "Banners & Posters", href: "/propertyowner/banners-posters", goldOnly: false },
-      { label: "Coupons & Offers", href: "/propertyowner/coupons-offers", goldOnly: false },
     ]
   },
   {
